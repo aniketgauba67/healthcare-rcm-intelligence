@@ -125,6 +125,12 @@ def validate_postgres(engine, frames: StarFrames) -> list[CheckResult]:
 
         results = run_violation_checks(scalar, f"{_SCHEMA}.")
         results += run_count_reconciliation(scalar, expected_counts(frames), f"{_SCHEMA}.")
+    # Independent source reconciliation (parity with the offline path): compare
+    # against a fresh read of the raw validated Parquet, not just the frames.
+    ip = pd.read_parquet(DATA_VALIDATED / "inpatient.parquet")
+    results += reconcile_to_source(
+        frames, raw_inpatient_lines=len(ip), source_distinct_claims=ip["CLM_ID"].nunique()
+    )
     for c in results:
         log_event(
             _LOGGER,

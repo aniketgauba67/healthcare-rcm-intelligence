@@ -39,28 +39,31 @@ def pg_engine():
     return engine
 
 
-def test_warehouse_load_and_acceptance_checks(pg_engine):
+def _load_once(engine, frames):
+    apply_ddl(engine)  # idempotent: drops + recreates every table
+    load_frames(engine, frames)
+    return validate_postgres(engine, frames)
+
+
+def test_warehouse_acceptance_and_idempotency(pg_engine):
+    """Load into live Postgres, assert all acceptance checks, then re-load and
+    confirm identical counts (idempotent) with all checks still green."""
     if not (DATA_VALIDATED / "inpatient.parquet").exists():
         pytest.skip("validated Parquet missing; run `make ingest && make stage` first")
 
     frames = build_star()
-    apply_ddl(pg_engine)  # idempotent: drops + recreates
-    load_frames(pg_engine, frames)
 
-    checks = validate_postgres(pg_engine, frames)
+    checks = _load_once(pg_engine, frames)
     failed = [c.name for c in checks if not c.passed]
     assert not failed, f"live-Postgres acceptance checks failed: {failed}"
-    # Sanity: the full suite ran (FKs + uniqueness + date order + money + counts).
+    # Full suite ran: FKs + uniqueness + date order + money + counts + reconcile.
     assert len(checks) >= 30
+    counts = {c.name: c.detail for c in checks if c.name.startswith("count:")}
 
+    # Release pooled connections before the drop/recreate to avoid lock contention.
+    pg_engine.dispose()
 
-def test_warehouse_load_is_idempotent(pg_engine):
-    """A second full apply+load produces identical counts (no duplication)."""
-    if not (DATA_VALIDATED / "inpatient.parquet").exists():
-        pytest.skip("validated Parquet missing; run `make ingest && make stage` first")
-
-    frames = build_star()
-    apply_ddl(pg_engine)
-    load_frames(pg_engine, frames)
-    checks = validate_postgres(pg_engine, frames)
-    assert not [c.name for c in checks if not c.passed]
+    checks2 = _load_once(pg_engine, frames)
+    assert not [c.name for c in checks2 if not c.passed]
+    counts2 = {c.name: c.detail for c in checks2 if c.name.startswith("count:")}
+    assert counts == counts2, "re-load changed row counts (not idempotent)"

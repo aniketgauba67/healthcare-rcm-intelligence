@@ -33,8 +33,10 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   EXACTLY to raw: beneficiary_2024.parquet 9,660 rows/185 cols/3 date cols;
   inpatient.parquet 58,066 rows/197 cols/33 date cols. 0 unparseable dates.
   Codes/ids/ZIP/NPI/CCN kept as text (leading zeros + signs preserved).
-- [~] PostgreSQL DDL: facts, dims, constraints, indexes, Unknown members
-  — data-engineer, feat/phase1-ingestion; DDL + loader done, awaiting qa review.
+- [x] PostgreSQL DDL: facts, dims, constraints, indexes, Unknown members
+  — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (7002243,
+  qa verified live PG16 independently). Live-load delta 7cc1dab (env-loading +
+  integration test + independent live reconciliation) sent for qa delta-ack.
   sql/ddl/ (00_schema,10_dimensions,20_facts): star schema — dim_date/beneficiary/
   provider/drg/discharge_status (each with Unknown member key 0) + fact_inpatient_
   claim (header grain), fact_claim_revenue_line (line), fact_claim_diagnosis
