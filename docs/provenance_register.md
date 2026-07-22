@@ -67,3 +67,10 @@ CCNs/NPIs, and every row is a seeded random assignment (seed
 `config/simulation.yaml:linkage.crosswalk_seed`), classified SIMULATED — never
 presented as a real correspondence (CLAUDE.md §3.4). All non-`sim_` warehouse
 columns remain SOURCE/DERIVED.
+
+Reproducibility guarantee: the crosswalk is byte-identical for the same
+`crosswalk_seed` **and** the same reference vintages. The facility/provider
+reference vintages are pinned in `config/sources.yaml` (`hospital_general_information`
+2026-04, `medicare_providers` 2024); re-pulling a reference at a new vintage will
+change the assignment. The crosswalk integrity checks (FK, provenance, counts)
+run identically against live Postgres and the DuckDB CI mirror.

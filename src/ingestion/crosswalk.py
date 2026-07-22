@@ -132,6 +132,20 @@ class CrosswalkResult:
     provider: pd.DataFrame
     report: dict[str, object] = field(default_factory=dict)
 
+    def loadable_frames(self) -> dict[str, pd.DataFrame]:
+        """Crosswalk frames with provenance + seed columns, ready to load/check."""
+        seed = int(self.report["crosswalk_seed"])
+        out = {}
+        for name, df in (
+            ("sim_facility_crosswalk", self.facility),
+            ("sim_provider_crosswalk", self.provider),
+        ):
+            d = df.copy()
+            d["crosswalk_seed"] = seed
+            d["provenance"] = "SIMULATED"
+            out[name] = d
+        return out
+
 
 def crosswalk_seed() -> int:
     """Read the dedicated crosswalk seed from config/simulation.yaml (read-only)."""

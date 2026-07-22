@@ -58,7 +58,10 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   CI mirror (`make warehouse-check`, 37/37) so they cannot drift. 910 null-provider
   + 2,741 null-DRG claims route to Unknown (metrics, not errors).
 - [x] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
-  — data-engineer, feat/phase1-ingestion; awaiting qa review. Built per the
+  — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (1d6205a,
+  live PG verified). Merged to main. qa non-blocking notes folded into task 5:
+  crosswalk checks now in the DuckDB CI mirror (parity, 42/42), reproducibility
+  "same seed + same reference vintage" noted in provenance_register. Built per the
   team-lead+human resolution (all 3 Blocked items). References: Hospital General
   Information (5,432 facilities) + Medicare Physician by Provider (1,296,739 real
   providers, human-selected nationwide pool; full 485 MB source checksummed then

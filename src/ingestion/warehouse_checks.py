@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import duckdb
 
+import pandas as pd
+
 from .star_transform import StarFrames
 from .warehouse_sql_checks import (
     CheckResult,
     run_count_reconciliation,
+    run_crosswalk_checks,
     run_violation_checks,
 )
 
@@ -35,26 +38,40 @@ def expected_counts(frames: StarFrames) -> dict[str, int]:
     return {name: int(len(merged[name])) for name in _ALL_TABLES}
 
 
-def duckdb_star_connection(frames: StarFrames) -> duckdb.DuckDBPyConnection:
-    """In-memory DuckDB with the star schema materialized under schema `rcm`."""
+def duckdb_star_connection(
+    frames: StarFrames, crosswalk_frames: dict[str, pd.DataFrame] | None = None
+) -> duckdb.DuckDBPyConnection:
+    """In-memory DuckDB with the star schema (+ optional crosswalk) under `rcm`."""
     con = duckdb.connect()
     con.execute("create schema rcm")
-    for name, df in {**frames.dims, **frames.facts}.items():
+    tables = {**frames.dims, **frames.facts, **(crosswalk_frames or {})}
+    for name, df in tables.items():
         con.register("_stage", df)
         con.execute(f"create table rcm.{name} as select * from _stage")
         con.unregister("_stage")
     return con
 
 
-def run_integrity_checks(frames: StarFrames) -> list[CheckResult]:
-    """Run the shared violation-check SQL against the DuckDB mirror."""
-    con = duckdb_star_connection(frames)
+def run_integrity_checks(
+    frames: StarFrames, crosswalk_frames: dict[str, pd.DataFrame] | None = None
+) -> list[CheckResult]:
+    """Run the shared violation-check SQL against the DuckDB mirror.
+
+    When `crosswalk_frames` are supplied, the SIMULATED crosswalk FK/provenance/
+    count checks run here too (CI parity with the live Postgres path).
+    """
+    con = duckdb_star_connection(frames, crosswalk_frames)
 
     def scalar(sql: str) -> int:
         return con.execute(sql).fetchone()[0]
 
     results = run_violation_checks(scalar, "rcm.")
     results += run_count_reconciliation(scalar, expected_counts(frames), "rcm.")
+    if crosswalk_frames:
+        results += run_crosswalk_checks(scalar, "rcm.")
+        results += run_count_reconciliation(
+            scalar, {t: len(df) for t, df in crosswalk_frames.items()}, "rcm."
+        )
     con.close()
     return results
 

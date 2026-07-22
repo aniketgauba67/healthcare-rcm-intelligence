@@ -141,6 +141,24 @@ VIOLATION_CHECKS: list[tuple[str, str]] = [
     ("unknown_member:dim_date", "select abs(1 - count(*)) from {s}dim_date where date_key = 0"),
 ]
 
+# SIMULATED crosswalk checks — same SQL runs against live PG and the DuckDB
+# mirror so crosswalk integrity is covered in CI, not only live Postgres.
+CROSSWALK_VIOLATION_CHECKS: list[tuple[str, str]] = [
+    (
+        "xwalk_fk:sim_prvdr_num->dim_provider",
+        "select count(*) from {s}sim_facility_crosswalk x "
+        "left join {s}dim_provider d on x.sim_prvdr_num = d.prvdr_num where d.prvdr_num is null",
+    ),
+    (
+        "xwalk_provenance:sim_facility_crosswalk",
+        "select count(*) from {s}sim_facility_crosswalk where provenance <> 'SIMULATED'",
+    ),
+    (
+        "xwalk_provenance:sim_provider_crosswalk",
+        "select count(*) from {s}sim_provider_crosswalk where provenance <> 'SIMULATED'",
+    ),
+]
+
 Scalar = Callable[[str], int]
 
 
@@ -161,4 +179,13 @@ def run_count_reconciliation(
     for table, expected in expected_counts.items():
         actual = int(scalar(f"select count(*) from {schema_prefix}{table}"))
         results.append(CheckResult(f"count:{table}", actual == expected, f"{actual} vs {expected}"))
+    return results
+
+
+def run_crosswalk_checks(scalar: Scalar, schema_prefix: str = "rcm.") -> list[CheckResult]:
+    """Run the SIMULATED crosswalk violation checks (FK + provenance)."""
+    results = []
+    for name, template in CROSSWALK_VIOLATION_CHECKS:
+        violations = int(scalar(template.format(s=schema_prefix)))
+        results.append(CheckResult(name, violations == 0, f"violations={violations}"))
     return results

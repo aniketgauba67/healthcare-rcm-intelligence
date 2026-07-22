@@ -5,11 +5,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+import duckdb
+
 from src.ingestion.crosswalk import (
     SSA_TO_POSTAL,
     build_facility_crosswalk,
     build_provider_crosswalk,
 )
+from src.ingestion.warehouse_sql_checks import run_crosswalk_checks
 
 
 def test_ssa_map_covers_50_states_plus_dc():
@@ -71,3 +74,27 @@ def test_provider_crosswalk_state_coherent_and_plausible():
     # Only individual, inpatient-plausible providers are chosen (not the 'O' clinic).
     assert ph1["real_specialty"] == "Internal Medicine"
     assert bool((a["match_rule"] == "state+plausible_specialty").all())
+
+
+def test_crosswalk_checks_detect_fk_and_provenance_violations():
+    con = duckdb.connect()
+    con.execute("create schema rcm")
+    con.execute("create table rcm.dim_provider (prvdr_num text)")
+    con.execute("insert into rcm.dim_provider values ('p1')")
+    con.execute("create table rcm.sim_facility_crosswalk (sim_prvdr_num text, provenance text)")
+    con.execute("create table rcm.sim_provider_crosswalk (provenance text)")
+
+    def scalar(sql):
+        return con.execute(sql).fetchone()[0]
+
+    # Clean: p1 resolves, provenance SIMULATED.
+    con.execute("insert into rcm.sim_facility_crosswalk values ('p1', 'SIMULATED')")
+    con.execute("insert into rcm.sim_provider_crosswalk values ('SIMULATED')")
+    assert all(c.passed for c in run_crosswalk_checks(scalar, "rcm."))
+
+    # Inject an orphan FK and a bad provenance -> both checks fail.
+    con.execute("insert into rcm.sim_facility_crosswalk values ('p_missing', 'REAL')")
+    results = {c.name: c.passed for c in run_crosswalk_checks(scalar, "rcm.")}
+    assert results["xwalk_fk:sim_prvdr_num->dim_provider"] is False
+    assert results["xwalk_provenance:sim_facility_crosswalk"] is False
+    assert results["xwalk_provenance:sim_provider_crosswalk"] is True

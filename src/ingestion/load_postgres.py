@@ -21,7 +21,12 @@ from .logging_utils import get_logger, log_event
 from .paths import DATA_VALIDATED, REPO_ROOT
 from .star_transform import StarFrames, build_star
 from .warehouse_checks import expected_counts, reconcile_to_source, run_integrity_checks
-from .warehouse_sql_checks import CheckResult, run_count_reconciliation, run_violation_checks
+from .warehouse_sql_checks import (
+    CheckResult,
+    run_count_reconciliation,
+    run_crosswalk_checks,
+    run_violation_checks,
+)
 
 _LOGGER = get_logger("ingestion.warehouse")
 
@@ -126,14 +131,7 @@ def load_crosswalk(engine, *, seed: int | None = None):
     from .crosswalk import build_crosswalk
 
     result = build_crosswalk(seed=seed)
-    seed_val = int(result.report["crosswalk_seed"])
-    for name, df in (
-        ("sim_facility_crosswalk", result.facility),
-        ("sim_provider_crosswalk", result.provider),
-    ):
-        out = df.copy()
-        out["crosswalk_seed"] = seed_val
-        out["provenance"] = "SIMULATED"
+    for name, out in result.loadable_frames().items():
         out.to_sql(
             name,
             engine,
@@ -181,38 +179,21 @@ def validate_crosswalk(engine, result) -> list[CheckResult]:
     """Acceptance checks for the SIMULATED crosswalk against live Postgres."""
     from sqlalchemy import text
 
-    checks: list[CheckResult] = []
     with engine.connect() as conn:
 
         def scalar(sql: str) -> int:
             return conn.execute(text(sql)).scalar()
 
-        # FK: every synthetic billing provider resolves to a real dim_provider.
-        orphans = scalar(
-            f"select count(*) from {_SCHEMA}.sim_facility_crosswalk x "
-            f"left join {_SCHEMA}.dim_provider d on x.sim_prvdr_num = d.prvdr_num "
-            "where d.prvdr_num is null"
+        # Same shared SQL the DuckDB mirror runs (no drift).
+        checks = run_crosswalk_checks(scalar, f"{_SCHEMA}.")
+        checks += run_count_reconciliation(
+            scalar,
+            {
+                "sim_facility_crosswalk": len(result.facility),
+                "sim_provider_crosswalk": len(result.provider),
+            },
+            f"{_SCHEMA}.",
         )
-        checks.append(
-            CheckResult("xwalk_fk:sim_prvdr_num->dim_provider", orphans == 0, f"orphans={orphans}")
-        )
-        # Every crosswalk row is classified SIMULATED.
-        for tbl in _SIM_TABLES:
-            non_sim = scalar(
-                f"select count(*) from {_SCHEMA}.{tbl} where provenance <> 'SIMULATED'"
-            )
-            checks.append(
-                CheckResult(f"xwalk_provenance:{tbl}", non_sim == 0, f"non_simulated={non_sim}")
-            )
-        # Row counts match the built frames.
-        for tbl, df in (
-            ("sim_facility_crosswalk", result.facility),
-            ("sim_provider_crosswalk", result.provider),
-        ):
-            actual = scalar(f"select count(*) from {_SCHEMA}.{tbl}")
-            checks.append(
-                CheckResult(f"xwalk_count:{tbl}", actual == len(df), f"{actual} vs {len(df)}")
-            )
     for c in checks:
         log_event(
             _LOGGER,
@@ -253,9 +234,24 @@ def validate_postgres(engine, frames: StarFrames) -> list[CheckResult]:
 
 
 def run_offline_check(frames: StarFrames) -> int:
-    """Run the integrity + reconciliation suite via DuckDB (no database)."""
+    """Run the integrity + reconciliation suite via DuckDB (no database).
+
+    Includes the SIMULATED crosswalk checks when the reference files are present
+    (CI parity with the live Postgres crosswalk validation).
+    """
+    from .paths import DATA_RAW
+
     ip = pd.read_parquet(DATA_VALIDATED / "inpatient.parquet")
-    checks = run_integrity_checks(frames) + reconcile_to_source(
+    crosswalk_frames = None
+    refs = (
+        DATA_RAW / "reference" / "hospital_general_information.csv",
+        DATA_RAW / "reference" / "medicare_providers_extract.csv",
+    )
+    if all(p.exists() for p in refs):
+        from .crosswalk import build_crosswalk
+
+        crosswalk_frames = build_crosswalk().loadable_frames()
+    checks = run_integrity_checks(frames, crosswalk_frames) + reconcile_to_source(
         frames, raw_inpatient_lines=len(ip), source_distinct_claims=ip["CLM_ID"].nunique()
     )
     failed = [c for c in checks if not c.passed]
