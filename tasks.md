@@ -156,7 +156,30 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   register + data_dictionary updated in the same commit, plus new
   docs/simulated_forbidden_columns.md so ml-engineer gets the §4 leakage boundary
   without reading src/simulation/ (§4.5).
-- [ ] ACCEPTANCE (qa-reviewer): seed-reproducible, validity checks pass
+> POST-SUBMISSION DELTA (simulation-engineer, 2026-07-22): review HEAD is
+> a242cdb, not the commit list first sent. Two self-audit commits landed after
+> the review request: 3f48c18 adds a drift test that fails the build if any
+> generated column is missing from docs/simulated_forbidden_columns.md (it caught
+> 7 unclassified workflow-event columns, incl. sim_appeal_level which
+> reconstructs the label via a max), plus `make warehouse-all` and
+> `make validate-simulation`; a242cdb is simulation.yaml v0.4.0, capping the
+> late-submission tail at 540 days after it was found reaching 5.3 years past the
+> service date (mechanism unaffected — per-payer late-filing rates unchanged to
+> 4 decimals) and documenting that payer denial rates do not rank by logit_offset
+> because payer effects are multi-channel.
+> FINDING FOR PHASE 4 (raised to team-lead, owner needed): config/model.yaml
+> `forbidden_features` is a placeholder that does not match the schema that now
+> exists. It misses 14 post-submission/latent columns on sim_claim_adjudication
+> alone — including sim_provider_quality_latent, a pure answer key — plus all of
+> sim_operating_costs; and 5 of its 11 patterns match zero real columns
+> (sim_denial_reason and sim_recovered_* do not exist; adjudication_date and
+> payment_date lack the sim_ prefix the real columns carry), so they look like
+> coverage and provide none. config/model.yaml is ml-engineer's file (§5) and
+> ml-engineer is not spawned, so simulation-engineer did NOT edit it. The correct
+> list is published in docs/simulated_forbidden_columns.md. Recommendation:
+> populating forbidden_features from that doc is the FIRST task of Phase 4,
+> before any feature code, with a qa leakage test asserting the two agree.
+- [ ] ACCEPTANCE (qa-reviewer-2): seed-reproducible, validity checks pass
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
 - [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
