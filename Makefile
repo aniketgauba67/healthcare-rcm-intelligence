@@ -1,4 +1,4 @@
-.PHONY: setup ingest stage warehouse warehouse-check validate-warehouse simulate views train score dashboard api test lint demo-extract
+.PHONY: setup ingest stage contracts warehouse warehouse-check validate-warehouse simulate views train score dashboard api test lint demo-extract
 
 setup:
 	uv sync
@@ -8,6 +8,9 @@ ingest:
 
 stage:
 	uv run python -m src.validation.run
+
+contracts:
+	uv run python -m src.validation.contracts_run
 
 simulate:
 	uv run python -m src.simulation.run

@@ -25,7 +25,13 @@ from .warehouse_sql_checks import CheckResult, run_count_reconciliation, run_vio
 
 _LOGGER = get_logger("ingestion.warehouse")
 
-_DDL_FILES = ("00_schema.sql", "10_dimensions.sql", "20_facts.sql", "30_sim_crosswalk.sql")
+_DDL_FILES = (
+    "00_schema.sql",
+    "10_dimensions.sql",
+    "20_facts.sql",
+    "30_sim_crosswalk.sql",
+    "40_quarantine.sql",
+)
 _SCHEMA = "rcm"
 _SIM_TABLES = ("sim_facility_crosswalk", "sim_provider_crosswalk")
 _LOAD_ORDER_DIMS = (
@@ -140,6 +146,35 @@ def load_crosswalk(engine, *, seed: int | None = None):
         log_event(_LOGGER, "warehouse.loaded", table=name, rows=int(len(out)))
     log_event(_LOGGER, "crosswalk.report", **result.report)
     return result
+
+
+def load_quarantine(engine) -> int:
+    """Run data contracts over the validated layer and load failures to quarantine."""
+    from src.validation.contracts import check_contracts
+
+    frames = []
+    for stem in ("beneficiary_2024", "inpatient"):
+        path = DATA_VALIDATED / f"{stem}.parquet"
+        if path.exists():
+            result = check_contracts(stem, pd.read_parquet(path))
+            if not result.quarantine.empty:
+                frames.append(result.quarantine)
+    quarantine = (
+        pd.concat(frames, ignore_index=True)
+        if frames
+        else pd.DataFrame(columns=["table_name", "contract", "entity_key", "reason"])
+    )
+    quarantine.to_sql(
+        "dq_quarantine",
+        engine,
+        schema=_SCHEMA,
+        if_exists="append",
+        index=False,
+        method="multi",
+        chunksize=1000,
+    )
+    log_event(_LOGGER, "warehouse.loaded", table="dq_quarantine", rows=int(len(quarantine)))
+    return int(len(quarantine))
 
 
 def validate_crosswalk(engine, result) -> list[CheckResult]:
@@ -272,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     apply_ddl(engine)
     load_frames(engine, frames)
     xwalk = load_crosswalk(engine)
+    load_quarantine(engine)
     checks = validate_postgres(engine, frames) + validate_crosswalk(engine, xwalk)
     failed = [c.name for c in checks if not c.passed]
     log_event(

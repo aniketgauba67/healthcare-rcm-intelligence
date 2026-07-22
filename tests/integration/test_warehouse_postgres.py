@@ -16,6 +16,7 @@ from src.ingestion.load_postgres import (
     database_url,
     load_crosswalk,
     load_frames,
+    load_quarantine,
     validate_crosswalk,
     validate_postgres,
 )
@@ -45,6 +46,7 @@ def _load_once(engine, frames):
     apply_ddl(engine)  # idempotent: drops + recreates every table
     load_frames(engine, frames)
     xwalk = load_crosswalk(engine)
+    load_quarantine(engine)
     return validate_postgres(engine, frames) + validate_crosswalk(engine, xwalk)
 
 

@@ -60,6 +60,7 @@ and all `sim_`-prefixed tables are added here by their owning agents.
 | fact_claim_diagnosis | `dgns_seq`, `icd_dgns_cd`, `poa_ind_sw` | SOURCE | inpatient | unpivot of ICD_DGNS_CD1..25; keys DERIVED. |
 | **sim_facility_crosswalk** | all | **SIMULATED** | seeded assignment | synthetic billing provider (`sim_prvdr_num`, FK to dim_provider) → REAL facility CCN, stratified by state+type. Not a real linkage. |
 | **sim_provider_crosswalk** | all | **SIMULATED** | seeded assignment | synthetic attending physician (`sim_at_physn_npi`) → REAL Medicare NPI, stratified by coherent state + inpatient-plausible specialty. Not a real linkage. |
+| dq_quarantine | all | DERIVED | contract engine | one row per data-contract violation (table, contract, entity key, reason). No SOURCE values beyond the offending key. |
 
 The `sim_*_crosswalk` tables are the ONLY link between synthetic claims and real
 CCNs/NPIs, and every row is a seeded random assignment (seed

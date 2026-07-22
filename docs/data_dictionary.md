@@ -34,6 +34,27 @@ token is not the final token (e.g. `NCH_BENE_MDCR_BNFTS_EXHTD_DT_I`,
 data dictionary. Their raw text is preserved losslessly; only the type hint is
 conservative. These are rarely populated in the synthetic data.
 
+## Data contracts, quarantine, and reconciliation (`make contracts`)
+
+`src/validation/contracts.py` enforces the validated-layer contracts:
+
+| Contract | Level | Action on failure |
+|---|---|---|
+| required columns | table | fail the table |
+| key uniqueness (`BENE_ID`; `CLM_ID`+`CLM_LINE_NUM`) | table | fail the table + quarantine dup rows |
+| date ordering (`CLM_FROM_DT ≤ CLM_THRU_DT`) | row | quarantine the row |
+| non-negative money (`CLM_PMT_AMT`, `CLM_TOT_CHRG_AMT`, …) | row | quarantine the row |
+
+Failing rows are isolated in `rcm.dq_quarantine` / `data/validated/quarantine/
+quarantine.parquet` (columns: `table_name`, `contract`, `entity_key`, `reason`)
+— never silently dropped. `make contracts` also writes
+`data/validated/reconciliation_report.json` (per-table rows, contract results,
+quarantine counts, and staged-vs-source row reconciliation). On this subset:
+all contracts pass, 0 quarantined, staged rows tie to source (9,660 / 58,066).
+The staging layer additionally counts present-but-unparseable money/int values
+(`numeric_null_from_nonempty`) alongside dates, so a dirty value surfaces as a
+data-quality signal instead of a silent null.
+
 ## Raw layer — CMS Synthetic Medicare RIF (SOURCE, vintage 2023-04)
 
 Files are **pipe-delimited** (`|`) plain text. Identifiers (`BENE_ID`,

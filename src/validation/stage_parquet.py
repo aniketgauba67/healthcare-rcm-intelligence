@@ -34,11 +34,20 @@ class StageResult:
     rows_in: int
     rows_out: int
     columns: int
-    date_null_from_nonempty: dict[str, int]  # values that were present but unparseable
+    date_null_from_nonempty: dict[str, int]  # present text that failed date parse
+    numeric_null_from_nonempty: dict[str, int]  # present text that failed money/int parse
 
     @property
     def reconciles(self) -> bool:
         return self.rows_in == self.rows_out
+
+
+def _coerce_numeric(chunk: pd.DataFrame, col: str, dtype: str, bad_numeric: dict[str, int]):
+    """Coerce a column to numeric, counting present-but-unparseable values."""
+    present = chunk[col].notna()
+    coerced = pd.to_numeric(chunk[col], errors="coerce")
+    bad_numeric[col] += int((present & coerced.isna()).sum())
+    return coerced.astype(dtype)
 
 
 def _cast_chunk(
@@ -48,12 +57,13 @@ def _cast_chunk(
     money_cols: list[str],
     int_cols: list[str],
     bad_dates: dict[str, int],
+    bad_numeric: dict[str, int],
 ) -> pa.Table:
     """Cast a text chunk to the typed Arrow table for the plan's schema."""
     for col in money_cols:
-        chunk[col] = pd.to_numeric(chunk[col], errors="coerce").astype("float64")
+        chunk[col] = _coerce_numeric(chunk, col, "float64", bad_numeric)
     for col in int_cols:
-        chunk[col] = pd.to_numeric(chunk[col], errors="coerce").astype("Int64")
+        chunk[col] = _coerce_numeric(chunk, col, "Int64", bad_numeric)
     for col in date_cols:
         present = chunk[col].notna()
         parsed = pd.to_datetime(chunk[col], format=DATE_FORMAT, errors="coerce")
@@ -85,6 +95,7 @@ def stage_file(
     money_cols = columns_by_kind(plan, "money")
     int_cols = columns_by_kind(plan, "int")
     bad_dates: dict[str, int] = {c: 0 for c in date_cols}
+    bad_numeric: dict[str, int] = {c: 0 for c in (*money_cols, *int_cols)}
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_suffix(out_path.suffix + ".part")
@@ -104,7 +115,9 @@ def stage_file(
         )
         for chunk in reader:
             rows_in += len(chunk)
-            table = _cast_chunk(chunk, plan, date_cols, money_cols, int_cols, bad_dates)
+            table = _cast_chunk(
+                chunk, plan, date_cols, money_cols, int_cols, bad_dates, bad_numeric
+            )
             writer.write_table(table)
     finally:
         writer.close()
@@ -119,6 +132,7 @@ def stage_file(
         rows_out=rows_out,
         columns=len(plan),
         date_null_from_nonempty={c: n for c, n in bad_dates.items() if n},
+        numeric_null_from_nonempty={c: n for c, n in bad_numeric.items() if n},
     )
     log_event(
         _LOGGER,
@@ -128,6 +142,7 @@ def stage_file(
         rows_out=rows_out,
         reconciles=result.reconciles,
         unparseable_dates=result.date_null_from_nonempty,
+        unparseable_numeric=result.numeric_null_from_nonempty,
         out=str(out_path),
     )
     if not result.reconciles:

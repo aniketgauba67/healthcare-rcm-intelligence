@@ -86,3 +86,20 @@ def test_stage_file_types_and_reconciliation(tmp_path):
     assert list(df["BENE_ID"]) == ["-1", "-2", "-3"]
     assert str(df["CLM_FROM_DT"].iloc[0]) == "2015-03-25"
     assert df["CLM_FROM_DT"].iloc[1] is None or df["CLM_FROM_DT"].isna().iloc[1]
+
+
+def test_stage_counts_unparseable_numeric(tmp_path):
+    raw = tmp_path / "num.csv"
+    out = tmp_path / "num.parquet"
+    header = "BENE_ID|CLM_PMT_AMT|CLM_UTLZTN_DAY_CNT"
+    rows = [
+        "-1|100.00|2",
+        "-2|BADMONEY|3",  # non-empty unparseable money -> counted
+        "-3|50.00|BADINT",  # non-empty unparseable int -> counted
+    ]
+    raw.write_text("\n".join([header, *rows]) + "\n")
+
+    result = stage_file("num", raw, out)
+    assert result.reconciles
+    # Present-but-unparseable money/int values are counted, not silently nulled.
+    assert result.numeric_null_from_nonempty == {"CLM_PMT_AMT": 1, "CLM_UTLZTN_DAY_CNT": 1}

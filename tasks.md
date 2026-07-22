@@ -71,7 +71,18 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   provider rows, 100% same-state (facility state+type; provider coherent-state +
   inpatient-plausible specialty). NPPES RI extract reclassified to validation
   sample. provenance_register + data_dictionary updated same commit.
-- [ ] Data-contract tests + quarantine table + reconciliation report
+- [x] Data-contract tests + quarantine table + reconciliation report
+  — data-engineer, feat/phase1-ingestion; awaiting qa review. src/validation/
+  contracts.py: required-columns, key-uniqueness, date-order (CLM_FROM_DT<=THRU),
+  non-negative money; table-level checks gate the table, row-level failures →
+  quarantine (never silently dropped). `make contracts` writes quarantine.parquet
+  + data/validated/reconciliation_report.json (contracts + staged-vs-source
+  reconciliation). Warehouse: sql/ddl/40_quarantine.sql (rcm.dq_quarantine,
+  DERIVED) loaded by the loader. qa notes folded: closed-loop sources.yaml
+  checksum test (66adccc) + money/int coercion counter (numeric_null_from_nonempty
+  in stage_parquet). On this subset: all contracts pass, 0 quarantined, rows
+  reconcile (9,660/58,066). LIVE PG load still 42/42; unit 42 pass, integration
+  1 pass, ruff clean. docs updated same commit.
 - [ ] docs: data_dictionary.md + provenance_register.md v1
 - [ ] ACCEPTANCE (qa-reviewer): contracts pass, FKs pass, counts reconcile
 
