@@ -75,7 +75,8 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   inpatient-plausible specialty). NPPES RI extract reclassified to validation
   sample. provenance_register + data_dictionary updated same commit.
 - [x] Data-contract tests + quarantine table + reconciliation report
-  — data-engineer, feat/phase1-ingestion; awaiting qa review. src/validation/
+  — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (7bcf140).
+  src/validation/
   contracts.py: required-columns, key-uniqueness, date-order (CLM_FROM_DT<=THRU),
   non-negative money; table-level checks gate the table, row-level failures →
   quarantine (never silently dropped). `make contracts` writes quarantine.parquet
@@ -87,14 +88,19 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   reconcile (9,660/58,066). LIVE PG load still 42/42; unit 42 pass, integration
   1 pass, ruff clean. docs updated same commit.
 - [x] docs: data_dictionary.md + provenance_register.md v1
-  — data-engineer, feat/phase1-ingestion; awaiting qa review. Both maintained
+  — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (952b521).
+  Both maintained
   in-commit across tasks 1-5; v1 coherence pass done: data_dictionary has a
   pipeline overview + every layer (raw ×5 sources, validated, contracts/
   quarantine, warehouse dims/facts/sim_/dq_quarantine); provenance_register
   classifies every artifact + table/column (SOURCE/DERIVED/REFERENCE/SIMULATED)
   with the §3.4 crosswalk rule stated. assumptions.md left to simulation-engineer
   (Phase 2).
-- [ ] ACCEPTANCE (qa-reviewer): contracts pass, FKs pass, counts reconcile
+- [x] ACCEPTANCE (qa-reviewer): contracts pass, FKs pass, counts reconcile
+  — qa-reviewer sign-off 2026-07-22 — live PG 42/42 + contracts + reconciliation.
+  Phase 1 COMPLETE. All 6 tasks PASS. Post-merge follow-ups (non-blocking, folded):
+  crosswalk checks in DuckDB mirror (done, bf35d5c) + COMMENT ON tables (73336bf).
+  Phase 2 gated by the human (do not start).
 
 ## Phase 2 — Simulation Layer (lead: simulation-engineer)
 - [ ] Generator: adjudication, denials, appeals, workflow events, timelines, costs
