@@ -268,6 +268,14 @@ ones without that being coded anywhere as a rule — it falls out of the
 interaction between the delay distribution and the limit. It also means the
 late-filing feature is legitimately available before submission.
 
+**The late tail is capped at 540 days.** Uncapped, the lognormal produced
+submission delays up to 5.3 years — which no billing office would produce, and
+which pushed generated submission dates (to mid-2024) well past the source
+data's own service-date range (ending 2023-03). The cap sits above every
+configured filing limit, so each claim in the tail is still late for its payer
+and the mechanism is untouched; only the implausible dates are removed. Measured
+effect: per-payer late-filing rates were unchanged to four decimal places.
+
 **Ordering guarantee.** Each step is generated as a non-negative increment on
 its predecessor and clamped to be no earlier than it, so the temporal-ordering
 validation cannot fail by construction. The check is still run, because a
@@ -341,7 +349,25 @@ cost. Inflating the labour parameters to hit the percentage would misrepresent
 the per-claim cost, which is the number the Phase 4 expected-net-recovery score
 actually consumes. We report the ratio and explain it instead.
 
-## 10. What the validation suite does and does not prove
+## 10. Payer effects are multi-channel, and the ranking will not match `logit_offset`
+
+Worth stating because it looks like an inconsistency and is not. A payer's
+denial rate is not a function of its `logit_offset` alone — the payer also sets
+prior-authorization prevalence, the contractual filing limit, adjudication
+speed, the allowed-amount ratio, and its row of the service-line interaction
+matrix. Those channels can reorder the marginals.
+
+Measured example: `COM_REGIONAL` has a *lower* offset than `COM_LARGE` (0.10 vs
+0.20) but a *higher* realized denial rate (13.6% vs 12.9%), because its 90-day
+filing limit is the shortest of any archetype and produces 2.7× the late-filing
+rate (1.90% vs 0.69%).
+
+This is deliberate. A payer feature that reduced to one additive constant would
+be trivially learnable and would make the payer × service-line interaction
+pointless. Anyone reconciling realized rates against this config should compare
+against the full set of per-payer parameters, not the offset column.
+
+## 11. What the validation suite does and does not prove
 
 It proves the generator is **internally consistent and reproducible**:
 same seed ⇒ byte-identical output; money invariants hold; events are ordered;
@@ -359,5 +385,6 @@ the simulation did what it was told, not that what it was told is true.
 | Version | Date | Change |
 |---|---|---|
 | 0.1.0 | 2026-07-22 | Initial stub (seed, target range, four mechanism ORs, timeline stub) laid down at project setup. `linkage.crosswalk_seed` added by data-engineer under one-commit delegated authority. |
+| 0.4.0 | 2026-07-22 | Capped the late-submission tail at 540 days (§7) after a self-audit found generated submission delays reaching 5.3 years and dates past the source period. Mechanism unaffected: per-payer late-filing rates unchanged to four decimals. Documented that payer effects are multi-channel and do not rank by `logit_offset` (§10). |
 | 0.3.0 | 2026-07-22 | Service lines rebucketed after measuring the actual DRG distribution (§5.1): 10 contiguous ranges replacing 8 with gaps, splitting the 940–999 block into aftercare/rehab and trauma/HIV/unrelated, and relocating the payer × service-line interactions onto buckets with enough volume to support them. No change to denial rate, mechanism, appeal, timeline or cost parameters. Realized denial rate 12.8%, oracle AUC 0.68. |
 | 0.2.0 | 2026-07-22 | Phase 2 build-out by simulation-engineer: simulated payer archetypes; service-line grouping; full mechanism set with prevalences, two explicit interactions, a payer × service-line matrix, and four non-linear terms; conditional denial-category catalog with CARC code groups as labels only; appeal propensity/overturn/recovery parameters; full timeline distributions with endogenous late filing; bottom-up operating-cost parameters; validation acceptance bands. `linkage.crosswalk_seed` reviewed and retained unchanged. |

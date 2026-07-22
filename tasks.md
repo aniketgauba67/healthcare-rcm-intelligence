@@ -114,6 +114,12 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > DuckDB mirror is supplementary CI only).
 > Kickoff item: simulation-engineer gets the deferred review pass on
 > data-engineer's sql/ddl/30_sim_crosswalk.sql + linkage.crosswalk_seed.
+> REVIEWER ROUTING (team-lead ruling 2026-07-22): the original `qa-reviewer`
+> instance revived after its session limit reset, completed the Phase 1
+> post-merge confirmation, and is STOOD DOWN. `qa-reviewer-2` is the sole
+> reviewer for Phase 2 and for any later tech-debt fixes — one reviewer per
+> phase, to avoid split verdicts and duplicate destructive runs on the single
+> shared Postgres container. Send all review requests to qa-reviewer-2.
 > CLAIMED 2026-07-22 by simulation-engineer: all 4 build tasks, branch
 > feat/phase2-simulation. Build order: (a) simulation.yaml v0.2.0 parameter set
 > + docs/assumptions.md anchors, (b) generator (pre-submission facts -> timeline
@@ -199,6 +205,29 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 - [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
 
 ## Phase 4 — ML (lead: ml-engineer)
+> GATE — FIRST TASK OF PHASE 4, BEFORE ANY FEATURE CODE (team-lead, verified
+> 2026-07-22 by reading config/model.yaml against the real Phase 2 schema).
+> §4 is NON-NEGOTIABLE and the current `forbidden_features` list is a
+> PLACEHOLDER that does not match the schema that now exists. It is worse than
+> empty: it looks like coverage and provides little. Found by simulation-engineer.
+>   STALE patterns matching ZERO real columns — note two lack the sim_ prefix
+>   that every generated column actually carries:
+>     sim_denial_reason, sim_recovered_*, adjudication_date, payment_date,
+>     post_submission_workflow_*
+>   MISSING post-submission / latent columns, currently UNPROTECTED:
+>     sim_provider_quality_latent (a pure answer key — provider latent quality),
+>     sim_label_noise_applied (reveals whether the label was flipped),
+>     sim_denial_type, sim_denial_carc_group, sim_denial_driver_mechanism,
+>     sim_patient_responsibility_amount, sim_contractual_adjustment_amount,
+>     sim_denied_amount, sim_ack_date, sim_adjudication_date,
+>     sim_denial_review_date, sim_payment_date, sim_days_to_adjudication,
+>     sim_days_to_payment, and ALL of sim_operating_costs
+>     (sim_denial_rework_cost > 0 implies a denial).
+> ACTION: ml-engineer populates forbidden_features from the authoritative
+> docs/simulated_forbidden_columns.md (the §4.5 firewall interface — it exists
+> precisely so ml-engineer never reads src/simulation/). qa-reviewer then adds a
+> leakage test asserting config/model.yaml and that document AGREE, rather than
+> trusting either alone. Do not begin feature work until this is done and green.
 - [ ] Point-in-time feature store + forbidden-column leakage tests
 - [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score

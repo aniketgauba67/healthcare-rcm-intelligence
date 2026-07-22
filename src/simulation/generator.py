@@ -280,6 +280,11 @@ def _pre_submission_timeline(
     # the payer's contractual limit, rather than being asserted as a rule.
     stalled = rng.random(n) < float(tl["late_submission_tail_rate"])
     extra = rounded_days(_lognormal(rng, tl["late_submission_extra_days_lognormal"], n), minimum=0)
+    # Cap the tail. Uncapped, the lognormal reached 5.3 years past the service
+    # date — implausible, and it pushed generated dates past the source data's
+    # own period. The cap is above every configured filing limit, so claims in
+    # the tail are still late for every payer and the mechanism is unchanged.
+    extra = np.minimum(extra, int(tl["late_submission_max_extra_days"]))
     submit_lag = submit_lag + np.where(stalled, extra, 0)
 
     coded_date = anchor + coded_lag.astype("timedelta64[D]")

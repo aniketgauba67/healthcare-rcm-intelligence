@@ -10,7 +10,7 @@
 # Versioning rule (persona): bump `version` on EVERY calibration change and note
 # the change in docs/assumptions.md § Changelog.
 # ============================================================================
-version: 0.3.0
+version: 0.4.0
 
 # Master seed for the generator. Every component derives an independent stream
 # from this via numpy SeedSequence.spawn, so adding a component never shifts an
@@ -303,6 +303,13 @@ timelines:
   # the ONLY route to a late-filing denial, so late filing is endogenous.
   late_submission_tail_rate: 0.030
   late_submission_extra_days_lognormal: {mu: 4.60, sigma: 0.80}
+  # Cap on that extra delay. An uncapped lognormal produced submission dates up
+  # to 5.3 years after the service date, which no billing office would produce
+  # and which pushed generated dates well past the source data's own period. The
+  # cap sits comfortably above the longest configured filing limit (365 days), so
+  # every claim in the tail is still late for every payer and the mechanism is
+  # untouched — only the implausible dates are removed.
+  late_submission_max_extra_days: 540
 
 # ---------------------------------------------------------------------------
 # Operating costs. Cost to collect is built bottom-up from touch minutes so the
