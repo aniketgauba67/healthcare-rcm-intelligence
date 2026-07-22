@@ -17,6 +17,7 @@ Checksums, sizes, and row counts are measured at download time and recorded in
 | `cms_synthetic/beneficiary_2024.csv` | cms_synthetic_claims | SOURCE | 2023-04 | Master Beneficiary Summary Base, 2024 enrollment year. Pipe-delimited. |
 | `cms_synthetic/inpatient.csv` | cms_synthetic_claims | SOURCE | 2023-04 | Inpatient FFS claims (line-level). Pipe-delimited. |
 | `nppes/nppes_ri_extract.csv` | nppes_npi | REFERENCE | 2026-07 | Rhode Island state-filtered NPPES provider extract (comma-delimited, quoted). |
+| `reference/hospital_general_information.csv` | hospital_general_information | REFERENCE | 2026-04 | CMS Hospital General Information; 5,432 real facilities (real CCNs). Crosswalk target, never joined directly. |
 
 ## Validated layer — typed Parquet (`data/validated/`, gitignored)
 

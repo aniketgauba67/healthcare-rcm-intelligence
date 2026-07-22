@@ -115,9 +115,22 @@ sources:
     url: https://data.cms.gov/provider-data/dataset/xubh-q36u
     provider: data.cms.gov/provider-data
     classification: REFERENCE
-    license_note: Public facility directory (CCN, name, address, type). Linked to claims ONLY via the SIMULATED crosswalk. Downloaded with the crosswalk task (Phase 1 item 4).
-    csv_url: https://data.cms.gov/provider-data/sites/default/files/resources/xubh-q36u.csv  # verified at download time
-    artifacts: {}
+    license_note: Public facility directory (CCN, name, address, type). Linked to claims ONLY via the SIMULATED crosswalk. Real CCNs — never joined directly to synthetic claims.
+    csv_url: https://data.cms.gov/provider-data/sites/default/files/resources/893c372430d9d71a1c52737d01239d47_1777413958/Hospital_General_Information.csv
+    vintage: "2026-04"  # dataset xubh-q36u, last modified 2026-04-28
+    stratify_keys: [State, Hospital Type]  # crosswalk stratification (CLAUDE.md §3.4)
+    # Measured at download 2026-07-22.
+    artifacts:
+      hospital_general_information:
+        role: reference
+        filename: data/raw/reference/hospital_general_information.csv
+        vintage: "2026-04"
+        sha256: 83c98b2e8687580e0482b13e1e9acd5813534be243e5ccd9f55556a869595d40
+        size_bytes: 1453884
+        row_count: 5432
+        facilities: 5432
+        states: 56
+        comma_delimited: true
 
   icd10:
     name: ICD-10-CM/PCS code files (match claims vintage)

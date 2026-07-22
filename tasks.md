@@ -11,6 +11,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > and may amend. First task in flight: download scripts (NPPES state-filtered
 > extract + CMS synthetic claims ZIP), checksums + vintages recorded in
 > config/sources.yaml, actual file sizes and row counts posted here.
+> TEAM RULE (2026-07-22, from qa task-3 review): all agents share ONE local
+> Postgres container; the loader is a single-writer batch job. Announce before
+> running `make warehouse` / `make validate-warehouse`, and acceptance runs get
+> a single-writer quiet window — never interleave loads with validation. A
+> transient reconciliation failure from interleaving is expected noise; re-run
+> in a quiet window before treating it as a bug. CI is unaffected (own service
+> container).
 - [x] Download scripts + manifest + checksums for all sources in config/sources.yaml
   — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (fc850f1).
   qa non-blocking notes folded: manifest `filename` now repo-relative (data/raw/…,
@@ -50,7 +57,12 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   (src/ingestion/warehouse_sql_checks.py) runs identically in PG and the DuckDB
   CI mirror (`make warehouse-check`, 37/37) so they cannot drift. 910 null-provider
   + 2,741 null-DRG claims route to Unknown (metrics, not errors).
-- [ ] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
+- [~] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
+  — data-engineer, feat/phase1-ingestion. DONE: Hospital General Information
+  reference downloaded (5,432 real facilities/56 states, vintage 2026-04, sha256
+  83c98b2e…, manifest + sources.yaml + provenance/dictionary updated). Crosswalk
+  builder NOT yet written — 3 coordination items in Blocked (seed source, sim_
+  DDL ownership, NPPES RI-only vs state-stratified provider linkage).
 - [ ] Data-contract tests + quarantine table + reconciliation report
 - [ ] docs: data_dictionary.md + provenance_register.md v1
 - [ ] ACCEPTANCE (qa-reviewer): contracts pass, FKs pass, counts reconcile
@@ -85,6 +97,27 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 
 ## Blocked / Questions for human
 (agents write here instead of guessing)
+
+- [data-engineer 2026-07-22] Task 4 crosswalk — 3 items before I build the sim_
+  crosswalk (touching §3.4 provenance + §5 ownership; not resolving by assumption):
+  1. SEED: CLAUDE.md §2 locks "seeds live in config/simulation.yaml" (owned by
+     simulation-engineer). That file has a general `seed: 42` but no dedicated
+     crosswalk seed. Proposal: simulation-engineer adds `crosswalk_seed` (keeps
+     the crosswalk reproducible independent of generator-seed changes); until
+     then I read the existing `seed` read-only. OK to proceed reading `seed`?
+  2. sim_ DDL OWNERSHIP: §5 lists `sql/ddl/ (sim tables only)` under
+     simulation-engineer, but the crosswalk build is a data-engineer Phase-1
+     task (persona #5). Who writes sql/ddl for `sim_provider_crosswalk` /
+     `sim_facility_crosswalk` — me (I own sql/ddl/ generally) or simulation-
+     engineer? Proposal: I write it as part of this task and simulation-engineer
+     reviews; confirm.
+  3. NPPES COVERAGE: the NPPES extract is Rhode-Island-only (task-1 choice). So a
+     claims→real-PROVIDER (NPI) crosswalk stratified by state can only be
+     same-state for RI. Facilities (Hospital General Info) are nationwide, so the
+     claims→real-FACILITY (CCN) crosswalk stratifies by state+type fine. Options:
+     (a) facility crosswalk primary + NPI provider crosswalk scoped/labeled
+     RI-only; (b) re-run NPPES for more states; (c) relax provider stratification.
+     Recommend (a) for Phase 1. Decision?
 
 ## Done
 - [x] Test gate green on clean clone (qa-reviewer, merged to main bc2a7ab, pushed):

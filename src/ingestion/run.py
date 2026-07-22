@@ -18,10 +18,11 @@ from .logging_utils import get_logger, log_event
 from .manifest import Manifest
 from .nppes import download_nppes_extract
 from .paths import RAW_MANIFEST, ensure_raw_dirs
+from .reference import download_hospital_general_information
 
 _LOGGER = get_logger("ingestion.run")
 
-_SOURCES = ("cms_synthetic", "nppes")
+_SOURCES = ("cms_synthetic", "nppes", "hospital")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -51,6 +52,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest.save()  # persist after each source so partial runs are durable
     if "nppes" in selected:
         download_nppes_extract(manifest, state=args.state, force=args.force)
+        manifest.save()
+    if "hospital" in selected:
+        download_hospital_general_information(manifest, force=args.force)
         manifest.save()
 
     log_event(

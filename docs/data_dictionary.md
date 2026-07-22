@@ -103,6 +103,14 @@ NPPES layout. Key: `NPI`. Filter column: `Provider Business Practice Location
 Address State Name`. Real NPIs — linked to synthetic claims only via the
 SIMULATED crosswalk.
 
+## Raw layer — CMS Hospital General Information (REFERENCE, vintage 2026-04)
+
+### `reference/hospital_general_information.csv`
+CMS Hospital General Information (dataset `xubh-q36u`). Comma-delimited, quoted.
+5,432 real facilities across 56 states/territories. Key columns for the
+SIMULATED crosswalk: `Facility ID` (CCN), `State`, `Hospital Type` (stratifiers).
+Real CCNs — linked to synthetic claims only via the seeded crosswalk (§3.4).
+
 ## Warehouse layer — star schema (`rcm`, PostgreSQL 16)
 
 Built by `src/ingestion/star_transform.py` + `sql/ddl/` (`make warehouse` loads
