@@ -1,4 +1,4 @@
-.PHONY: setup ingest stage warehouse warehouse-check simulate views train score dashboard api test lint demo-extract
+.PHONY: setup ingest stage warehouse warehouse-check validate-warehouse simulate views train score dashboard api test lint demo-extract
 
 setup:
 	uv sync
@@ -17,6 +17,9 @@ warehouse:
 
 warehouse-check:
 	uv run python -m src.ingestion.load_postgres --offline-check
+
+validate-warehouse:
+	uv run pytest -m integration -q
 
 views:
 	uv run python -m src.ingestion.build_views

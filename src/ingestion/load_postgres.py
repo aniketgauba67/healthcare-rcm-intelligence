@@ -20,7 +20,8 @@ import pandas as pd
 from .logging_utils import get_logger, log_event
 from .paths import DATA_VALIDATED, REPO_ROOT
 from .star_transform import StarFrames, build_star
-from .warehouse_checks import reconcile_to_source, run_integrity_checks
+from .warehouse_checks import expected_counts, reconcile_to_source, run_integrity_checks
+from .warehouse_sql_checks import CheckResult, run_count_reconciliation, run_violation_checks
 
 _LOGGER = get_logger("ingestion.warehouse")
 
@@ -40,8 +41,22 @@ _LOAD_ORDER_FACTS = (
 )
 
 
+def _load_dotenv() -> None:
+    """Populate os.environ from repo-root .env (does not overwrite real env)."""
+    env_path = REPO_ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
+
+
 def database_url() -> str | None:
-    """Build the SQLAlchemy URL from env, or return None if unconfigured."""
+    """Build the SQLAlchemy URL from env (loading .env first), or None."""
+    _load_dotenv()
     if os.environ.get("DATABASE_URL"):
         return os.environ["DATABASE_URL"]
     user = os.environ.get("POSTGRES_USER")
@@ -55,13 +70,14 @@ def database_url() -> str | None:
 
 
 def apply_ddl(engine) -> None:
-    """Execute the DDL files in order (idempotent drop/recreate)."""
-    from sqlalchemy import text
+    """Execute the DDL files in order (idempotent drop/recreate).
 
+    Uses exec_driver_sql so multi-statement DDL files run as one script.
+    """
     with engine.begin() as conn:
         for fname in _DDL_FILES:
             sql = (REPO_ROOT / "sql" / "ddl" / fname).read_text()
-            conn.execute(text(sql))
+            conn.exec_driver_sql(sql)
             log_event(_LOGGER, "warehouse.ddl_applied", file=fname)
 
 
@@ -98,26 +114,26 @@ def load_frames(engine, frames: StarFrames) -> None:
         log_event(_LOGGER, "warehouse.loaded", table=name, rows=int(len(df)))
 
 
-def reconcile_postgres(engine, frames: StarFrames) -> bool:
-    """Post-load: confirm warehouse counts match the transformed frames."""
+def validate_postgres(engine, frames: StarFrames) -> list[CheckResult]:
+    """Run the shared acceptance checks against the LIVE Postgres warehouse."""
     from sqlalchemy import text
 
-    ok = True
     with engine.connect() as conn:
-        for name in (*_LOAD_ORDER_DIMS, *_LOAD_ORDER_FACTS):
-            expected = len(frames.dims.get(name, frames.facts.get(name)))
-            actual = conn.execute(text(f"select count(*) from {_SCHEMA}.{name}")).scalar()
-            match = actual == expected
-            ok = ok and match
-            log_event(
-                _LOGGER,
-                "warehouse.reconcile",
-                table=name,
-                expected=expected,
-                actual=actual,
-                match=match,
-            )
-    return ok
+
+        def scalar(sql: str) -> int:
+            return conn.execute(text(sql)).scalar()
+
+        results = run_violation_checks(scalar, f"{_SCHEMA}.")
+        results += run_count_reconciliation(scalar, expected_counts(frames), f"{_SCHEMA}.")
+    for c in results:
+        log_event(
+            _LOGGER,
+            "warehouse.check",
+            name=c.name,
+            status="PASS" if c.passed else "FAIL",
+            detail=c.detail,
+        )
+    return results
 
 
 def run_offline_check(frames: StarFrames) -> int:
@@ -174,9 +190,16 @@ def main(argv: list[str] | None = None) -> int:
     engine = create_engine(url)
     apply_ddl(engine)
     load_frames(engine, frames)
-    ok = reconcile_postgres(engine, frames)
-    log_event(_LOGGER, "warehouse.done", reconciled=ok)
-    return 0 if ok else 1
+    checks = validate_postgres(engine, frames)
+    failed = [c.name for c in checks if not c.passed]
+    log_event(
+        _LOGGER,
+        "warehouse.done",
+        checks=len(checks),
+        failed=len(failed),
+        reconciled=not failed,
+    )
+    return 0 if not failed else 1
 
 
 if __name__ == "__main__":

@@ -105,8 +105,10 @@ SIMULATED crosswalk.
 
 ## Warehouse layer — star schema (`rcm`, PostgreSQL 16)
 
-Built by `src/ingestion/star_transform.py` + `sql/ddl/` (`make warehouse`; DB-free
-integrity via `make warehouse-check`). Every dimension reserves surrogate key
+Built by `src/ingestion/star_transform.py` + `sql/ddl/` (`make warehouse` loads
+live PostgreSQL 16; `make validate-warehouse` runs the acceptance checks against
+it; `make warehouse-check` is the DuckDB CI mirror of the same check SQL). Every
+dimension reserves surrogate key
 `0` for an **Unknown** member so facts never carry null foreign keys. Synthetic
 provider ids are flagged `is_synthetic_id = true` — they are NOT real CCNs/NPIs.
 

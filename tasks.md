@@ -27,7 +27,7 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   NPPES vintage 2026-07 (July V2). Subset = enrollment + inpatient claims.
   Scripts idempotent (checksum-skip); NPPES streams 9 GB main file, keeps RI only.
 - [x] Typed Parquet staging for claims/enrollment files (validated layer)
-  — data-engineer, feat/phase1-ingestion; awaiting qa-reviewer PASS.
+  — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (aaa601d).
   `make stage` (src/validation/): rule-based dtype resolution, chunked read,
   date parse (%d-%b-%Y), structured logging, idempotent. Row counts reconcile
   EXACTLY to raw: beneficiary_2024.parquet 9,660 rows/185 cols/3 date cols;
@@ -40,12 +40,14 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   claim (header grain), fact_claim_revenue_line (line), fact_claim_diagnosis
   (unpivot); FKs, non-negative + date-order CHECKs, indexes. Idempotent loader
   (src/ingestion/load_postgres.py, `make warehouse`) + engine-agnostic transform.
-  Offline reconciliation (`make warehouse-check`, DuckDB) = 28/28 checks PASS on
-  real data: 20,867 claims/58,066 lines/338,024 diagnoses reconcile to source;
-  all FKs resolve; 910 null-provider + 2,741 null-DRG claims routed to Unknown
-  (metrics, not errors). CAVEAT: live Postgres load NOT runnable in this env
-  (no docker daemon / psql) — validated offline; live `make warehouse` pending a
-  Postgres instance (CI/Docker). Flagged to team-lead.
+  LIVE Postgres 16 (docker compose) acceptance PASSED 2026-07-22: `make warehouse`
+  loads + reconciles (20,867 claims/58,066 lines/338,024 diagnoses), and
+  `make validate-warehouse` (pytest -m integration) = 35/35 acceptance checks
+  PASS against real PG (FK anti-joins, uniqueness, date-order, non-negative money,
+  Unknown members, row counts) + idempotent re-load verified. Shared check SQL
+  (src/ingestion/warehouse_sql_checks.py) runs identically in PG and the DuckDB
+  CI mirror (`make warehouse-check`, 37/37) so they cannot drift. 910 null-provider
+  + 2,741 null-DRG claims route to Unknown (metrics, not errors).
 - [ ] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
 - [ ] Data-contract tests + quarantine table + reconciliation report
 - [ ] docs: data_dictionary.md + provenance_register.md v1
