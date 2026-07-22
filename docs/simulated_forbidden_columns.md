@@ -111,9 +111,22 @@ The robust filter is timestamp-based rather than type-based: keep events whose
 `sim_event_ts` is at or before that claim's `CLAIM_SUBMITTED` timestamp. That
 stays correct if new event types are added later.
 
-Note also that `sim_touch_minutes` aggregated across a claim's full history
-encodes rework effort and therefore the label. Aggregate only over the safe
-subset.
+### Column-by-column, once the rows have been filtered
+
+| Column | Notes |
+|---|---|
+| `sim_event_sk` | Surrogate key. Never a feature — assigned in generation order, so it correlates with time. |
+| `sim_event_seq` | Position within the claim. Safe **only** within the filtered subset; computed over all events it counts post-submission activity and therefore encodes the label. |
+| `sim_event_type` | Safe within the filtered subset. See the table above. |
+| `sim_activity` | Safe within the filtered subset. |
+| `sim_event_date`, `sim_event_ts` | Safe within the filtered subset; `sim_event_ts` is the filter boundary itself. |
+| `sim_actor_role` | Safe within the filtered subset. |
+| `sim_appeal_level` | **Forbidden.** Non-zero only on appeal events, and appeals exist only on denied claims — a max over the claim reconstructs the label. |
+| `sim_touch_minutes` | Safe only within the filtered subset. Aggregated across a claim's full history it encodes rework effort and therefore the label. |
+
+The recurring hazard here is aggregation, not selection: most of these columns
+are harmless per row and become answer keys the moment they are summed, maxed,
+or counted over a claim's whole history. Filter the rows first, then aggregate.
 
 ## 5. Model C (appeal success) — a different boundary
 
@@ -131,7 +144,17 @@ submission, so the Model A forbidden list does not apply unchanged:
 - `sim_appeal_recovered_amount` is the Model C regression target's own input;
   treat it as a label, never a feature.
 
-## 6. A caution on `clm_id` and `claim_sk`
+## 6. Provenance stamp columns — present on every table, never a feature
+
+`sim_provenance`, `sim_config_version`, `sim_seed`
+
+Every generated table carries these three. They are constants describing which
+calibration produced the row, not claim attributes. They carry no signal and
+must never enter a feature matrix — `sim_seed` in particular is a single
+repeated integer that a tree model will happily split on if handed a version
+with more than one value in it.
+
+## 7. A caution on `clm_id` and `claim_sk`
 
 Neither is a `sim_` column — they are the warehouse's SOURCE degenerate key and
 DERIVED surrogate key. Neither should be a feature. `claim_sk` in particular is

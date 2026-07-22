@@ -174,8 +174,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   claim_sk, never on facility_ccn or facility_name, or it silently merges several
   distinct synthetic hospitals. Binding on analytics-engineer (Phase 3) and
   app-engineer (Phase 5). If a 1:1 mapping is ever wanted, fix = sample without
-  replacement within stratum then fall back. Team-lead to measure collision rate
-  once the shared container is free and record the number here.
+  replacement within stratum then fall back.
+  MEASURED by team-lead 2026-07-22 on live PG — the collision is MATERIAL, not
+  theoretical: 4,876 synthetic billing providers map onto only 2,857 distinct
+  real CCNs; 45.9% of those CCNs carry more than one synthetic provider, and the
+  worst carries 8. So a naive `group by facility_ccn` merges up to 8 distinct
+  synthetic hospitals into one row and inflates its volume ~8x. The keying rule
+  above is therefore MANDATORY for Phase 3/5, not advisory.
 
 ## Phase 3 — Analytics + KPI Views (lead: analytics-engineer)
 > CARRY-FORWARD from Phase 1 (team-lead, 2026-07-22): Phase 1 task 1 was scoped

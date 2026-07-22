@@ -1,4 +1,4 @@
-.PHONY: setup ingest stage contracts warehouse warehouse-check validate-warehouse simulate simulate-warehouse simulate-check views train score dashboard api test lint demo-extract
+.PHONY: setup ingest stage contracts warehouse warehouse-all warehouse-check validate-warehouse simulate simulate-warehouse simulate-check validate-simulation views train score dashboard api test lint demo-extract
 
 setup:
 	uv sync
@@ -25,6 +25,15 @@ simulate-warehouse:
 
 simulate-check:
 	uv run python -m src.simulation.load_sim --offline-check
+
+# Directional / distributional / temporal / referential / provenance checks on the
+# generated frames, without writing any files. Fails non-zero on any violation.
+validate-simulation:
+	uv run python -m src.simulation.run --no-write
+
+# The whole warehouse in the one order that is correct. Use this rather than
+# running `make warehouse` on its own, which leaves the sim layer stale.
+warehouse-all: warehouse simulate simulate-warehouse
 
 warehouse:
 	uv run python -m src.ingestion.load_postgres
