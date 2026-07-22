@@ -15,3 +15,5 @@ mlruns/
 .ipynb_checkpoints/
 models_artifacts/
 .claude/worktrees/
+data/simulated/*
+!data/simulated/.gitkeep

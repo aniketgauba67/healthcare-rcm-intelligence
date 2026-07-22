@@ -77,6 +77,19 @@ has its own irreducible noise (payer discretion, human error, appeals that
 reverse the original decision); 5% is our stand-in for it, not an estimate of
 it.
 
+Measured effect on this subset: the best achievable discrimination — scoring
+with the *true* latent probability, which no model can beat — is **AUC ≈ 0.68**.
+That is the ceiling Phase 4 should be compared against, not 1.0.
+
+**A calibration subtlety worth stating explicitly.** Symmetric noise pulls the
+observed rate toward 0.5: observed = p·(1−2ε) + ε. Solving the logistic
+intercept against the 13% target directly would have produced a *latent* mean of
+13% and an *observed* rate of 16.7% — outside the tolerance and, more
+importantly, wrong, because the benchmarks in §1 are rates of observed denials.
+The generator therefore inverts the noise first and solves for the latent mean
+(8.9%) that lands the observed rate on target. A configuration whose target rate
+falls outside [ε, 1−ε] is unreachable and is rejected rather than approximated.
+
 ## 3. Risk mechanisms and their odds ratios
 
 | Mechanism | OR | Kind |
@@ -172,6 +185,32 @@ authorization, eligibility/coverage, missing documentation, and medical
 necessity at the top, with timely filing and duplicates as small tails. The
 conditional distributions reproduce that ordering. The probabilities themselves
 are design choices.
+
+### 5.1 Service lines, and a real limitation of the source data
+
+The service-line grouping is ten contiguous MS-DRG numeric ranges plus an
+UNKNOWN member. **The boundaries are ours**, chosen for this project; they are
+not an official CMS MS-DRG-to-MDC mapping, and the repo does not have the MS-DRG
+reference file (it is a Phase 3 carry-forward). Ranges are contiguous so that
+every numeric DRG lands in exactly one bucket and UNKNOWN can only ever mean
+"the source had no DRG", never "fell in a gap".
+
+**Measured limitation (2026-07-22).** The CMS synthetic claims are heavily
+concentrated in the aftercare / rehabilitation / other-factors DRG range: DRG
+951 alone accounts for about **44%** of claims, and the 940–951 bucket holds
+about **46%** of the book, while several clinical buckets hold 1–2%. This is a
+property of how the synthetic SOURCE data was generated, not of this simulation,
+and no choice of bucket boundaries repairs it.
+
+Two consequences worth being honest about downstream:
+
+1. Service line is a weak stratifier here. Any per-service-line comparison in
+   Phase 3 or Phase 5 must show volumes alongside rates, because several buckets
+   have too few claims to support a stable rate.
+2. The payer × service-line interaction is deliberately placed **only** on
+   buckets with enough volume for the cross term to be estimable. Loading an
+   interaction onto a 200-claim bucket would manufacture noise and then invite a
+   model to learn it.
 
 ## 6. Money
 
@@ -286,6 +325,22 @@ rather than as an input. If a calibration change pushes it outside that range,
 that is a signal worth investigating, and the validation suite reports the
 realized figure for exactly that reason.
 
+**Realized on this subset** (config v0.3.0): mean total cost to collect **$23.98
+per claim**, and mean denial rework + appeal cost **$29.88 per denied claim**.
+The rework figure sits in the low end of the cited $25–$120 range, which is what
+we would expect from a book where most denials are worked once and never
+escalated.
+
+**Where our output does not match a cited benchmark, and why.** Cost to collect
+comes out near **1% of allowed amounts**, below the commonly benchmarked 2–3% of
+net patient revenue. That gap is expected and we are not tuning it away: these
+are inpatient facility claims averaging roughly $2,300 allowed, whereas the 2–3%
+benchmark is struck against a whole revenue cycle that is dominated in *volume*
+by small professional and outpatient claims carrying similar per-claim handling
+cost. Inflating the labour parameters to hit the percentage would misrepresent
+the per-claim cost, which is the number the Phase 4 expected-net-recovery score
+actually consumes. We report the ratio and explain it instead.
+
 ## 10. What the validation suite does and does not prove
 
 It proves the generator is **internally consistent and reproducible**:
@@ -304,4 +359,5 @@ the simulation did what it was told, not that what it was told is true.
 | Version | Date | Change |
 |---|---|---|
 | 0.1.0 | 2026-07-22 | Initial stub (seed, target range, four mechanism ORs, timeline stub) laid down at project setup. `linkage.crosswalk_seed` added by data-engineer under one-commit delegated authority. |
+| 0.3.0 | 2026-07-22 | Service lines rebucketed after measuring the actual DRG distribution (§5.1): 10 contiguous ranges replacing 8 with gaps, splitting the 940–999 block into aftercare/rehab and trauma/HIV/unrelated, and relocating the payer × service-line interactions onto buckets with enough volume to support them. No change to denial rate, mechanism, appeal, timeline or cost parameters. Realized denial rate 12.8%, oracle AUC 0.68. |
 | 0.2.0 | 2026-07-22 | Phase 2 build-out by simulation-engineer: simulated payer archetypes; service-line grouping; full mechanism set with prevalences, two explicit interactions, a payer × service-line matrix, and four non-linear terms; conditional denial-category catalog with CARC code groups as labels only; appeal propensity/overturn/recovery parameters; full timeline distributions with endogenous late filing; bottom-up operating-cost parameters; validation acceptance bands. `linkage.crosswalk_seed` reviewed and retained unchanged. |

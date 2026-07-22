@@ -10,7 +10,7 @@
 # Versioning rule (persona): bump `version` on EVERY calibration change and note
 # the change in docs/assumptions.md § Changelog.
 # ============================================================================
-version: 0.2.0
+version: 0.3.0
 
 # Master seed for the generator. Every component derives an independent stream
 # from this via numpy SeedSequence.spawn, so adding a component never shifts an
@@ -88,17 +88,28 @@ payers:
 # variable. The bucket boundaries are a design choice, so sim_service_line is
 # classified SIMULATED even though its input (drg_cd) is SOURCE.
 # `lo`/`hi` are inclusive MS-DRG numbers; claims with no DRG get UNKNOWN.
+#
+# Ranges are CONTIGUOUS by design so that every numeric DRG lands in exactly one
+# bucket and UNKNOWN means "the source had no DRG", never "fell in a gap".
+#
+# KNOWN SKEW (measured 2026-07-22, docs/assumptions.md §5.1): the CMS synthetic
+# claims are heavily concentrated in the aftercare/rehab/other-factors range —
+# DRG 951 alone is ~44% of claims — so AFTERCARE_REHAB holds roughly 46% of the
+# book and several clinical buckets hold 1-2%. That is a property of the
+# synthetic SOURCE data, not of this simulation, and no rebucketing fixes it.
 # ---------------------------------------------------------------------------
 service_lines:
-  - {id: TRANSPLANT_TRACH,  name: Transplant & Tracheostomy,          lo: 1,   hi: 19,  logit_offset: 0.25}
-  - {id: NEURO_ENT,         name: Neurology & ENT,                    lo: 20,  hi: 152, logit_offset: 0.10}
-  - {id: CARDIO_RESP,       name: Cardiovascular & Respiratory,       lo: 153, hi: 264, logit_offset: -0.05}
-  - {id: DIGESTIVE_HEPATO,  name: Digestive & Hepatobiliary,          lo: 265, hi: 395, logit_offset: 0.00}
-  - {id: MSK_ENDO,          name: Musculoskeletal & Endocrine,        lo: 405, hi: 517, logit_offset: 0.30}
-  - {id: SKIN_RENAL_METAB,  name: Skin, Renal & Metabolic,            lo: 518, hi: 645, logit_offset: 0.05}
-  - {id: ONC_ID_BLOOD,      name: Blood, Oncology & Infectious Disease, lo: 652, hi: 816, logit_offset: 0.15}
-  - {id: TRAUMA_BEHAV,      name: Trauma, Behavioral & Other,         lo: 817, hi: 999, logit_offset: 0.35}
-  - {id: UNKNOWN,           name: Unknown / no DRG,                   lo: null, hi: null, logit_offset: 0.20}
+  - {id: TRANSPLANT_TRACH,   name: "Transplant & Tracheostomy",            lo: 1,    hi: 19,   logit_offset: 0.25}
+  - {id: NEURO_ENT,          name: "Nervous System, Eye & ENT",            lo: 20,   hi: 162,  logit_offset: 0.10}
+  - {id: RESP_CIRC,          name: "Respiratory & Circulatory",            lo: 163,  hi: 325,  logit_offset: -0.05}
+  - {id: DIGESTIVE_HEPATO,   name: "Digestive & Hepatobiliary",            lo: 326,  hi: 452,  logit_offset: 0.00}
+  - {id: MSK_SKIN_ENDO,      name: "Musculoskeletal, Skin & Endocrine",    lo: 453,  hi: 651,  logit_offset: 0.30}
+  - {id: RENAL_REPRO,        name: "Kidney, Urinary & Reproductive",       lo: 652,  hi: 788,  logit_offset: 0.05}
+  - {id: BLOOD_ONC_ID,       name: "Blood, Oncology & Infectious Disease", lo: 789,  hi: 895,  logit_offset: 0.15}
+  - {id: TRAUMA_FACTORS,     name: "Injury, Poisoning & Health Factors",   lo: 896,  hi: 939,  logit_offset: 0.35}
+  - {id: AFTERCARE_REHAB,    name: "Aftercare, Rehabilitation & Signs",    lo: 940,  hi: 951,  logit_offset: 0.20}
+  - {id: TRAUMA_HIV_OTHER,   name: "Multiple Trauma, HIV & Unrelated OR",  lo: 952,  hi: 999,  logit_offset: 0.30}
+  - {id: UNKNOWN,            name: "Unknown / no DRG",                     lo: null, hi: null, logit_offset: 0.20}
 
 # ---------------------------------------------------------------------------
 # Latent denial mechanism. logit(sim_latent_p) = intercept (solved) + sum of the
@@ -139,24 +150,27 @@ mechanisms:
     # payer x service_line: additional log-odds, {payer_id: {service_line_id: v}}.
     # Sparse — any pair not listed contributes 0. Deliberately non-additive so a
     # model must learn the cross term, not just two main effects.
+    # Placed only on buckets with enough volume for the cross term to be
+    # estimable (see the KNOWN SKEW note above); loading an interaction onto a
+    # 200-claim bucket would be noise dressed up as signal.
     payer_x_service_line:
       MCR_ADV:
-        MSK_ENDO: 0.55          # elective ortho under MA: heavy auth scrutiny
-        TRAUMA_BEHAV: 0.45
-        CARDIO_RESP: -0.20
+        MSK_SKIN_ENDO: 0.55       # elective ortho under MA: heavy auth scrutiny
+        AFTERCARE_REHAB: 0.45     # post-acute/rehab: the MA utilization battleground
+        RESP_CIRC: -0.20
       COM_LARGE:
-        MSK_ENDO: 0.40
-        TRANSPLANT_TRACH: 0.50
+        MSK_SKIN_ENDO: 0.40
+        BLOOD_ONC_ID: 0.30
         NEURO_ENT: 0.20
       COM_REGIONAL:
-        MSK_ENDO: 0.30
-        ONC_ID_BLOOD: 0.25
+        MSK_SKIN_ENDO: 0.30
+        BLOOD_ONC_ID: 0.25
       MCD_MCO:
-        TRAUMA_BEHAV: 0.60
-        SKIN_RENAL_METAB: 0.25
-        CARDIO_RESP: -0.15
+        AFTERCARE_REHAB: 0.60
+        TRAUMA_HIV_OTHER: 0.30
+        RESP_CIRC: -0.15
       MCR_FFS:
-        TRANSPLANT_TRACH: -0.25
+        AFTERCARE_REHAB: -0.30
         UNKNOWN: 0.30
 
   # --- Non-linear / continuous mechanisms (log-odds contributions) ---

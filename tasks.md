@@ -131,6 +131,31 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   — simulation-engineer, feat/phase2-simulation, claimed.
 - [ ] ACCEPTANCE (qa-reviewer): seed-reproducible, validity checks pass
 
+## Carry-forward / tech debt (team-lead tracked, not phase-gated)
+- [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
+  2026-07-22 reading sql/ddl/30_sim_crosswalk.sql). §3.2 requires every simulated
+  table AND column name prefixed `sim_`. In sim_facility_crosswalk only 3 of 11
+  columns comply (facility_ccn/_name/_state/_type, match_rule, same_state,
+  crosswalk_seed, provenance do not); sim_provider_crosswalk likewise. Raised by
+  simulation-engineer at Phase 2 kickoff. Not merely cosmetic: the §4 leakage
+  blacklist is column-name based, so an unprefixed column escaping into a
+  flattened feature matrix loses its provenance marker. Owner: data-engineer
+  (re-spawn; owns src/ingestion/ + sql/ddl/). MUST land before Phase 4 opens
+  (leakage blacklist) and before the Phase 5 honesty pass. Deferred now only to
+  avoid shared-Postgres contention with Phase 2 acceptance runs.
+  NOTE: simulation-engineer adopts STRICT prefixing for all new sim_ tables —
+  team-lead RATIFIED; that is the standard going forward.
+- [ ] CROSSWALK SAMPLES WITH REPLACEMENT (analytic fidelity, not provenance).
+  Distinct synthetic providers collide onto the same real CCN (within-state pools
+  are small). Team-lead ruling: do NOT re-randomize the accepted Phase 1 crosswalk
+  for this. Instead — the real facility/NPI is DISPLAY-ONLY enrichment; every
+  facility- or provider-level analysis MUST key on the synthetic prvdr_num /
+  claim_sk, never on facility_ccn or facility_name, or it silently merges several
+  distinct synthetic hospitals. Binding on analytics-engineer (Phase 3) and
+  app-engineer (Phase 5). If a 1:1 mapping is ever wanted, fix = sample without
+  replacement within stratum then fall back. Team-lead to measure collision rate
+  once the shared container is free and record the number here.
+
 ## Phase 3 — Analytics + KPI Views (lead: analytics-engineer)
 > CARRY-FORWARD from Phase 1 (team-lead, 2026-07-22): Phase 1 task 1 was scoped
 > to "all sources in config/sources.yaml" but only the 4 data sources were
