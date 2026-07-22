@@ -90,6 +90,19 @@ The generator therefore inverts the noise first and solves for the latent mean
 (8.9%) that lands the observed rate on target. A configuration whose target rate
 falls outside [ε, 1−ε] is unreachable and is rejected rather than approximated.
 
+The concrete consequence, worth stating plainly because it bounds what Phase 4
+can achieve: because the base rate is low, a *symmetric* flip lands
+asymmetrically on the two classes. Measured on this subset (seed 42), 961 labels
+are flipped, but 892 of those turn a non-denial into a denial and only 69 go the
+other way. So of the 2,663 observed denials, roughly **one third (892, ~33%)
+carry no underlying mechanism signal at all** — they are pure noise. This is not
+a defect; it is the design lever that produces the AUC ≈ 0.68 ceiling. It does
+mean the positive class must not be over-interpreted: no feature, and no model,
+can explain the third of denials that were manufactured by the flip, and any
+Phase 4 analysis that appears to "explain" them is fitting noise. The share is a
+deterministic function of the base rate and ε, so it moves if either is
+recalibrated.
+
 ## 3. Risk mechanisms and their odds ratios
 
 | Mechanism | OR | Kind |
