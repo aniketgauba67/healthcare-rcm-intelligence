@@ -12,7 +12,10 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > extract + CMS synthetic claims ZIP), checksums + vintages recorded in
 > config/sources.yaml, actual file sizes and row counts posted here.
 - [x] Download scripts + manifest + checksums for all sources in config/sources.yaml
-  — data-engineer, branch feat/phase1-ingestion; awaiting qa-reviewer PASS.
+  — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (fc850f1).
+  qa non-blocking notes folded: manifest `filename` now repo-relative (data/raw/…,
+  fixed in task 2); closed-loop sha256/size/row_count-vs-sources.yaml reconciliation
+  test deferred to Phase 1 task "Data-contract tests" / task 5 acceptance.
   Measured 2026-07-22 (`uv run python -m src.ingestion.run`):
   | artifact | class | rows | size | sha256 (12) |
   |---|---|---|---|---|
