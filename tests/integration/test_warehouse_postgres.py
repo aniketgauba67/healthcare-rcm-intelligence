@@ -14,7 +14,9 @@ import pytest
 from src.ingestion.load_postgres import (
     apply_ddl,
     database_url,
+    load_crosswalk,
     load_frames,
+    validate_crosswalk,
     validate_postgres,
 )
 from src.ingestion.paths import DATA_VALIDATED
@@ -42,7 +44,8 @@ def pg_engine():
 def _load_once(engine, frames):
     apply_ddl(engine)  # idempotent: drops + recreates every table
     load_frames(engine, frames)
-    return validate_postgres(engine, frames)
+    xwalk = load_crosswalk(engine)
+    return validate_postgres(engine, frames) + validate_crosswalk(engine, xwalk)
 
 
 def test_warehouse_acceptance_and_idempotency(pg_engine):

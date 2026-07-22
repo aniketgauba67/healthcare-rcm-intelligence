@@ -13,3 +13,11 @@ appeal:
   base_success_rate_range: [0.35, 0.55]
 timelines:
   submission_lag_days: {dist: lognormal, mu: 1.2, sigma: 0.6}
+
+# Linkage / crosswalk seed (CLAUDE.md §3.4). Added by data-engineer under
+# one-commit delegated authority (team-lead ruling 2026-07-22) because the
+# SIMULATED claim->real facility/provider crosswalk must be seed-reproducible.
+# Kept separate from `seed` so the crosswalk is stable across generator changes.
+# simulation-engineer owns this file and may revisit this value at Phase 2 kickoff.
+linkage:
+  crosswalk_seed: 20260722

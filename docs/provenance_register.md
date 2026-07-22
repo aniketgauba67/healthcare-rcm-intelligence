@@ -16,8 +16,9 @@ Checksums, sizes, and row counts are measured at download time and recorded in
 |---|---|---|---|---|
 | `cms_synthetic/beneficiary_2024.csv` | cms_synthetic_claims | SOURCE | 2023-04 | Master Beneficiary Summary Base, 2024 enrollment year. Pipe-delimited. |
 | `cms_synthetic/inpatient.csv` | cms_synthetic_claims | SOURCE | 2023-04 | Inpatient FFS claims (line-level). Pipe-delimited. |
-| `nppes/nppes_ri_extract.csv` | nppes_npi | REFERENCE | 2026-07 | Rhode Island state-filtered NPPES provider extract (comma-delimited, quoted). |
-| `reference/hospital_general_information.csv` | hospital_general_information | REFERENCE | 2026-04 | CMS Hospital General Information; 5,432 real facilities (real CCNs). Crosswalk target, never joined directly. |
+| `nppes/nppes_ri_extract.csv` | nppes_npi | REFERENCE | 2026-07 | Rhode Island NPPES extract. Role reclassified 2026-07-22: VALIDATION SAMPLE only (spot-check real NPIs); superseded as the crosswalk provider pool by the nationwide Medicare Physician dataset per human decision. |
+| `reference/hospital_general_information.csv` | hospital_general_information | REFERENCE | 2026-04 | CMS Hospital General Information; 5,432 real facilities (real CCNs). Facility crosswalk target, never joined directly. |
+| `reference/medicare_providers_extract.csv` | medicare_providers | REFERENCE | 2024 | Medicare Physician & Other Practitioners by Provider; 1,296,739 real providers (NPI/specialty/state). Nationwide provider crosswalk pool. Real NPIs, never joined directly. |
 
 ## Validated layer — typed Parquet (`data/validated/`, gitignored)
 
@@ -57,7 +58,11 @@ and all `sim_`-prefixed tables are added here by their owning agents.
 | fact_inpatient_claim | measures, degenerate `clm_id`, diagnosis codes | SOURCE | inpatient | surrogate/FK keys DERIVED; `length_of_stay_days` DERIVED. |
 | fact_claim_revenue_line | `clm_line_num`, `rev_cntr`, `hcpcs_cd` | SOURCE | inpatient | surrogate/FK keys DERIVED. |
 | fact_claim_diagnosis | `dgns_seq`, `icd_dgns_cd`, `poa_ind_sw` | SOURCE | inpatient | unpivot of ICD_DGNS_CD1..25; keys DERIVED. |
+| **sim_facility_crosswalk** | all | **SIMULATED** | seeded assignment | synthetic billing provider (`sim_prvdr_num`, FK to dim_provider) → REAL facility CCN, stratified by state+type. Not a real linkage. |
+| **sim_provider_crosswalk** | all | **SIMULATED** | seeded assignment | synthetic attending physician (`sim_at_physn_npi`) → REAL Medicare NPI, stratified by coherent state + inpatient-plausible specialty. Not a real linkage. |
 
-No warehouse column is SIMULATED. Synthetic provider/facility ids remain
-unlinked to real NPPES/Hospital data; that linkage is the SIMULATED crosswalk
-(Phase 1 task 4), which will be registered here as `sim_*`.
+The `sim_*_crosswalk` tables are the ONLY link between synthetic claims and real
+CCNs/NPIs, and every row is a seeded random assignment (seed
+`config/simulation.yaml:linkage.crosswalk_seed`), classified SIMULATED — never
+presented as a real correspondence (CLAUDE.md §3.4). All non-`sim_` warehouse
+columns remain SOURCE/DERIVED.

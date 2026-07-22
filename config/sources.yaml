@@ -76,6 +76,7 @@ sources:
     provider: download.cms.gov
     classification: REFERENCE
     license_note: Public NPI registry. Full monthly file ~1.14 GB zipped / ~9 GB CSV; we retain only a single-state streamed extract. Linked to claims ONLY via the SIMULATED crosswalk (CLAUDE.md §3.4).
+    role_note: "Reclassified 2026-07-22 to VALIDATION SAMPLE only (real-NPI spot-check). The crosswalk provider pool is now the nationwide medicare_providers dataset (human decision). See provenance_register.md."
     monthly_file_url: https://download.cms.gov/nppes/NPPES_Data_Dissemination_July_2026_V2.zip
     vintage: "2026-07"  # July 2026 V2 monthly dissemination; last-modified 2026-07-13
     # One-state extract keeps the artifact compact and contract tests fast while
@@ -131,6 +132,35 @@ sources:
         facilities: 5432
         states: 56
         comma_delimited: true
+
+  medicare_providers:
+    name: Medicare Physician & Other Practitioners - by Provider
+    url: https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/medicare-physician-other-practitioners-by-provider
+    csv_url: https://data.cms.gov/sites/default/files/2026-05/7323ba02-52e7-4a86-b2ce-ad210c25d9aa/MUP_PHY_R26_P05_V10_D24_Prov.csv
+    provider: data.cms.gov
+    classification: REFERENCE
+    license_note: Public. Real NPIs, specialties, states. Nationwide provider pool for the SIMULATED crosswalk (HUMAN-selected 2026-07-22). Real NPIs linked to synthetic claims ONLY via the seeded crosswalk.
+    vintage: "2024"  # data year D24 (MUP_PHY_R26_P05_V10_D24_Prov); released 2026-05
+    # Full CSV is ~hundreds of MB; we checksum the source then keep only these
+    # columns as a compact provider pool. Full file deleted after extraction.
+    extract_columns: [Rndrng_NPI, Rndrng_Prvdr_Ent_Cd, Rndrng_Prvdr_State_Abrvtn, Rndrng_Prvdr_Type, Rndrng_Prvdr_Last_Org_Name]
+    keep_full: false
+    # Measured at download 2026-07-22.
+    artifacts:
+      source_csv:
+        role: source_csv  # checksummed then deleted (not retained)
+        vintage: "2024"
+        sha256: e9e779645b5dd8fdd39e8533df525899b488a66863bb51ea8644ec59861feefc
+        size_bytes: 508819864
+        row_count: 1296739
+      extract:
+        role: reference
+        filename: data/raw/reference/medicare_providers_extract.csv
+        vintage: "2024"
+        sha256: d0a9c31eaf6eb26f8cd19825ee8965d6afb859d4f1cf0b5295c845218afd0ba4
+        size_bytes: 59901880
+        row_count: 1296739
+        columns: [Rndrng_NPI, Rndrng_Prvdr_Ent_Cd, Rndrng_Prvdr_State_Abrvtn, Rndrng_Prvdr_Type, Rndrng_Prvdr_Last_Org_Name]
 
   icd10:
     name: ICD-10-CM/PCS code files (match claims vintage)

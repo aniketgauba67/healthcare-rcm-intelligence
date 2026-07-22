@@ -57,12 +57,20 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   (src/ingestion/warehouse_sql_checks.py) runs identically in PG and the DuckDB
   CI mirror (`make warehouse-check`, 37/37) so they cannot drift. 910 null-provider
   + 2,741 null-DRG claims route to Unknown (metrics, not errors).
-- [~] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
-  — data-engineer, feat/phase1-ingestion. DONE: Hospital General Information
-  reference downloaded (5,432 real facilities/56 states, vintage 2026-04, sha256
-  83c98b2e…, manifest + sources.yaml + provenance/dictionary updated). Crosswalk
-  builder NOT yet written — 3 coordination items in Blocked (seed source, sim_
-  DDL ownership, NPPES RI-only vs state-stratified provider linkage).
+- [x] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
+  — data-engineer, feat/phase1-ingestion; awaiting qa review. Built per the
+  team-lead+human resolution (all 3 Blocked items). References: Hospital General
+  Information (5,432 facilities) + Medicare Physician by Provider (1,296,739 real
+  providers, human-selected nationwide pool; full 485 MB source checksummed then
+  discarded, 57 MB extract kept). `crosswalk_seed` added to config/simulation.yaml
+  (delegated one-commit). src/ingestion/crosswalk.py: seeded, stratified,
+  REPRODUCIBLE (same seed → identical). sql/ddl/30_sim_crosswalk.sql: sim_facility_
+  crosswalk (sim_prvdr_num FK→dim_provider) + sim_provider_crosswalk, classified
+  SIMULATED (sim_ prefix). LIVE Postgres load PASSED: 42/42 acceptance checks incl.
+  5 crosswalk checks (FK, provenance=SIMULATED, counts); 4,876 facility + 2,463
+  provider rows, 100% same-state (facility state+type; provider coherent-state +
+  inpatient-plausible specialty). NPPES RI extract reclassified to validation
+  sample. provenance_register + data_dictionary updated same commit.
 - [ ] Data-contract tests + quarantine table + reconciliation report
 - [ ] docs: data_dictionary.md + provenance_register.md v1
 - [ ] ACCEPTANCE (qa-reviewer): contracts pass, FKs pass, counts reconcile

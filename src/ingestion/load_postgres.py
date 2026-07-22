@@ -25,8 +25,9 @@ from .warehouse_sql_checks import CheckResult, run_count_reconciliation, run_vio
 
 _LOGGER = get_logger("ingestion.warehouse")
 
-_DDL_FILES = ("00_schema.sql", "10_dimensions.sql", "20_facts.sql")
+_DDL_FILES = ("00_schema.sql", "10_dimensions.sql", "20_facts.sql", "30_sim_crosswalk.sql")
 _SCHEMA = "rcm"
+_SIM_TABLES = ("sim_facility_crosswalk", "sim_provider_crosswalk")
 _LOAD_ORDER_DIMS = (
     "dim_date",
     "dim_beneficiary",
@@ -114,6 +115,80 @@ def load_frames(engine, frames: StarFrames) -> None:
         log_event(_LOGGER, "warehouse.loaded", table=name, rows=int(len(df)))
 
 
+def load_crosswalk(engine, *, seed: int | None = None):
+    """Build and load the SIMULATED linkage crosswalk into rcm.sim_* tables."""
+    from .crosswalk import build_crosswalk
+
+    result = build_crosswalk(seed=seed)
+    seed_val = int(result.report["crosswalk_seed"])
+    for name, df in (
+        ("sim_facility_crosswalk", result.facility),
+        ("sim_provider_crosswalk", result.provider),
+    ):
+        out = df.copy()
+        out["crosswalk_seed"] = seed_val
+        out["provenance"] = "SIMULATED"
+        out.to_sql(
+            name,
+            engine,
+            schema=_SCHEMA,
+            if_exists="append",
+            index=False,
+            method="multi",
+            chunksize=1000,
+        )
+        log_event(_LOGGER, "warehouse.loaded", table=name, rows=int(len(out)))
+    log_event(_LOGGER, "crosswalk.report", **result.report)
+    return result
+
+
+def validate_crosswalk(engine, result) -> list[CheckResult]:
+    """Acceptance checks for the SIMULATED crosswalk against live Postgres."""
+    from sqlalchemy import text
+
+    checks: list[CheckResult] = []
+    with engine.connect() as conn:
+
+        def scalar(sql: str) -> int:
+            return conn.execute(text(sql)).scalar()
+
+        # FK: every synthetic billing provider resolves to a real dim_provider.
+        orphans = scalar(
+            f"select count(*) from {_SCHEMA}.sim_facility_crosswalk x "
+            f"left join {_SCHEMA}.dim_provider d on x.sim_prvdr_num = d.prvdr_num "
+            "where d.prvdr_num is null"
+        )
+        checks.append(
+            CheckResult("xwalk_fk:sim_prvdr_num->dim_provider", orphans == 0, f"orphans={orphans}")
+        )
+        # Every crosswalk row is classified SIMULATED.
+        for tbl in _SIM_TABLES:
+            non_sim = scalar(
+                f"select count(*) from {_SCHEMA}.{tbl} where provenance <> 'SIMULATED'"
+            )
+            checks.append(
+                CheckResult(f"xwalk_provenance:{tbl}", non_sim == 0, f"non_simulated={non_sim}")
+            )
+        # Row counts match the built frames.
+        for tbl, df in (
+            ("sim_facility_crosswalk", result.facility),
+            ("sim_provider_crosswalk", result.provider),
+        ):
+            actual = scalar(f"select count(*) from {_SCHEMA}.{tbl}")
+            checks.append(
+                CheckResult(f"xwalk_count:{tbl}", actual == len(df), f"{actual} vs {len(df)}")
+            )
+    for c in checks:
+        log_event(
+            _LOGGER,
+            "warehouse.check",
+            name=c.name,
+            status="PASS" if c.passed else "FAIL",
+            detail=c.detail,
+        )
+    return checks
+
+
 def validate_postgres(engine, frames: StarFrames) -> list[CheckResult]:
     """Run the shared acceptance checks against the LIVE Postgres warehouse."""
     from sqlalchemy import text
@@ -196,7 +271,8 @@ def main(argv: list[str] | None = None) -> int:
     engine = create_engine(url)
     apply_ddl(engine)
     load_frames(engine, frames)
-    checks = validate_postgres(engine, frames)
+    xwalk = load_crosswalk(engine)
+    checks = validate_postgres(engine, frames) + validate_crosswalk(engine, xwalk)
     failed = [c.name for c in checks if not c.passed]
     log_event(
         _LOGGER,

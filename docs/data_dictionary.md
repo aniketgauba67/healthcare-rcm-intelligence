@@ -142,3 +142,25 @@ Loaded counts (this subset, reconciled to source): 20,867 claims / 58,066
 revenue lines / 338,024 diagnoses; dims 9,660 beneficiaries, 4,876 providers,
 167 DRGs. 910 claims have a null billing provider and 2,741 a null DRG — both
 routed to the Unknown member (reported as data-quality metrics, not errors).
+
+SIMULATED crosswalk tables (CLAUDE.md §3.4 — seeded random assignment, NOT a
+real linkage; seed in `config/simulation.yaml:linkage.crosswalk_seed`):
+
+| Table | Grain | Maps | Stratified by |
+|---|---|---|---|
+| `sim_facility_crosswalk` | one synthetic billing provider (`sim_prvdr_num`, FK to `dim_provider`) | → real facility CCN (Hospital General Information) | state (SSA→postal) + acute-care type |
+| `sim_provider_crosswalk` | one synthetic attending physician (`sim_at_physn_npi`) | → real Medicare NPI (Medicare Physician by Provider) | coherent state + inpatient-plausible specialty |
+
+Each row carries `match_rule`, `same_state`, `crosswalk_seed`, and
+`provenance='SIMULATED'`. On this subset: 4,876 facility rows and 2,463 provider
+rows, 100% same-state matches. Same seed reproduces an identical crosswalk.
+
+## Raw layer — Medicare Physician & Other Practitioners by Provider (REFERENCE, vintage 2024)
+
+### `reference/medicare_providers_extract.csv`
+Compact column extract (NPI, entity code, state, specialty, name) of the CMS
+"Medicare Physician & Other Practitioners - by Provider" dataset (D24 release).
+1,296,739 real providers, nationwide. Provider pool for the SIMULATED
+`sim_provider_crosswalk`. Real NPIs — linked to synthetic claims only via that
+crosswalk. (The full ~485 MB source is checksummed then deleted; only the
+extract is retained.)
