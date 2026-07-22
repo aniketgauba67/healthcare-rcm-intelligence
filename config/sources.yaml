@@ -1,0 +1,39 @@
+# Source manifest. data-engineer fills checksums + exact vintages at download time.
+sources:
+  cms_synthetic_claims:
+    name: CMS Synthetic Medicare Enrollment, FFS Claims, and PDE
+    url: https://data.cms.gov/collection/synthetic-medicare-enrollment-fee-for-service-claims-and-prescription-drug-event
+    classification: SOURCE
+    license_note: Official CMS synthetic data; not valid for real population estimates.
+    vintage: TBD_AT_DOWNLOAD
+    sha256: {}
+  hospital_general_information:
+    name: CMS Hospital General Information
+    url: https://data.cms.gov/provider-data/dataset/xubh-q36u
+    classification: REFERENCE
+    license_note: Public. Linked to claims ONLY via simulated crosswalk.
+  nppes_npi:
+    name: NPPES NPI downloadable file (state-filtered extract)
+    url: https://download.cms.gov/nppes/NPI_Files.html
+    classification: REFERENCE
+    license_note: Public. Use filtered extract; full file ~9GB.
+  icd10:
+    name: ICD-10-CM/PCS code files (match claims vintage)
+    url: https://www.cms.gov/medicare/coding-billing/icd-10-codes
+    classification: REFERENCE
+  hcpcs:
+    name: HCPCS Level II quarterly update
+    url: https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system
+    classification: REFERENCE
+    license_note: Public Level II only. NO CPT descriptions in repo (AMA-licensed).
+  ms_drg:
+    name: MS-DRG definitions (IPPS tables, matching year)
+    url: https://www.cms.gov/medicare/payment/prospective-payment-systems/acute-inpatient-pps
+    classification: REFERENCE
+  carc_codes:
+    name: X12 Claim Adjustment Reason Codes
+    url: https://x12.org/codes
+    classification: REFERENCE
+    license_note: Use as category taxonomy labels only.
+benchmarks_for_calibration:
+  note: Cited in docs/assumptions.md to justify simulation ranges; data not ingested.

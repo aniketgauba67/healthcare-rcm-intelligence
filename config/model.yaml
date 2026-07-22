@@ -1,0 +1,20 @@
+seed: 1337
+split:
+  strategy: temporal
+forbidden_features:
+  - sim_denial_flag
+  - sim_denial_reason
+  - sim_denial_category
+  - sim_allowed_amount
+  - sim_paid_amount
+  - sim_latent_p
+  - sim_appeal_*
+  - sim_recovered_*
+  - adjudication_date
+  - payment_date
+  - post_submission_workflow_*
+cost_matrix:
+  review_cost_usd: 25
+  prevented_denial_value_multiplier: 1.0
+  false_negative_penalty: full_expected_reimbursement_loss
+calibration: isotonic

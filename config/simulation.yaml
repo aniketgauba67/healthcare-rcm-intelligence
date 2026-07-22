@@ -1,0 +1,15 @@
+version: 0.1.0
+seed: 42
+targets:
+  overall_denial_rate: {min: 0.10, max: 0.18, note: design choice, cite benchmarks}
+  label_noise: 0.05
+mechanisms:
+  # simulation-engineer expands: coefficients, interactions, category logic
+  authorization_missing_or: 3.0
+  eligibility_failed_or: 2.5
+  documentation_deficit_or: 1.8
+  late_filing_or: 2.2
+appeal:
+  base_success_rate_range: [0.35, 0.55]
+timelines:
+  submission_lag_days: {dist: lognormal, mu: 1.2, sigma: 0.6}

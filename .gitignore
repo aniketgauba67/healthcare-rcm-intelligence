@@ -1,0 +1,16 @@
+data/raw/*
+data/validated/*
+data/curated/*
+!data/**/.gitkeep
+.env
+.claude/settings.local.json
+__pycache__/
+*.pyc
+.venv/
+mlruns/
+*.parquet
+*.duckdb
+!dashboard/demo_data/*.parquet
+!dashboard/demo_data/*.duckdb
+.ipynb_checkpoints/
+models_artifacts/
