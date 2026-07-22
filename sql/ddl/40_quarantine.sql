@@ -20,3 +20,6 @@ create table rcm.dq_quarantine (
 );
 create index ix_dq_table    on rcm.dq_quarantine (table_name);
 create index ix_dq_contract on rcm.dq_quarantine (contract);
+comment on table rcm.dq_quarantine is
+  'DERIVED data-quality quarantine: one row per validated-layer data-contract '
+  'violation. Failing rows are isolated here, never silently dropped.';

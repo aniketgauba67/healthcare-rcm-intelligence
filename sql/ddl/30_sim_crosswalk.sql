@@ -34,6 +34,9 @@ create table rcm.sim_facility_crosswalk (
 );
 create index ix_sfx_ccn   on rcm.sim_facility_crosswalk (facility_ccn);
 create index ix_sfx_state on rcm.sim_facility_crosswalk (facility_state);
+comment on table rcm.sim_facility_crosswalk is
+  'SIMULATED: seeded assignment of synthetic billing providers to REAL facility '
+  'CCNs (Hospital General Information). Not a real correspondence (CLAUDE.md §3.4).';
 
 -- ---------------------------------------------------------------------------
 -- sim_provider_crosswalk — synthetic attending physician -> real Medicare
@@ -55,3 +58,6 @@ create table rcm.sim_provider_crosswalk (
 );
 create index ix_spx_npi     on rcm.sim_provider_crosswalk (real_npi);
 create index ix_spx_state   on rcm.sim_provider_crosswalk (real_provider_state);
+comment on table rcm.sim_provider_crosswalk is
+  'SIMULATED: seeded assignment of synthetic attending physicians to REAL '
+  'Medicare NPIs. Not a real correspondence (CLAUDE.md §3.4).';
