@@ -121,14 +121,35 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > (c) sql/ddl/50_sim_adjudication.sql + own loader in src/simulation/ (does NOT
 > touch src/ingestion/), (d) validation suite + docs. Crosswalk review verdict
 > and the crosswalk_seed decision are in the kickoff message to team-lead.
-- [ ] Generator: adjudication, denials, appeals, workflow events, timelines, costs
-  — simulation-engineer, feat/phase2-simulation, IN PROGRESS.
-- [ ] Calibration to cited benchmark ranges (docs/assumptions.md)
-  — simulation-engineer, feat/phase2-simulation, IN PROGRESS (with the generator).
-- [ ] Validation suite: directional, distributional, temporal, reproducibility
-  — simulation-engineer, feat/phase2-simulation, claimed.
-- [ ] Load sim_ tables into warehouse; provenance updated
-  — simulation-engineer, feat/phase2-simulation, claimed.
+- [x] Generator: adjudication, denials, appeals, workflow events, timelines, costs
+  — simulation-engineer, feat/phase2-simulation (6d708bd), SENT TO QA 2026-07-22.
+  src/simulation/ (config, base, generator, validate, sim_sql_checks, load_sim,
+  run) + sql/ddl/50_sim_adjudication.sql. 8 sim_ tables, causal generation order
+  (pre-submission facts → timeline → latent p → outcome → money → appeals →
+  events → costs). auth_required×auth_missing and payer×service_line
+  interactions, 4 non-linear terms, 5% label noise, oracle AUC 0.68.
+  Late filing is endogenous (generated submission date vs payer filing limit).
+- [x] Calibration to cited benchmark ranges (docs/assumptions.md)
+  — simulation-engineer, same commit. simulation.yaml v0.3.0; every range labeled
+  DESIGN CHOICE and cited (KFF, Premier, Experian, Change Healthcare, MGMA/HFMA,
+  Medicare 14-day payment floor + 12-month filing limit). Realized: denial rate
+  12.8% (band 10-18%), appeal rate 36.3% of denials, overturn 48.0%, rework
+  $29.88/denied claim. Documented where our output does NOT match a benchmark
+  (cost to collect ~1% vs the 2-3% figure) and why, rather than tuning to it.
+  Also documented the source-data DRG skew (DRG 951 = 44% of claims).
+- [x] Validation suite: directional, distributional, temporal, reproducibility
+  — simulation-engineer, same commit. 63 frame checks + 52 shared-SQL checks that
+  run IDENTICALLY against live PG and the DuckDB mirror (warehouse_sql_checks
+  single-source pattern). 28 new unit tests in tests/simulation/ (built on a
+  synthetic base frame so they run in CI without the gitignored data layer) +
+  2 live-PG integration tests. Reproducibility = SHA-256 of each table's
+  canonical CSV, recorded in the run report.
+- [x] Load sim_ tables into warehouse; provenance updated
+  — simulation-engineer, same commit. `make simulate-warehouse` (own loader in
+  src/simulation/, does NOT touch src/ingestion/). LIVE PG 52/52. provenance_
+  register + data_dictionary updated in the same commit, plus new
+  docs/simulated_forbidden_columns.md so ml-engineer gets the §4 leakage boundary
+  without reading src/simulation/ (§4.5).
 - [ ] ACCEPTANCE (qa-reviewer): seed-reproducible, validity checks pass
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
