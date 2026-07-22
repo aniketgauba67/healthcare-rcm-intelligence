@@ -102,3 +102,33 @@ file (`npidata_pfile_*`). Comma-delimited, fields quoted. Standard ~330-column
 NPPES layout. Key: `NPI`. Filter column: `Provider Business Practice Location
 Address State Name`. Real NPIs — linked to synthetic claims only via the
 SIMULATED crosswalk.
+
+## Warehouse layer — star schema (`rcm`, PostgreSQL 16)
+
+Built by `src/ingestion/star_transform.py` + `sql/ddl/` (`make warehouse`; DB-free
+integrity via `make warehouse-check`). Every dimension reserves surrogate key
+`0` for an **Unknown** member so facts never carry null foreign keys. Synthetic
+provider ids are flagged `is_synthetic_id = true` — they are NOT real CCNs/NPIs.
+
+Dimensions:
+
+| Table | Grain | Natural key | Notes |
+|---|---|---|---|
+| `dim_date` | one calendar day | `date_key` (yyyymmdd) | key 0 = Unknown/undated; keys are date-ordered ints. |
+| `dim_beneficiary` | one beneficiary | `bene_id` | demographics + coverage months; SOURCE. |
+| `dim_provider` | one billing provider | `prvdr_num` | synthetic CCN/NPI; `is_synthetic_id`. |
+| `dim_drg` | one MS-DRG code | `drg_cd` | `drg_desc` null until MS-DRG REFERENCE loaded. |
+| `dim_discharge_status` | one status code | `discharge_status_cd` | SOURCE. |
+
+Facts:
+
+| Table | Grain | Key | Notes |
+|---|---|---|---|
+| `fact_inpatient_claim` | one claim (`CLM_ID`) | `claim_sk` | claim-header measures (payment/charges constant per claim); FKs to all dims; `length_of_stay_days` is DERIVED; CHECK constraints enforce non-negative money and `from_date_key ≤ thru_date_key`. |
+| `fact_claim_revenue_line` | one revenue line (`CLM_ID`+`CLM_LINE_NUM`) | `claim_line_sk` | rev code / HCPCS; FK to claim. |
+| `fact_claim_diagnosis` | one (claim, diagnosis slot) | `claim_dgns_sk` | long form of `ICD_DGNS_CD1..25` + POA; only non-empty codes. |
+
+Loaded counts (this subset, reconciled to source): 20,867 claims / 58,066
+revenue lines / 338,024 diagnoses; dims 9,660 beneficiaries, 4,876 providers,
+167 DRGs. 910 claims have a null billing provider and 2,741 a null DRG — both
+routed to the Unknown member (reported as data-quality metrics, not errors).

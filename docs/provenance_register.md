@@ -40,11 +40,23 @@ Provenance rules enforced here:
 - No raw source is ever classified `SIMULATED`; no downloaded reference file is
   presented as claims-linked truth.
 
-## Warehouse tables and columns
+## Warehouse tables and columns (star schema `rcm`)
 
-Populated with the DDL task (Phase 1 item 3). The simulated crosswalk table and
-all `sim_`-prefixed tables are added here by their owning agents.
+Star schema over the validated RIF (DDL in `sql/ddl/`, load via
+`src/ingestion/star_transform.py` + `load_postgres.py`). The simulated crosswalk
+and all `sim_`-prefixed tables are added here by their owning agents.
 
-| Table | Column | Classification | Source / Generator | Notes |
+| Table | Column(s) | Classification | Source / Generator | Notes |
 |---|---|---|---|---|
-| _(pending DDL)_ | | | | |
+| dim_date | all | DERIVED | generated calendar | from fact date columns; key 0 = Unknown. |
+| dim_beneficiary | all except `bene_key` | SOURCE | beneficiary_2024 | `bene_key` surrogate is DERIVED; Unknown row DERIVED. |
+| dim_provider | `prvdr_num`, `org_npi_num`, `provider_state_cd` | SOURCE | inpatient | synthetic ids (`is_synthetic_id=true`); NOT real CCN/NPI. `provider_key` DERIVED. |
+| dim_drg | `drg_cd` | SOURCE | inpatient | `drg_desc` will be REFERENCE (MS-DRG file); `drg_key` DERIVED. |
+| dim_discharge_status | `discharge_status_cd` | SOURCE | inpatient | `discharge_status_key` DERIVED. |
+| fact_inpatient_claim | measures, degenerate `clm_id`, diagnosis codes | SOURCE | inpatient | surrogate/FK keys DERIVED; `length_of_stay_days` DERIVED. |
+| fact_claim_revenue_line | `clm_line_num`, `rev_cntr`, `hcpcs_cd` | SOURCE | inpatient | surrogate/FK keys DERIVED. |
+| fact_claim_diagnosis | `dgns_seq`, `icd_dgns_cd`, `poa_ind_sw` | SOURCE | inpatient | unpivot of ICD_DGNS_CD1..25; keys DERIVED. |
+
+No warehouse column is SIMULATED. Synthetic provider/facility ids remain
+unlinked to real NPPES/Hospital data; that linkage is the SIMULATED crosswalk
+(Phase 1 task 4), which will be registered here as `sim_*`.

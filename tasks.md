@@ -33,7 +33,19 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   EXACTLY to raw: beneficiary_2024.parquet 9,660 rows/185 cols/3 date cols;
   inpatient.parquet 58,066 rows/197 cols/33 date cols. 0 unparseable dates.
   Codes/ids/ZIP/NPI/CCN kept as text (leading zeros + signs preserved).
-- [ ] PostgreSQL DDL: facts, dims, constraints, indexes, Unknown members
+- [~] PostgreSQL DDL: facts, dims, constraints, indexes, Unknown members
+  — data-engineer, feat/phase1-ingestion; DDL + loader done, awaiting qa review.
+  sql/ddl/ (00_schema,10_dimensions,20_facts): star schema — dim_date/beneficiary/
+  provider/drg/discharge_status (each with Unknown member key 0) + fact_inpatient_
+  claim (header grain), fact_claim_revenue_line (line), fact_claim_diagnosis
+  (unpivot); FKs, non-negative + date-order CHECKs, indexes. Idempotent loader
+  (src/ingestion/load_postgres.py, `make warehouse`) + engine-agnostic transform.
+  Offline reconciliation (`make warehouse-check`, DuckDB) = 28/28 checks PASS on
+  real data: 20,867 claims/58,066 lines/338,024 diagnoses reconcile to source;
+  all FKs resolve; 910 null-provider + 2,741 null-DRG claims routed to Unknown
+  (metrics, not errors). CAVEAT: live Postgres load NOT runnable in this env
+  (no docker daemon / psql) — validated offline; live `make warehouse` pending a
+  Postgres instance (CI/Docker). Flagged to team-lead.
 - [ ] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
 - [ ] Data-contract tests + quarantine table + reconciliation report
 - [ ] docs: data_dictionary.md + provenance_register.md v1
