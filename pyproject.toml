@@ -3,7 +3,7 @@ name = "healthcare-rcm-intelligence"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-  "pandas>=2.2", "pyarrow>=16", "numpy>=1.26",
+  "pandas>=2.2", "pyarrow>=16", "numpy>=1.26,<2.1",
   "sqlalchemy>=2.0", "psycopg2-binary>=2.9", "duckdb>=1.0",
   "scikit-learn>=1.5", "xgboost>=2.1", "shap>=0.46",
   "lifelines>=0.29", "scipy>=1.13", "statsmodels>=0.14",
@@ -17,3 +17,19 @@ dev = ["pytest>=8.2", "ruff>=0.5", "pytest-cov>=5.0"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.uv]
+# Resolution is scoped to the CPython 3.11-3.12 range. Upstream reason: shap
+# pulls in numba, which requires numpy < 2.1; numpy < 2.1 ships no cp313 wheels,
+# so an unbounded resolution backtracks numba/llvmlite to unbuildable 2021-era
+# releases. Bounding the solved environments (and the numpy cap below) keeps the
+# declared requires-python (">=3.11", a locked decision) intact while producing
+# a lockfile that installs. Revisit if numba/numpy publish a 3.13-compatible pair.
+environments = ["python_version >= '3.11' and python_version < '3.13'"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+  "integration: tests that require external services (Postgres, network); excluded in CI unit runs",
+]
