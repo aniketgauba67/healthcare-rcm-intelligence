@@ -98,26 +98,32 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 ## Blocked / Questions for human
 (agents write here instead of guessing)
 
-- [data-engineer 2026-07-22] Task 4 crosswalk — 3 items before I build the sim_
-  crosswalk (touching §3.4 provenance + §5 ownership; not resolving by assumption):
-  1. SEED: CLAUDE.md §2 locks "seeds live in config/simulation.yaml" (owned by
-     simulation-engineer). That file has a general `seed: 42` but no dedicated
-     crosswalk seed. Proposal: simulation-engineer adds `crosswalk_seed` (keeps
-     the crosswalk reproducible independent of generator-seed changes); until
-     then I read the existing `seed` read-only. OK to proceed reading `seed`?
-  2. sim_ DDL OWNERSHIP: §5 lists `sql/ddl/ (sim tables only)` under
-     simulation-engineer, but the crosswalk build is a data-engineer Phase-1
-     task (persona #5). Who writes sql/ddl for `sim_provider_crosswalk` /
-     `sim_facility_crosswalk` — me (I own sql/ddl/ generally) or simulation-
-     engineer? Proposal: I write it as part of this task and simulation-engineer
-     reviews; confirm.
-  3. NPPES COVERAGE: the NPPES extract is Rhode-Island-only (task-1 choice). So a
-     claims→real-PROVIDER (NPI) crosswalk stratified by state can only be
-     same-state for RI. Facilities (Hospital General Info) are nationwide, so the
-     claims→real-FACILITY (CCN) crosswalk stratifies by state+type fine. Options:
-     (a) facility crosswalk primary + NPI provider crosswalk scoped/labeled
-     RI-only; (b) re-run NPPES for more states; (c) relax provider stratification.
-     Recommend (a) for Phase 1. Decision?
+- [RESOLVED 2026-07-22, team-lead + HUMAN] Task 4 crosswalk 3 items:
+  1. SEED (team-lead ruling): add dedicated `crosswalk_seed` to
+     config/simulation.yaml. data-engineer has one-commit delegated authority to
+     add that single key (simulation-engineer not yet spawned; inherits the file
+     and may revisit the value at Phase 2 kickoff). Do not read the generator
+     `seed` for the crosswalk.
+  2. sim_ DDL OWNERSHIP (team-lead ruling): data-engineer writes the
+     sim_*_crosswalk DDL as part of task 4 (persona assigns the crosswalk build);
+     qa-reviewer reviews now; simulation-engineer gets a review pass at Phase 2
+     kickoff. §5 stands otherwise — all future sim_ DDL is simulation-engineer's.
+  3. PROVIDER SOURCE (HUMAN decision — supersedes options a/b/c): use the CMS
+     Medicare Physician & Other Practitioners "by Provider" dataset
+     (data.cms.gov, latest year) as the nationwide provider dimension source
+     (NPI, specialty, state; ~hundreds of MB; Medicare-aligned). Add to
+     config/sources.yaml with checksum + vintage per manifest rules.
+     Requirements: facility crosswalk state+type stratified nationwide as
+     planned; provider crosswalk assigns providers stratified by the claim's
+     crosswalked FACILITY state and specialty-to-service-type plausibility
+     (facility/provider states coherent), seeded + reproducible; RI NPPES
+     extract becomes a validation sample only (classify its role in the
+     provenance register, or drop if unused); do NOT download the 9GB full
+     NPPES file. FALLBACK if the dataset download fails or schema lacks
+     state/specialty: facility-primary + RI-only provider crosswalk, with a
+     documented limitation in docs/provenance_register.md (provider state may
+     not match facility state) logged as a known issue for the Phase 5
+     honesty pass.
 
 ## Done
 - [x] Test gate green on clean clone (qa-reviewer, merged to main bc2a7ab, pushed):
