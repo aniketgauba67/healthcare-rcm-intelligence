@@ -1,23 +1,336 @@
-version: 0.1.0
+# ============================================================================
+# config/simulation.yaml — parameters for the SIMULATED adjudication layer.
+#
+# EVERY number in this file is a DESIGN CHOICE. None of it is measured from the
+# CMS synthetic claims, and none of it describes real CMS, Medicare Advantage,
+# commercial, or Medicaid adjudication behaviour. Ranges are bracketed against
+# published industry reporting; each anchor is cited in docs/assumptions.md.
+#
+# Owner: simulation-engineer (CLAUDE.md §5).
+# Versioning rule (persona): bump `version` on EVERY calibration change and note
+# the change in docs/assumptions.md § Changelog.
+# ============================================================================
+version: 0.2.0
+
+# Master seed for the generator. Every component derives an independent stream
+# from this via numpy SeedSequence.spawn, so adding a component never shifts an
+# existing component's draws. Never hardcode a seed in code (CLAUDE.md §2).
 seed: 42
+
+# ---------------------------------------------------------------------------
+# Marginal calibration targets. The generator solves for the logistic intercept
+# so the realized denial rate lands on `point`; `min`/`max` are the acceptance
+# band the validation suite enforces.
+# ---------------------------------------------------------------------------
 targets:
-  overall_denial_rate: {min: 0.10, max: 0.18, note: design choice, cite benchmarks}
+  overall_denial_rate: {min: 0.10, max: 0.18, point: 0.130}
+  # Symmetric label noise: after drawing y ~ Bernoulli(sim_latent_p), flip y with
+  # this probability. Guarantees irreducible Bayes error so downstream ML cannot
+  # reach AUC 1.0 by recovering the generator. Design choice.
   label_noise: 0.05
+  # Share of denials that are partial (line-level reduction) vs full.
+  partial_denial_share: 0.28
+  # Share of denied claims that get appealed at least once.
+  appeal_rate: {min: 0.30, max: 0.45, point: 0.360}
+  # Share of appealed claims overturned (fully or partially) at any level.
+  appeal_overturn_rate: {min: 0.35, max: 0.60, point: 0.470}
+
+# ---------------------------------------------------------------------------
+# Simulated payer dimension (CLAUDE.md §3.5: Medicare FFS has ONE payer; this
+# multi-payer dimension is 100% simulated). These are ARCHETYPES, deliberately
+# not modelled on and not named after any real insurer.
+# ---------------------------------------------------------------------------
+payers:
+  - id: MCR_FFS
+    name: Traditional Medicare FFS (simulated archetype)
+    mix: 0.40
+    logit_offset: -0.35          # relative denial propensity
+    auth_required_rate: 0.10     # inpatient prior-auth prevalence
+    timely_filing_days: 365
+    adjudication_lognormal: {mu: 2.60, sigma: 0.40}
+    allowed_ratio_beta: {a: 6.0, b: 12.0}   # allowed / billed charges
+  - id: MCR_ADV
+    name: Medicare Advantage (simulated archetype)
+    mix: 0.25
+    logit_offset: 0.30
+    auth_required_rate: 0.62
+    timely_filing_days: 365
+    adjudication_lognormal: {mu: 3.05, sigma: 0.55}
+    allowed_ratio_beta: {a: 6.0, b: 12.5}
+  - id: COM_LARGE
+    name: Large Commercial (simulated archetype)
+    mix: 0.15
+    logit_offset: 0.20
+    auth_required_rate: 0.55
+    timely_filing_days: 180
+    adjudication_lognormal: {mu: 2.95, sigma: 0.55}
+    allowed_ratio_beta: {a: 7.5, b: 10.0}
+  - id: COM_REGIONAL
+    name: Regional Commercial (simulated archetype)
+    mix: 0.10
+    logit_offset: 0.10
+    auth_required_rate: 0.48
+    timely_filing_days: 90
+    adjudication_lognormal: {mu: 2.85, sigma: 0.60}
+    allowed_ratio_beta: {a: 7.0, b: 10.5}
+  - id: MCD_MCO
+    name: Medicaid Managed Care (simulated archetype)
+    mix: 0.10
+    logit_offset: 0.45
+    auth_required_rate: 0.65
+    timely_filing_days: 120
+    adjudication_lognormal: {mu: 3.15, sigma: 0.65}
+    allowed_ratio_beta: {a: 5.0, b: 13.0}
+
+# ---------------------------------------------------------------------------
+# Service lines. NOT an official CMS MS-DRG/MDC taxonomy — these are coarse
+# contiguous MS-DRG numeric ranges chosen BY THIS SIMULATION as a grouping
+# variable. The bucket boundaries are a design choice, so sim_service_line is
+# classified SIMULATED even though its input (drg_cd) is SOURCE.
+# `lo`/`hi` are inclusive MS-DRG numbers; claims with no DRG get UNKNOWN.
+# ---------------------------------------------------------------------------
+service_lines:
+  - {id: TRANSPLANT_TRACH,  name: Transplant & Tracheostomy,          lo: 1,   hi: 19,  logit_offset: 0.25}
+  - {id: NEURO_ENT,         name: Neurology & ENT,                    lo: 20,  hi: 152, logit_offset: 0.10}
+  - {id: CARDIO_RESP,       name: Cardiovascular & Respiratory,       lo: 153, hi: 264, logit_offset: -0.05}
+  - {id: DIGESTIVE_HEPATO,  name: Digestive & Hepatobiliary,          lo: 265, hi: 395, logit_offset: 0.00}
+  - {id: MSK_ENDO,          name: Musculoskeletal & Endocrine,        lo: 405, hi: 517, logit_offset: 0.30}
+  - {id: SKIN_RENAL_METAB,  name: Skin, Renal & Metabolic,            lo: 518, hi: 645, logit_offset: 0.05}
+  - {id: ONC_ID_BLOOD,      name: Blood, Oncology & Infectious Disease, lo: 652, hi: 816, logit_offset: 0.15}
+  - {id: TRAUMA_BEHAV,      name: Trauma, Behavioral & Other,         lo: 817, hi: 999, logit_offset: 0.35}
+  - {id: UNKNOWN,           name: Unknown / no DRG,                   lo: null, hi: null, logit_offset: 0.20}
+
+# ---------------------------------------------------------------------------
+# Latent denial mechanism. logit(sim_latent_p) = intercept (solved) + sum of the
+# terms below. Odds ratios are converted to log-odds coefficients by the
+# generator; a term applies only when its condition holds.
+# ---------------------------------------------------------------------------
 mechanisms:
-  # simulation-engineer expands: coefficients, interactions, category logic
-  authorization_missing_or: 3.0
-  eligibility_failed_or: 2.5
-  documentation_deficit_or: 1.8
-  late_filing_or: 2.2
+  # --- Prevalence of the pre-submission risk facts themselves ---
+  prevalence:
+    # P(auth missing | auth required), before the provider-quality adjustment.
+    auth_missing_given_required: 0.115
+    eligibility_verification_attempted: 0.93
+    eligibility_failed: 0.055
+    documentation_deficit: 0.150
+    coding_specificity_deficit: 0.120
+    # P(this claim duplicates an earlier submission for the same beneficiary)
+    duplicate_submission: 0.012
+
+  # --- Main effects, expressed as odds ratios (design choices) ---
+  odds_ratios:
+    authorization_missing: 3.00      # auth REQUIRED and NOT obtained
+    authorization_late: 1.45         # obtained, but after the service date
+    eligibility_failed: 2.50
+    eligibility_not_verified: 1.35
+    documentation_deficit: 1.80
+    coding_specificity_deficit: 1.65
+    late_filing: 2.20                # submitted past the payer's filing limit
+    duplicate_submission: 4.50
+
+  # --- Interactions (CLAUDE.md persona §2 requires genuine interactions) ---
+  interactions:
+    # THE headline interaction: an auth being required is nearly harmless on its
+    # own; required AND missing is what bites. Extra OR on top of the main
+    # effects, applied only when auth_required AND auth_missing.
+    auth_required_x_auth_missing: 1.60
+    # Missing documentation compounds a missing auth (nothing to back-fill with).
+    auth_missing_x_documentation_deficit: 1.30
+    # payer x service_line: additional log-odds, {payer_id: {service_line_id: v}}.
+    # Sparse — any pair not listed contributes 0. Deliberately non-additive so a
+    # model must learn the cross term, not just two main effects.
+    payer_x_service_line:
+      MCR_ADV:
+        MSK_ENDO: 0.55          # elective ortho under MA: heavy auth scrutiny
+        TRAUMA_BEHAV: 0.45
+        CARDIO_RESP: -0.20
+      COM_LARGE:
+        MSK_ENDO: 0.40
+        TRANSPLANT_TRACH: 0.50
+        NEURO_ENT: 0.20
+      COM_REGIONAL:
+        MSK_ENDO: 0.30
+        ONC_ID_BLOOD: 0.25
+      MCD_MCO:
+        TRAUMA_BEHAV: 0.60
+        SKIN_RENAL_METAB: 0.25
+        CARDIO_RESP: -0.15
+      MCR_FFS:
+        TRANSPLANT_TRACH: -0.25
+        UNKNOWN: 0.30
+
+  # --- Non-linear / continuous mechanisms (log-odds contributions) ---
+  # These exist so the relationship is not learnable by a linear model alone.
+  nonlinear:
+    # Charge amount: z-scored log(billed charges). Contribution is
+    # b1*z + b2*z^2 — mildly U-shaped, with high-dollar claims scrutinised most.
+    log_charge: {b1: 0.22, b2: 0.09}
+    # Length of stay: U-shaped. Very short stays read as "should have been
+    # observation"; very long stays trip outlier review. Contribution is
+    # b_short * 1[los <= short_days] + b_long * max(0, los - long_days) / 10.
+    length_of_stay: {short_days: 1, b_short: 0.35, long_days: 14, b_long: 0.30}
+    # Diagnosis-code count: protective at first (better-documented complexity),
+    # then rising (coding-complexity risk). Contribution is
+    # b1*(n/10) + b2*(n/10)^2.
+    diagnosis_count: {b1: -0.30, b2: 0.14}
+    # Per-provider latent "clean claim" quality, drawn once per billing provider
+    # from Normal(0, sigma) and added to every one of that provider's claims.
+    # Also shifts P(auth missing) and P(documentation deficit) for that provider.
+    provider_quality_sigma: 0.45
+    provider_quality_prevalence_scale: 0.35
+
+# ---------------------------------------------------------------------------
+# Denial categories. CARC codes are used as CATEGORY LABELS ONLY (CLAUDE.md
+# §3.7) — no CARC description text is reproduced anywhere in this repo. The
+# `name` values are plain-language labels authored for this project.
+#
+# `by_mechanism` gives P(category | strongest active mechanism). Categories are
+# drawn CONDITIONALLY on the mechanism that contributed the most log-odds to
+# that claim, so the category carries real information about the cause.
+# ---------------------------------------------------------------------------
+denial_categories:
+  catalog:
+    - {id: PRIOR_AUTH_MISSING,     carc_group: "197", name: Prior authorization absent or invalid}
+    - {id: ELIGIBILITY_COVERAGE,   carc_group: "27",  name: Coverage terminated or not in effect}
+    - {id: MEDICAL_NECESSITY,      carc_group: "50",  name: Service not deemed medically necessary}
+    - {id: DOCUMENTATION_MISSING,  carc_group: "16",  name: Required documentation not submitted}
+    - {id: CODING_INVALID,         carc_group: "181", name: Code invalid or insufficiently specific}
+    - {id: TIMELY_FILING,          carc_group: "29",  name: Filing limit exceeded}
+    - {id: DUPLICATE_CLAIM,        carc_group: "18",  name: Duplicate claim or service}
+    - {id: NON_COVERED_SERVICE,    carc_group: "96",  name: Service not covered under the plan}
+    - {id: COORDINATION_BENEFITS,  carc_group: "22",  name: Other payer primary}
+    - {id: BUNDLING,               carc_group: "97",  name: Payment bundled into another service}
+  by_mechanism:
+    authorization_missing:
+      {PRIOR_AUTH_MISSING: 0.72, MEDICAL_NECESSITY: 0.13, DOCUMENTATION_MISSING: 0.09, NON_COVERED_SERVICE: 0.06}
+    authorization_late:
+      {PRIOR_AUTH_MISSING: 0.58, MEDICAL_NECESSITY: 0.20, DOCUMENTATION_MISSING: 0.14, NON_COVERED_SERVICE: 0.08}
+    eligibility_failed:
+      {ELIGIBILITY_COVERAGE: 0.66, COORDINATION_BENEFITS: 0.22, NON_COVERED_SERVICE: 0.12}
+    eligibility_not_verified:
+      {ELIGIBILITY_COVERAGE: 0.45, COORDINATION_BENEFITS: 0.33, DOCUMENTATION_MISSING: 0.22}
+    documentation_deficit:
+      {DOCUMENTATION_MISSING: 0.55, MEDICAL_NECESSITY: 0.27, CODING_INVALID: 0.18}
+    coding_specificity_deficit:
+      {CODING_INVALID: 0.58, BUNDLING: 0.20, DOCUMENTATION_MISSING: 0.13, MEDICAL_NECESSITY: 0.09}
+    late_filing:
+      {TIMELY_FILING: 0.88, DOCUMENTATION_MISSING: 0.07, CODING_INVALID: 0.05}
+    duplicate_submission:
+      {DUPLICATE_CLAIM: 0.86, BUNDLING: 0.09, CODING_INVALID: 0.05}
+    # Fallback when no discrete mechanism is active and the denial is driven by
+    # the continuous/payer terms or by label noise.
+    baseline:
+      {MEDICAL_NECESSITY: 0.26, CODING_INVALID: 0.18, DOCUMENTATION_MISSING: 0.16,
+       BUNDLING: 0.13, NON_COVERED_SERVICE: 0.11, COORDINATION_BENEFITS: 0.08,
+       ELIGIBILITY_COVERAGE: 0.05, PRIOR_AUTH_MISSING: 0.03}
+
+# ---------------------------------------------------------------------------
+# Appeals. Drawn only for denied claims. Level 1 = payer reconsideration;
+# level 2 = formal appeal, attempted only if level 1 is upheld and the disputed
+# amount clears `level_2_min_amount`.
+# ---------------------------------------------------------------------------
 appeal:
   base_success_rate_range: [0.35, 0.55]
-timelines:
-  submission_lag_days: {dist: lognormal, mu: 1.2, sigma: 0.6}
+  # P(appeal | denied), by denial category. Scaled by the dollar term below.
+  propensity_by_category:
+    PRIOR_AUTH_MISSING: 0.45
+    ELIGIBILITY_COVERAGE: 0.30
+    MEDICAL_NECESSITY: 0.50
+    DOCUMENTATION_MISSING: 0.42
+    CODING_INVALID: 0.36
+    TIMELY_FILING: 0.14
+    DUPLICATE_CLAIM: 0.10
+    NON_COVERED_SERVICE: 0.16
+    COORDINATION_BENEFITS: 0.34
+    BUNDLING: 0.30
+  # Larger balances are worked more often: multiplier = 1 + k * z(log amount).
+  amount_propensity_k: 0.18
+  # Log-odds of OVERTURN at level 1, by category (relative to the solved intercept).
+  overturn_logit_by_category:
+    PRIOR_AUTH_MISSING: 0.35
+    ELIGIBILITY_COVERAGE: -0.30
+    MEDICAL_NECESSITY: 0.10
+    DOCUMENTATION_MISSING: 0.55
+    CODING_INVALID: 0.45
+    TIMELY_FILING: -1.40
+    DUPLICATE_CLAIM: -0.90
+    NON_COVERED_SERVICE: -0.75
+    COORDINATION_BENEFITS: 0.20
+    BUNDLING: 0.30
+  # Good documentation is what wins appeals.
+  overturn_logit_documentation_complete: 0.60
+  overturn_logit_partial_denial: 0.40
+  level_2_min_amount: 5000.0
+  level_2_attempt_rate: 0.45
+  level_2_overturn_multiplier: 0.70   # applied to level-1 odds
+  # Fraction of the disputed allowed amount actually recovered when overturned.
+  recovery_fraction_beta: {a: 9.0, b: 2.0}
 
+# ---------------------------------------------------------------------------
+# Timeline. The source claims carry service dates only; every date below is
+# generated. All lags are in days, drawn then rounded to whole days, and each
+# step is forced to be >= its predecessor so temporal ordering can never break.
+# ---------------------------------------------------------------------------
+timelines:
+  # discharge -> coding complete (the "discharged not final billed" window)
+  discharge_to_coded_gamma: {shape: 2.0, scale: 2.0}
+  # coding complete -> claim submitted
+  coded_to_submission_lognormal: {mu: 0.50, sigma: 0.60}
+  # submitted -> payer acknowledgement (EDI 277CA equivalent)
+  submission_to_ack_days: {min: 1, max: 4}
+  # acknowledgement -> adjudication decision: payer-specific, see payers[].
+  # adjudication -> payment posted (paid claims only)
+  adjudication_to_payment_lognormal: {mu: 1.40, sigma: 0.50}
+  # denial posted -> appeal filed
+  denial_to_appeal_lognormal: {mu: 2.70, sigma: 0.70}
+  # appeal filed -> appeal decision
+  appeal_decision_lognormal: {mu: 3.60, sigma: 0.50}
+  # A small tail of claims stalls in the billing office and files late. This is
+  # the ONLY route to a late-filing denial, so late filing is endogenous.
+  late_submission_tail_rate: 0.030
+  late_submission_extra_days_lognormal: {mu: 4.60, sigma: 0.80}
+
+# ---------------------------------------------------------------------------
+# Operating costs. Cost to collect is built bottom-up from touch minutes so the
+# workflow event log and the cost table reconcile to each other.
+# ---------------------------------------------------------------------------
+operating_costs:
+  labor_rate_per_hour: 32.00        # blended RCM staff rate, fully loaded
+  overhead_multiplier: 1.35         # benefits, systems, space
+  touch_minutes:
+    coding: {shape: 3.0, scale: 6.0}
+    billing_submission: {shape: 2.0, scale: 3.0}
+    payment_posting: {shape: 1.5, scale: 2.5}
+    denial_review: {shape: 2.5, scale: 8.0}
+    appeal_preparation: {shape: 3.0, scale: 14.0}
+  # Flat per-event costs on top of labour (clearinghouse fees, records retrieval).
+  fixed_costs:
+    clearinghouse_per_submission: 0.35
+    records_retrieval_per_appeal: 12.00
+
+# ---------------------------------------------------------------------------
+# Validation acceptance bands enforced by the validation suite. Failing any of
+# these fails the simulation build.
+# ---------------------------------------------------------------------------
+validation:
+  # Realized denial rate must land inside targets.overall_denial_rate min/max.
+  # Directional checks: each must hold with at least this margin in rate points.
+  directional_min_margin: 0.02
+  # Minimum share of the minority class, so downstream ML has a workable balance.
+  min_class_share: 0.05
+  # Realized mean must be within this absolute tolerance of the target point.
+  rate_tolerance: 0.010
+  # Maximum share of claims allowed to fall back to the UNKNOWN service line.
+  max_unknown_service_line_share: 0.20
+
+# ---------------------------------------------------------------------------
 # Linkage / crosswalk seed (CLAUDE.md §3.4). Added by data-engineer under
 # one-commit delegated authority (team-lead ruling 2026-07-22) because the
 # SIMULATED claim->real facility/provider crosswalk must be seed-reproducible.
 # Kept separate from `seed` so the crosswalk is stable across generator changes.
-# simulation-engineer owns this file and may revisit this value at Phase 2 kickoff.
+# REVIEWED at Phase 2 kickoff by simulation-engineer: value RETAINED unchanged
+# (changing it would re-randomize 7,339 already-accepted rows for no benefit).
+# The generator never reads this key, and the crosswalk never reads `seed`.
+# ---------------------------------------------------------------------------
 linkage:
   crosswalk_seed: 20260722

@@ -103,13 +103,45 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   Phase 2 gated by the human (do not start).
 
 ## Phase 2 — Simulation Layer (lead: simulation-engineer)
+> OPENED 2026-07-22 by human go-ahead after Phase 1 acceptance. Team re-spawned
+> (prior data-engineer + qa-reviewer instances hit a session limit): Phase 2 =
+> simulation-engineer (lead) + qa-reviewer-2 (review). data-engineer is NOT
+> respawned — Phase 1 scope is closed; re-spawn only if sim work needs an
+> ingestion/DDL change outside simulation-engineer's ownership.
+> State verified on main 2dc4e92 by team-lead: make test 44 passed, ruff clean,
+> main == origin/main, docker daemon up. Phase 1 team rules still in force
+> (shared single-writer Postgres + quiet windows; live PG is the acceptance bar,
+> DuckDB mirror is supplementary CI only).
+> Kickoff item: simulation-engineer gets the deferred review pass on
+> data-engineer's sql/ddl/30_sim_crosswalk.sql + linkage.crosswalk_seed.
+> CLAIMED 2026-07-22 by simulation-engineer: all 4 build tasks, branch
+> feat/phase2-simulation. Build order: (a) simulation.yaml v0.2.0 parameter set
+> + docs/assumptions.md anchors, (b) generator (pre-submission facts -> timeline
+> -> latent denial -> adjudication -> appeals -> workflow events -> costs),
+> (c) sql/ddl/50_sim_adjudication.sql + own loader in src/simulation/ (does NOT
+> touch src/ingestion/), (d) validation suite + docs. Crosswalk review verdict
+> and the crosswalk_seed decision are in the kickoff message to team-lead.
 - [ ] Generator: adjudication, denials, appeals, workflow events, timelines, costs
+  — simulation-engineer, feat/phase2-simulation, IN PROGRESS.
 - [ ] Calibration to cited benchmark ranges (docs/assumptions.md)
+  — simulation-engineer, feat/phase2-simulation, IN PROGRESS (with the generator).
 - [ ] Validation suite: directional, distributional, temporal, reproducibility
+  — simulation-engineer, feat/phase2-simulation, claimed.
 - [ ] Load sim_ tables into warehouse; provenance updated
+  — simulation-engineer, feat/phase2-simulation, claimed.
 - [ ] ACCEPTANCE (qa-reviewer): seed-reproducible, validity checks pass
 
 ## Phase 3 — Analytics + KPI Views (lead: analytics-engineer)
+> CARRY-FORWARD from Phase 1 (team-lead, 2026-07-22): Phase 1 task 1 was scoped
+> to "all sources in config/sources.yaml" but only the 4 data sources were
+> ingested (CMS synthetic claims, NPPES-RI validation sample, Hospital General
+> Information, Medicare Physician by Provider). The REFERENCE code sets —
+> hcpcs, ms_drg, carc_codes (and icd10) — have NO vintage/sha256 recorded and
+> are not downloaded. Not blocking Phase 2 (CARC is used as category LABELS
+> only, no file needed; §3.7). It DOES bite Phase 3 (service-line/DRG naming)
+> and any code-description enrichment. Owner when scheduled: data-engineer
+> (re-spawn). Watch §2 vintage rule: claims are 2023-04, so ICD-10/HCPCS/MS-DRG
+> references must match that period, NOT the current year.
 - [ ] 8 metric-contract views with control queries
 - [ ] EDA notebooks: >= 12 insights with statistical support
 - [ ] Statistical tests, survival analysis, process mining modules
