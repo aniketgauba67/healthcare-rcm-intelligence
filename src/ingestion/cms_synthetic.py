@@ -5,7 +5,7 @@ from __future__ import annotations
 from .http import download
 from .logging_utils import get_logger, log_event
 from .manifest import Manifest, ManifestEntry, count_csv_data_rows
-from .paths import DATA_RAW
+from .paths import DATA_RAW, REPO_ROOT
 from .sources import get_source
 
 _LOGGER = get_logger("ingestion.cms_synthetic")
@@ -53,7 +53,7 @@ def download_synthetic_subset(
                 role=_role_for(member),
                 classification=cfg["classification"],
                 url=url,
-                filename=str(dest.relative_to(DATA_RAW.parent)),
+                filename=str(dest.relative_to(REPO_ROOT)),
                 vintage=cfg["vintage"],
                 sha256=digest,
                 size_bytes=size,

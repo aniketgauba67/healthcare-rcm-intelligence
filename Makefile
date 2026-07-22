@@ -1,10 +1,13 @@
-.PHONY: setup ingest simulate warehouse views train score dashboard api test lint demo-extract
+.PHONY: setup ingest stage simulate warehouse views train score dashboard api test lint demo-extract
 
 setup:
 	uv sync
 
 ingest:
 	uv run python -m src.ingestion.run
+
+stage:
+	uv run python -m src.validation.run
 
 simulate:
 	uv run python -m src.simulation.run

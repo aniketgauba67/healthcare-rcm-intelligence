@@ -18,6 +18,19 @@ Checksums, sizes, and row counts are measured at download time and recorded in
 | `cms_synthetic/inpatient.csv` | cms_synthetic_claims | SOURCE | 2023-04 | Inpatient FFS claims (line-level). Pipe-delimited. |
 | `nppes/nppes_ri_extract.csv` | nppes_npi | REFERENCE | 2026-07 | Rhode Island state-filtered NPPES provider extract (comma-delimited, quoted). |
 
+## Validated layer — typed Parquet (`data/validated/`, gitignored)
+
+Typed representations of the raw RIF SOURCE files (dtype standardization only —
+no new computed columns), produced by `src/validation/` (`make stage`).
+Classification is unchanged from the raw source.
+
+| Artifact | Derived from | Classification | Rows | Notes |
+|---|---|---|---|---|
+| `beneficiary_2024.parquet` | `cms_synthetic/beneficiary_2024.csv` | SOURCE | 9,660 | 185 cols; typed dates/money/int, codes kept as text. |
+| `inpatient.parquet` | `cms_synthetic/inpatient.csv` | SOURCE | 58,066 | 197 cols; 33 typed date columns. |
+
+Row counts reconcile exactly to the raw source (enforced by `src.validation.run`).
+
 Provenance rules enforced here:
 - Synthetic claims carry **synthetic** provider/facility identifiers
   (`PRVDR_NUM`, `ORG_NPI_NUM`, `AT_PHYSN_NPI`). These do **not** join to the

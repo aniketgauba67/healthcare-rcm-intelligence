@@ -1,7 +1,38 @@
 # Data Dictionary
 
-Covers the raw ingestion layer (`data/raw/`). Typed Parquet (validated layer)
-and warehouse table dictionaries are added by their respective Phase 1 tasks.
+Covers the raw ingestion layer (`data/raw/`) and the typed validated layer
+(`data/validated/`). Warehouse table dictionaries are added by the DDL task.
+
+## Validated layer — typed Parquet (`data/validated/`)
+
+`src/validation/` (`make stage`) standardizes the raw pipe-delimited RIF CSVs
+into typed Parquet without altering values (leading zeros, signed synthetic
+ids, and ICD codes are preserved as text). Dtypes are resolved by explicit,
+auditable rules in `src/validation/schemas.py`:
+
+| Kind | Rule | Arrow type |
+|---|---|---|
+| date | name matches `_DT` + optional index digit (e.g. `CLM_FROM_DT`, `PRCDR_DT1..25`), or `COVSTART` | `date32[day]` |
+| money | name ends `_AMT`, or `CLM_PPS_CPTL_DRG_WT_NUM` | `float64` |
+| int | name ends `_CNT`/`_MONS`/`_DAYS`/`_QTY`/`_YR`, or `CLM_LINE_NUM` | `int64` (nullable) |
+| string | everything else — codes (`_CD`), ids (`_NUM`, `_NPI`, `_ID`), ZIP, switches (`_SW`/`_IND`) | `string` |
+
+Dates parse with format `%d-%b-%Y` (e.g. `25-Mar-2015`); empty strings become
+null, and non-empty values that fail to parse are counted per column and
+reported (data-quality signal), never silently dropped.
+
+Staged outputs (row counts reconcile exactly to the raw source):
+
+| Parquet | Rows | Columns | Typed date cols |
+|---|---|---|---|
+| `data/validated/beneficiary_2024.parquet` | 9,660 | 185 | 3 |
+| `data/validated/inpatient.parquet` | 58,066 | 197 | 33 |
+
+Known limitation: a few RIF columns whose names are truncated so the `_DT`
+token is not the final token (e.g. `NCH_BENE_MDCR_BNFTS_EXHTD_DT_I`,
+`NCH_ACTV_OR_CVRD_LVL_CARE_THRU`) remain string-typed pending the official RIF
+data dictionary. Their raw text is preserved losslessly; only the type hint is
+conservative. These are rarely populated in the synthetic data.
 
 ## Raw layer — CMS Synthetic Medicare RIF (SOURCE, vintage 2023-04)
 
@@ -27,7 +58,7 @@ Grain: one row per synthetic beneficiary per reference year. Key: `BENE_ID`.
 | `DUAL_STUS_CD_01..12`, `DUAL_ELGBL_MONS` | Monthly dual-eligibility status / months. |
 | `PTC_*`, `PTD_*` (`_01..12`) | Monthly Part C/D contract, plan, segment ids. |
 
-(158 columns total; monthly arrays `_01..12` carry the per-month values.)
+(185 columns total; monthly arrays `_01..12` carry the per-month values.)
 
 ### `inpatient.csv` — Inpatient FFS claims
 Grain: claim line (claim header repeats across revenue-center lines).

@@ -23,7 +23,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   CMS synthetic vintage 2023-04 (ICD-10 RIF, pipe-delimited, 8,671 synth benes);
   NPPES vintage 2026-07 (July V2). Subset = enrollment + inpatient claims.
   Scripts idempotent (checksum-skip); NPPES streams 9 GB main file, keeps RI only.
-- [ ] Typed Parquet staging for claims/enrollment files (validated layer)
+- [x] Typed Parquet staging for claims/enrollment files (validated layer)
+  — data-engineer, feat/phase1-ingestion; awaiting qa-reviewer PASS.
+  `make stage` (src/validation/): rule-based dtype resolution, chunked read,
+  date parse (%d-%b-%Y), structured logging, idempotent. Row counts reconcile
+  EXACTLY to raw: beneficiary_2024.parquet 9,660 rows/185 cols/3 date cols;
+  inpatient.parquet 58,066 rows/197 cols/33 date cols. 0 unparseable dates.
+  Codes/ids/ZIP/NPI/CCN kept as text (leading zeros + signs preserved).
 - [ ] PostgreSQL DDL: facts, dims, constraints, indexes, Unknown members
 - [ ] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
 - [ ] Data-contract tests + quarantine table + reconciliation report
