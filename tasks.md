@@ -83,7 +83,14 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   in stage_parquet). On this subset: all contracts pass, 0 quarantined, rows
   reconcile (9,660/58,066). LIVE PG load still 42/42; unit 42 pass, integration
   1 pass, ruff clean. docs updated same commit.
-- [ ] docs: data_dictionary.md + provenance_register.md v1
+- [x] docs: data_dictionary.md + provenance_register.md v1
+  — data-engineer, feat/phase1-ingestion; awaiting qa review. Both maintained
+  in-commit across tasks 1-5; v1 coherence pass done: data_dictionary has a
+  pipeline overview + every layer (raw ×5 sources, validated, contracts/
+  quarantine, warehouse dims/facts/sim_/dq_quarantine); provenance_register
+  classifies every artifact + table/column (SOURCE/DERIVED/REFERENCE/SIMULATED)
+  with the §3.4 crosswalk rule stated. assumptions.md left to simulation-engineer
+  (Phase 2).
 - [ ] ACCEPTANCE (qa-reviewer): contracts pass, FKs pass, counts reconcile
 
 ## Phase 2 — Simulation Layer (lead: simulation-engineer)

@@ -1,7 +1,25 @@
 # Data Dictionary
 
-Covers the raw ingestion layer (`data/raw/`) and the typed validated layer
-(`data/validated/`). Warehouse table dictionaries are added by the DDL task.
+Phase 1 pipeline, source → warehouse (see `docs/provenance_register.md` for the
+per-column classification of every table):
+
+```
+raw (data/raw, gitignored)          make ingest
+  CMS synthetic RIF (SOURCE)  ─┐
+  NPPES RI extract (REFERENCE) │   validated (data/validated)   make stage
+  Hospital General Info (REF)  ├──▶  typed Parquet ──▶ contracts + quarantine  make contracts
+  Medicare providers (REF)    ─┘        │                 (reconciliation_report.json)
+                                        ▼
+                              warehouse (PostgreSQL rcm)        make warehouse
+                                dims + facts (SOURCE/DERIVED)
+                                sim_*_crosswalk (SIMULATED, seeded)
+                                dq_quarantine (DERIVED)
+```
+
+Core principle (CLAUDE.md §3): no simulated value is ever presented as real.
+Synthetic claim identifiers never join real CCNs/NPIs directly — the only link
+is the seeded, clearly-labelled `sim_*_crosswalk`. Sections below cover each
+layer; the raw RIF is pipe-delimited, reference files are comma-delimited.
 
 ## Validated layer — typed Parquet (`data/validated/`)
 
