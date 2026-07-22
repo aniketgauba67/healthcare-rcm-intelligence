@@ -113,7 +113,13 @@ published by simulation-engineer so ml-engineer never needs to read
 
 Reproducibility guarantee (simulation): same `seed` in `config/simulation.yaml`
 ⇒ byte-identical output, defined as the SHA-256 of each table's canonical CSV
-serialization and recorded in `data/simulated/simulation_report.json`. Each
+serialization and recorded in `data/simulated/simulation_report.json`. Verified
+2026-07-22 across two separate `make simulate` invocations: all 8 canonical
+hashes matched, and in fact all 8 Parquet files were byte-identical too. The
+guarantee is stated against the CSV hash rather than the Parquet bytes because
+Parquet embeds writer metadata that can differ between pyarrow builds without a
+single value having changed — the contract should not depend on a library
+version. Each
 component draws from an independently *named* RNG stream, so adding a component
 never perturbs an existing one. Changing `seed`, changing any calibration
 parameter, or reloading source data that renumbers `claim_sk` all change the
