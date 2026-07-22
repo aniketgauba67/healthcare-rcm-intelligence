@@ -4,7 +4,25 @@ Rules: one owner per task; move tasks between sections with a one-line note;
 a phase is DONE only when qa-reviewer checks its acceptance box.
 
 ## Phase 1 — Ingestion + Warehouse (lead: data-engineer)
-- [ ] Download scripts + manifest + checksums for all sources in config/sources.yaml
+> ASSIGNED 2026-07-22 by team-lead: all Phase 1 tasks → data-engineer;
+> qa-reviewer reviews each task as it lands (PASS or numbered fix list, max 3
+> cycles, then escalate to Blocked). Ownership ruling: data-engineer may write
+> `tests/contracts/` for its own modules; qa-reviewer owns `tests/` overall
+> and may amend. First task in flight: download scripts (NPPES state-filtered
+> extract + CMS synthetic claims ZIP), checksums + vintages recorded in
+> config/sources.yaml, actual file sizes and row counts posted here.
+- [x] Download scripts + manifest + checksums for all sources in config/sources.yaml
+  — data-engineer, branch feat/phase1-ingestion; awaiting qa-reviewer PASS.
+  Measured 2026-07-22 (`uv run python -m src.ingestion.run`):
+  | artifact | class | rows | size | sha256 (12) |
+  |---|---|---|---|---|
+  | cms_synthetic/beneficiary_2024.csv | SOURCE | 9,660 | 5,336,856 B (5.09 MB) | 7b32aaca2def |
+  | cms_synthetic/inpatient.csv | SOURCE | 58,066 | 35,534,745 B (33.89 MB) | 4085f4ee4519 |
+  | nppes monthly zip (deleted after extract) | REFERENCE | 9,671,888 NPIs | 1,145,146,362 B (1.14 GB) | 82b43e035045 |
+  | nppes/nppes_ri_extract.csv (state=RI, 330 cols) | REFERENCE | 31,847 | 17,552,843 B (16.74 MB) | 04ebdbc8f14e |
+  CMS synthetic vintage 2023-04 (ICD-10 RIF, pipe-delimited, 8,671 synth benes);
+  NPPES vintage 2026-07 (July V2). Subset = enrollment + inpatient claims.
+  Scripts idempotent (checksum-skip); NPPES streams 9 GB main file, keeps RI only.
 - [ ] Typed Parquet staging for claims/enrollment files (validated layer)
 - [ ] PostgreSQL DDL: facts, dims, constraints, indexes, Unknown members
 - [ ] Simulated-linkage crosswalk (claims → real facilities/providers, seeded)
@@ -44,3 +62,8 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 (agents write here instead of guessing)
 
 ## Done
+- [x] Test gate green on clean clone (qa-reviewer, merged to main bc2a7ab, pushed):
+  smoke tests + pytest config; scope-expanded dependency fix (numpy<2.1 cap,
+  [tool.uv] environments bounded to CPython 3.11–3.12, uv.lock committed,
+  .python-version=3.11) to unbreak `uv sync` — RATIFIED by team-lead 2026-07-22;
+  requires-python ">=3.11" unchanged, locked decisions intact.

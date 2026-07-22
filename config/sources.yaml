@@ -1,39 +1,151 @@
-# Source manifest. data-engineer fills checksums + exact vintages at download time.
+# Source manifest for the Healthcare RCM Intelligence Platform.
+#
+# data-engineer owns this file. `sha256`, `size_bytes`, `row_count`, and
+# `vintage` under each source's `artifacts:` block are MEASURED at download
+# time (never estimated) and are the committed, human-readable counterpart to
+# the gitignored data/raw/manifest.json ledger.
+#
+# Classification vocabulary (CLAUDE.md §3): SOURCE | REFERENCE | DERIVED | SIMULATED.
+# Raw files are never committed (CLAUDE.md §3.6); only URLs, checksums, and
+# vintages live here.
+
 sources:
   cms_synthetic_claims:
     name: CMS Synthetic Medicare Enrollment, FFS Claims, and PDE
     url: https://data.cms.gov/collection/synthetic-medicare-enrollment-fee-for-service-claims-and-prescription-drug-event
+    provider: data.cms.gov
     classification: SOURCE
-    license_note: Official CMS synthetic data; not valid for real population estimates.
-    vintage: TBD_AT_DOWNLOAD
-    sha256: {}
-  hospital_general_information:
-    name: CMS Hospital General Information
-    url: https://data.cms.gov/provider-data/dataset/xubh-q36u
-    classification: REFERENCE
-    license_note: Public. Linked to claims ONLY via simulated crosswalk.
+    license_note: Official CMS synthetic data; realistic-but-not-real (8,671 synthetic beneficiaries). NOT valid for real population estimates. Modern ICD-10 RIF schema (NOT DE-SynPUF).
+    vintage: "2023-04"  # file release folder; files last-modified 2023-04-26; collection node changed 2023-06-22
+    discovered_at: "2026-07-22"  # via data.cms.gov Drupal JSON:API (node/story_page includes)
+    delimiter: "|"  # RIF flat files are PIPE-delimited (not comma); matters for Parquet staging
+    # Full catalog available in the collection (download_subset marks what we
+    # actually fetch first; the rest are wired for later phases).
+    available_files:
+      # Master Beneficiary Summary Base — enrollment, one CSV per year 2015-2025.
+      beneficiary_2015: https://data.cms.gov/sites/default/files/2023-04/d5da04d5-61c8-4174-be11-02d0f58217e7/beneficiary_2015.csv
+      beneficiary_2016: https://data.cms.gov/sites/default/files/2023-04/c401e869-f85e-4c57-a9ae-fa7b982593d6/beneficiary_2016.csv
+      beneficiary_2017: https://data.cms.gov/sites/default/files/2023-04/b70edfc5-cd50-4983-9837-b5ece38d400f/beneficiary_2017.csv
+      beneficiary_2018: https://data.cms.gov/sites/default/files/2023-04/bf7aac0e-3ba3-4e7e-9463-073316a17d8a/beneficiary_2018.csv
+      beneficiary_2019: https://data.cms.gov/sites/default/files/2023-04/7f65254b-174e-4460-aa49-6759ea8397af/beneficiary_2019.csv
+      beneficiary_2020: https://data.cms.gov/sites/default/files/2023-04/74b86018-5148-45bb-87f7-c551eda070d8/beneficiary_2020.csv
+      beneficiary_2021: https://data.cms.gov/sites/default/files/2023-04/98832739-88bd-4243-87fe-ee12b8542baf/beneficiary_2021.csv
+      beneficiary_2022: https://data.cms.gov/sites/default/files/2023-04/831cfb41-3a7a-4ce0-b02f-04d27df56b31/beneficiary_2022.csv
+      beneficiary_2023: https://data.cms.gov/sites/default/files/2023-04/18fe0f5d-4126-432f-b12b-2569db9bdefa/beneficiary_2023.csv
+      beneficiary_2024: https://data.cms.gov/sites/default/files/2023-04/402c0430-aab0-47f9-ab51-4274e30d2f79/beneficiary_2024.csv
+      beneficiary_2025: https://data.cms.gov/sites/default/files/2023-04/428fe76b-964d-48ca-b310-86f246fac829/beneficiary_2025.csv
+      # Fee-for-service claims by type (direct CSVs).
+      inpatient: https://data.cms.gov/sites/default/files/2023-04/67157de9-d962-4af0-bf0e-3578b3afec58/inpatient.csv
+      snf: https://data.cms.gov/sites/default/files/2023-04/1138e453-f79d-4bd9-8561-26a7d7a7cc36/snf.csv
+      hospice: https://data.cms.gov/sites/default/files/2023-04/72c61730-dcb4-4246-af69-f573c997e5dd/hospice.csv
+      hha: https://data.cms.gov/sites/default/files/2023-04/cf87867a-c878-4709-84f4-29be1b07ae5b/hha.csv
+      dme: https://data.cms.gov/sites/default/files/2023-04/647931dd-f8ea-423a-98a3-655e586a7c1f/dme.csv
+      pde: https://data.cms.gov/sites/default/files/2023-04/a3969dcf-0799-49fe-8380-9eef788d5ac4/pde.csv
+      # Bundled ZIPs (large; carrier & outpatient are only offered zipped).
+      zip_all_beneficiary_years: https://data.cms.gov/sites/default/files/2023-04/250e6ca0-3515-4767-957c-5528bfcee75c/All%20Beneficiary%20Years.zip
+      zip_all_ffs_claims: https://data.cms.gov/sites/default/files/2023-04/f67c2406-4413-4ace-817d-b170cbdd0a3e/All%20FFS%20Claims.zip
+      zip_carrier: https://data.cms.gov/sites/default/files/2023-04/b6fe03a8-82e2-49b7-a9fe-9eb68c8ac4d0/Carrier.zip
+      zip_outpatient: https://data.cms.gov/sites/default/files/2023-04/c3d8a962-c6b8-4a59-adb5-f0495cc81fda/Outpatient.zip
+    # Initial subset actually downloaded in Phase 1 (enrollment + one claim type).
+    # Rationale: inpatient FFS is the richest claim type for RCM modeling
+    # (DRGs, high-dollar facility claims, denial/appeal relevance) and anchors
+    # the facility crosswalk; beneficiary_2024 is a recent full enrollment year.
+    download_subset: [beneficiary_2024, inpatient]
+    # Measured at download 2026-07-22 (uv run python -m src.ingestion.run).
+    artifacts:
+      beneficiary_2024:
+        role: enrollment
+        filename: data/raw/cms_synthetic/beneficiary_2024.csv
+        url: https://data.cms.gov/sites/default/files/2023-04/402c0430-aab0-47f9-ab51-4274e30d2f79/beneficiary_2024.csv
+        vintage: "2023-04"
+        sha256: 7b32aaca2defa1b6d0ff5174a4aef12b8ebb41eeb3b4e062421c6af0120cab2a
+        size_bytes: 5336856
+        row_count: 9660
+      inpatient:
+        role: claims_inpatient
+        filename: data/raw/cms_synthetic/inpatient.csv
+        url: https://data.cms.gov/sites/default/files/2023-04/67157de9-d962-4af0-bf0e-3578b3afec58/inpatient.csv
+        vintage: "2023-04"
+        sha256: 4085f4ee4519c9dcee8c124d127f9feb7062053a103a94f72d7a576a4b3031e6
+        size_bytes: 35534745
+        row_count: 58066
+
   nppes_npi:
     name: NPPES NPI downloadable file (state-filtered extract)
     url: https://download.cms.gov/nppes/NPI_Files.html
+    provider: download.cms.gov
     classification: REFERENCE
-    license_note: Public. Use filtered extract; full file ~9GB.
+    license_note: Public NPI registry. Full monthly file ~1.14 GB zipped / ~9 GB CSV; we retain only a single-state streamed extract. Linked to claims ONLY via the SIMULATED crosswalk (CLAUDE.md §3.4).
+    monthly_file_url: https://download.cms.gov/nppes/NPPES_Data_Dissemination_July_2026_V2.zip
+    vintage: "2026-07"  # July 2026 V2 monthly dissemination; last-modified 2026-07-13
+    # One-state extract keeps the artifact compact and contract tests fast while
+    # remaining real NPIs. Rhode Island chosen for the smallest footprint;
+    # override with --state on the CLI to rebuild for another state.
+    filter_state: RI
+    # Main entity file inside the zip; the state code lives in this column.
+    main_member_prefix: npidata_pfile_
+    state_column: Provider Business Practice Location Address State Name
+    npi_column: NPI
+    keep_zip_after_extract: false  # delete the 1.14 GB zip once the extract exists
+    # Measured at download 2026-07-22. The source zip is checksummed then deleted
+    # (never committed, not retained); only the RI extract persists in data/raw.
+    artifacts:
+      monthly_zip:
+        role: source_zip
+        url: https://download.cms.gov/nppes/NPPES_Data_Dissemination_July_2026_V2.zip
+        vintage: "2026-07"
+        sha256: 82b43e03504550112bd375d66c3498a259dbaa2172824d57dc3f3241e9994adf
+        size_bytes: 1145146362
+        row_count: null  # 9,671,888 NPI records scanned during filtering
+        main_member: npidata_pfile_20050523-20260712.csv
+      extract_ri:
+        role: reference
+        state: RI
+        filename: data/raw/nppes/nppes_ri_extract.csv
+        vintage: "2026-07"
+        sha256: 04ebdbc8f14e78abbc969307c2bb3d2c942acafe9242941a703a51d515d3feac
+        size_bytes: 17552843
+        row_count: 31847
+        providers_scanned: 9671888
+        providers_kept: 31847
+        columns: 330
+
+  hospital_general_information:
+    name: CMS Hospital General Information
+    url: https://data.cms.gov/provider-data/dataset/xubh-q36u
+    provider: data.cms.gov/provider-data
+    classification: REFERENCE
+    license_note: Public facility directory (CCN, name, address, type). Linked to claims ONLY via the SIMULATED crosswalk. Downloaded with the crosswalk task (Phase 1 item 4).
+    csv_url: https://data.cms.gov/provider-data/sites/default/files/resources/xubh-q36u.csv  # verified at download time
+    artifacts: {}
+
   icd10:
     name: ICD-10-CM/PCS code files (match claims vintage)
     url: https://www.cms.gov/medicare/coding-billing/icd-10-codes
     classification: REFERENCE
+    license_note: Public CMS code files. Never mix ICD-9 references (CLAUDE.md locked decision).
+    artifacts: {}
+
   hcpcs:
     name: HCPCS Level II quarterly update
     url: https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system
     classification: REFERENCE
-    license_note: Public Level II only. NO CPT descriptions in repo (AMA-licensed).
+    license_note: Public HCPCS Level II descriptions ONLY. NO CPT descriptions in repo (AMA-licensed, CLAUDE.md §3.7).
+    artifacts: {}
+
   ms_drg:
     name: MS-DRG definitions (IPPS tables, matching year)
     url: https://www.cms.gov/medicare/payment/prospective-payment-systems/acute-inpatient-pps
     classification: REFERENCE
+    license_note: Public IPPS MS-DRG tables.
+    artifacts: {}
+
   carc_codes:
     name: X12 Claim Adjustment Reason Codes
     url: https://x12.org/codes
     classification: REFERENCE
-    license_note: Use as category taxonomy labels only.
+    license_note: Use as denial-category taxonomy LABELS only (CLAUDE.md §3.7).
+    artifacts: {}
+
 benchmarks_for_calibration:
   note: Cited in docs/assumptions.md to justify simulation ranges; data not ingested.

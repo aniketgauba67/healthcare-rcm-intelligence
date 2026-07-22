@@ -14,3 +14,4 @@ mlruns/
 !dashboard/demo_data/*.duckdb
 .ipynb_checkpoints/
 models_artifacts/
+.claude/worktrees/
