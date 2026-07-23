@@ -292,6 +292,16 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > NOTE ON CRASHES: reset times run 2:50/7:50/12:50/5:50 — a hard ~5-hour ACCOUNT
 > usage window, NOT Fable-specific; the Opus pin did not prevent it. Agents must
 > commit early/often + post state to main before a suspected limit.
+> RE-SPAWN #2 2026-07-23 ~14:40 (team-lead): ALL THREE Phase 3 agents hit the ~5h
+> cap together at 13:41 (reset 2pm); qa-reviewer-p4 died too because it was ACTIVE
+> mid-review, not idle. Re-spawned as data-engineer-refs2 / analytics-engineer-3 /
+> qa-reviewer-p5 (Opus). PRESERVED: analytics fully committed (feat/phase3-
+> analytics through 9dc31a5, incl. ITS notebook 06); data-engineer's uncommitted
+> reference work saved as f32098e on feat/phase3-references. WAREHOUSE: the
+> reference additive write HAD executed pre-crash — dim_drg.drg_desc 167/168 + 5
+> ref_* tables live; analytics reconciled against the pre-populate (NULL) state,
+> so qa must re-reconcile against the populated state. OPEN: analytics 70-vs-81
+> unit-test regression to resolve; DRG name enrichment now unblocked.
 > branches; live PG single-writer + quiet-window rules in force (see the Phase 1
 > TEAM RULE incl. the claim_sk warehouse-reload mechanism).
 > MANDATORY RULING (from Phase 2 crosswalk audit, team-lead): every facility- or
@@ -339,7 +349,23 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   engineer-2: naming enrichment can now join dim_drg.drg_desc + ref_* tables.
 - [ ] 8 metric-contract views with control queries
 - [ ] EDA notebooks: >= 12 insights with statistical support
-- [ ] Statistical tests, survival analysis, process mining modules
+- [~] Statistical tests, survival analysis, process mining modules — analytics-
+  engineer-2 in progress. ITS RULING (team-lead 2026-07-23): §7.3 lists an
+  interrupted time series for "the simulated intervention module", but Phase 2
+  built NO intervention module (plan/build gap). Resolution: implement ITS
+  methodology on a CLEARLY-LABELED ILLUSTRATIVE hypothetical intervention in a
+  NOTEBOOK ONLY (no intervention field/table written to the warehouse; every
+  caption states "illustrative, not real/simulated operational event, no causal
+  claim"; best done by inserting a KNOWN synthetic step and showing ITS recover
+  it, or by demonstrating on a no-effect date). Must not leak into the KPI views
+  or headline metrics. qa-reviewer-p4 verifies the labeling. Optional FUTURE
+  enhancement (NOT required for Phase 3, do not reopen Phase 2 now): a real
+  sim-layer intervention module with a designed ground-truth effect + treated/
+  control cohorts so ITS validates against known truth.
+- [ ] (milestone) 8 metric-contract views + vw_claim_enriched — BUILT + reconciled
+  on live PG (analytics-engineer-2, f13285e, feat/phase3-analytics); synthetic-id
+  keying verified (distinct prvdr_num == row count), payer=simulated banner,
+  heuristic/drift scaffolds labeled. Sent to qa-reviewer-p4 for review.
 - [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
 
 ## Phase 4 — ML (lead: ml-engineer)
