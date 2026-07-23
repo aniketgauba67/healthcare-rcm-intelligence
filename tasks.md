@@ -179,7 +179,36 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > list is published in docs/simulated_forbidden_columns.md. Recommendation:
 > populating forbidden_features from that doc is the FIRST task of Phase 4,
 > before any feature code, with a qa leakage test asserting the two agree.
-- [ ] ACCEPTANCE (qa-reviewer-2): seed-reproducible, validity checks pass
+> QA REVIEW OUTCOME (qa-reviewer-p2, 2026-07-22, branch HEAD 69c2736): build
+> tasks 1-4 all PASS. Verified by commands I ran myself, not by reading:
+> `make test` 78 unit pass; `ruff check`/`ruff format --check` clean;
+> reproducibility = TWO independent `make simulate` builds → byte-identical
+> table hashes (63/63 frame checks each, denial rate 12.76% in band); DuckDB
+> mirror 52/52; LIVE PG in correct manual order warehouse 42/42 → simulate 63/63
+> → simulate-warehouse 52/52 → `validate-warehouse` integration 6/6. DB end-state
+> independently queried: 8 sim_ tables, 10 FKs intact, 0 orphans, all rows
+> SIMULATED. Honesty pass CLEAN: every sim_ column prefixed (join-key carve-out
+> only), provenance_register + data_dictionary updated in same commit as the DDL,
+> assumptions.md labels every range DESIGN CHOICE with citations bracketing (not
+> validating) ranges, §11 states validation proves nothing about realism, no
+> "fraud" framing anywhere, forbidden-columns doc authoritative + complete
+> (drift test enforces it). Leakage: sim_latent_p / sim_provider_quality_latent /
+> sim_appeal_latent_p stored validation-only, each in exactly one place (unit test
+> asserts no copies); no ML training path exists yet (Phase 4).
+> TEST-ORDERING BUG (team-lead-assigned, tests/ = qa): FIXED and committed by me
+> (69c2736). conftest.py collection-sort runs warehouse(10) before simulation(20);
+> I added test_end_state.py(90) asserting the sim_ layer survived with FKs + no
+> orphans, so the corruption is now an automated check, not a manual one. Verified
+> the DB is coherent AFTER a full ordered integration run.
+> NON-BLOCKING for Phase 2 (correctly deferred): (a) config/model.yaml forbidden_
+> features placeholder is the Phase 4 GATE below, owned by ml-engineer — I will
+> add the model.yaml-vs-doc leakage test then; (b) crosswalk strict-prefix tech
+> debt is data-engineer's, tracked above.
+- [~] ACCEPTANCE (qa-reviewer-p2): all criteria PASS on branch HEAD 69c2736
+  (seed-reproducible + validity + honesty + leakage + live-PG, verified by my own
+  commands). Box left unchecked pending the final verification run on MERGED main
+  state per team-lead protocol — merge can proceed; I will re-run and check this
+  box immediately after.
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
 - [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
@@ -251,6 +280,36 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > precisely so ml-engineer never reads src/simulation/). qa-reviewer then adds a
 > leakage test asserting config/model.yaml and that document AGREE, rather than
 > trusting either alone. Do not begin feature work until this is done and green.
+> ML-FACING CAUTIONS from simulation-engineer's Phase 2 self-audit (in
+> docs/assumptions.md; surfaced here so ml-engineer reads them before modeling):
+>   - ~33% of observed denials (892 of 2,663) are PURE LABEL NOISE with no
+>     mechanism signal (latent mechanism denial rate ~8.8%; observed 12.76%).
+>     Do not over-interpret the positive class or expect SHAP to explain every
+>     denial — a third are unexplainable by construction. This is the source of
+>     the ~0.64 realistic AUC ceiling (oracle ~0.68).
+>   - Temporal split guidance (VERIFIED against generated data; authoritative
+>     copy in docs/simulated_forbidden_columns.md §8, the §4.5 interface):
+>     sim_submission_date spans 2015-2024; holding out calendar-2023 gives only
+>     701 claims (3.36%) — too thin. Use an 80/20 QUANTILE split on
+>     sim_submission_date (cut ~2021-12-28, ~4,173-claim / 20% forward test fold).
+>     Not hold-out-last-year.
+>   - Per-service-line denial ranking is a WEAK signal (Spearman latent-vs-
+>     observed 0.59, p=0.056) vs per-payer strong (0.90). Ties to the
+>     "show volumes alongside rates" rule and the DRG-951 concentration.
+>   - ADVANCED ≈ BASELINE IS EXPECTED AND HONEST, NOT A FAILURE (team-lead
+>     ruling 2026-07-22). Gradient boosting does not beat regularized logistic
+>     on this layer (temporal 0.627 vs 0.636). Verified reason: the flagship
+>     auth_required×auth_missing interaction is DEFINITIONALLY absorbed (you
+>     cannot miss an auth that was not required, so auth_missing already equals
+>     the interaction and a linear model captures it fully — correct domain
+>     logic), and the one genuinely tree-only interaction (payer×service_line)
+>     is thin due to source DRG skew. The generator was NOT tuned to manufacture
+>     a tree edge (that would invert the §4.5 firewall and optimize impressive
+>     over honest, §1). Phase 4 §7 DoD is "baseline vs advanced comparison
+>     REPORTED", not "advanced must win" — report the near-null edge truthfully
+>     with this domain explanation; a competitive logistic baseline is a realistic
+>     and credible result for denial prediction. Documented in docs/assumptions.md
+>     by simulation-engineer.
 - [ ] Point-in-time feature store + forbidden-column leakage tests
 - [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
