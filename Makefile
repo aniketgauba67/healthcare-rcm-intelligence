@@ -45,7 +45,8 @@ validate-warehouse:
 	uv run pytest -m integration -q
 
 views:
-	uv run python -m src.ingestion.build_views
+	uv run python sql/views/apply_views.py
+	uv run python sql/quality/view_reconciliation.py
 
 train:
 	uv run python -m src.models.train

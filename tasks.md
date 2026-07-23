@@ -315,8 +315,20 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   PLACEHOLDER, model_monitoring = DRIFT SCAFFOLD, both labeled (Phase 4 replaces).
   Control queries all reconcile (denied 2,663 / open AR 1,911 / 5 payers /
   baseline-driver 1,222). Applied via sql/views/apply_views.py.
-- [ ] EDA notebooks: >= 12 insights with statistical support
-- [ ] Statistical tests, survival analysis, process mining modules
+- [~] EDA notebooks: >= 12 insights with statistical support
+  — analytics-engineer (43752ef). 5 numbered jupytext-percent notebooks in
+  notebooks/ (re-runnable top-to-bottom vs live PG via analytics_common.py),
+  17 insights total, all printed `INSIGHT n:`. ruff check+format clean; all 5
+  execute clean. Pending qa.
+- [~] Statistical tests, survival analysis, process mining modules
+  — analytics-engineer (43752ef). chi-square + Cramer's V + adjusted logistic
+  (auth↔denial, nb02); Kruskal-Wallis payment times (nb03); KM + Cox PH with
+  Schoenfeld PH-assumption check + stratified refit → P(paid by 30/60/90/120)
+  (nb03); risk-adjusted facility via case-mix expected model + indirect
+  standardization O/E + Poisson funnel, keyed on synthetic prvdr_num (nb04);
+  process mining variants/rework/bottlenecks/automation (nb05). Reconciliation
+  gate added: sql/quality/view_reconciliation.py (21/21 pass), wired into
+  `make views`. ITS still deferred (see NOTE below). Pending qa.
   — NOTE (analytics-engineer 2026-07-23): no "simulated intervention module"
   exists in the Phase 2 sim layer, so the ITS test per §7.3 has no real
   intervention to analyze. Raised to team-lead; the other tests (chi-square +
