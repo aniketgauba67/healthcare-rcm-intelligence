@@ -279,6 +279,26 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > and any code-description enrichment. Owner when scheduled: data-engineer
 > (re-spawn). Watch §2 vintage rule: claims are 2023-04, so ICD-10/HCPCS/MS-DRG
 > references must match that period, NOT the current year.
+> OPENED 2026-07-23 by human go-ahead after Phase 2 acceptance. Team (all on
+> Opus 4.8 per the model pin): analytics-engineer (lead) + data-engineer
+> (re-spawned for the reference-code-set prerequisite only) + a fresh
+> qa-reviewer (one reviewer for the phase). Standard kickoff pattern; feature
+> branches; live PG single-writer + quiet-window rules in force (see the Phase 1
+> TEAM RULE incl. the claim_sk warehouse-reload mechanism).
+> MANDATORY RULING (from Phase 2 crosswalk audit, team-lead): every facility- or
+> provider-level view MUST key on the SYNTHETIC ids (prvdr_num / claim_sk /
+> sim_at_physn_npi), NEVER on facility_ccn or facility_name. The crosswalk maps
+> 4,876 synthetic providers onto only 2,857 real CCNs (45.9% multiplexed, worst
+> 8-to-1), so grouping by facility_ccn silently merges up to 8 distinct synthetic
+> hospitals. Real CCN/name are DISPLAY-ONLY enrichment. qa-reviewer must reject
+> any view violating this.
+- [ ] PREREQUISITE (data-engineer): download + load REFERENCE code sets matching
+  the 2023-04 claims vintage — ICD-10-CM/PCS FY2023, HCPCS 2023, MS-DRG (FY2023,
+  ~v40), CARC codes (category labels only, §3.7). Record vintage + sha256 in
+  config/sources.yaml per manifest rules; add REFERENCE dim tables in sql/ddl/;
+  update provenance_register + data_dictionary same commit. §2 vintage rule is
+  binding: FY2023 codes, NOT current year; NO CPT descriptions (AMA-licensed),
+  HCPCS Level II public descriptions only. Blocks the naming-dependent views.
 - [ ] 8 metric-contract views with control queries
 - [ ] EDA notebooks: >= 12 insights with statistical support
 - [ ] Statistical tests, survival analysis, process mining modules
