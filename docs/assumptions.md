@@ -165,8 +165,9 @@ rates are ours.
 | Diagnosis-code count | `-0.30·(n/10) + 0.14·(n/10)²` | DESIGN CHOICE |
 | Per-provider latent quality | `Normal(0, 0.45)`, one draw per billing provider | DESIGN CHOICE |
 
-These exist so that a linear baseline is genuinely beaten by a non-linear model
-for a real reason rather than by tuning luck. The narrative shapes are chosen to
+These exist to give a non-linear model something real to find beyond the main
+effects, rather than leaving any tree edge to tuning luck (but see the measured
+caveat in §4.1). The narrative shapes are chosen to
 be recognisable to anyone who has worked a denials queue — high-dollar claims
 draw scrutiny; one-day stays invite "this should have been observation"; very
 long stays trip outlier review; well-documented complexity protects a claim
@@ -178,6 +179,34 @@ missing an authorization or a document (`provider_quality_prevalence_scale`),
 which is what makes provider-level historical rates genuinely predictive — and
 therefore what makes the Phase 4 requirement to compute those rates with
 out-of-fold or prior-period logic a real leakage risk rather than a formality.
+
+### 4.1 A measured caveat: expect a competitive linear baseline
+
+Stated plainly because Phase 4 must report it honestly rather than read it as a
+failure: on this layer a gradient-boosted model is **not** expected to
+meaningfully beat a regularised logistic baseline, and a prototype comparison
+found only a negligible edge (roughly +0.005–0.009 AUC on an 80/20 temporal
+split at this sample size — inside noise). That is not a missing mechanism; it is
+the layer being honest about a phenomenon that genuinely is mostly linear. The
+flagship `auth_required × auth_missing` interaction is **definitionally absorbed
+by a linear model**: `auth_missing` can only be true when `auth_required` is
+true — you cannot miss an authorization that was never required — so the product
+term is identically equal to `auth_missing`, and a linear model given that single
+indicator captures the interaction in full, leaving no residual curvature for a
+tree to exploit. The continuous terms in §4 do carry real non-linear shape, but
+they are modest next to the payer and authorization main effects, so the realised
+tree edge stays small.
+
+This is deliberately left as-is. The generator must never be tuned to make a
+particular downstream model win — conditioning the data on a model metric would
+manufacture a Phase 4 result instead of earning it (CLAUDE.md §1). A mechanism
+may only ever be strengthened on independent domain-realism grounds with a
+citation, accepting whatever model edge results. CLAUDE.md §7's ML definition of
+done is "baseline vs advanced comparison **reported**," not "advanced must win":
+a regularised logistic baseline being competitive with gradient boosting is a
+realistic, credible outcome for denial prediction, and reporting it truthfully —
+alongside the oracle-AUC ≈ 0.68 irreducible-noise ceiling (§2) — is the honest
+result, not a shortfall to be engineered away.
 
 ## 5. Denial category mix
 
