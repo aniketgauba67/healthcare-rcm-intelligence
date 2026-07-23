@@ -316,7 +316,23 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   enrichment waits for these tables.
 - [ ] 8 metric-contract views with control queries
 - [ ] EDA notebooks: >= 12 insights with statistical support
-- [ ] Statistical tests, survival analysis, process mining modules
+- [~] Statistical tests, survival analysis, process mining modules — analytics-
+  engineer-2 in progress. ITS RULING (team-lead 2026-07-23): §7.3 lists an
+  interrupted time series for "the simulated intervention module", but Phase 2
+  built NO intervention module (plan/build gap). Resolution: implement ITS
+  methodology on a CLEARLY-LABELED ILLUSTRATIVE hypothetical intervention in a
+  NOTEBOOK ONLY (no intervention field/table written to the warehouse; every
+  caption states "illustrative, not real/simulated operational event, no causal
+  claim"; best done by inserting a KNOWN synthetic step and showing ITS recover
+  it, or by demonstrating on a no-effect date). Must not leak into the KPI views
+  or headline metrics. qa-reviewer-p4 verifies the labeling. Optional FUTURE
+  enhancement (NOT required for Phase 3, do not reopen Phase 2 now): a real
+  sim-layer intervention module with a designed ground-truth effect + treated/
+  control cohorts so ITS validates against known truth.
+- [ ] (milestone) 8 metric-contract views + vw_claim_enriched — BUILT + reconciled
+  on live PG (analytics-engineer-2, f13285e, feat/phase3-analytics); synthetic-id
+  keying verified (distinct prvdr_num == row count), payer=simulated banner,
+  heuristic/drift scaffolds labeled. Sent to qa-reviewer-p4 for review.
 - [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
 
 ## Phase 4 — ML (lead: ml-engineer)
