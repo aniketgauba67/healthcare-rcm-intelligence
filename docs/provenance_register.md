@@ -152,3 +152,44 @@ reference vintages are pinned in `config/sources.yaml` (`hospital_general_inform
 2026-04, `medicare_providers` 2024); re-pulling a reference at a new vintage will
 change the assignment. The crosswalk integrity checks (FK, provenance, counts)
 run identically against live Postgres and the DuckDB CI mirror.
+
+## The analytics KPI views (Phase 3)
+
+`sql/views/` defines 9 read-only views (`vw_claim_enriched` base + 8
+metric-contract views), applied by `sql/views/apply_views.py` (`make views`) and
+guarded by the reconciliation gate `sql/quality/view_reconciliation.py` (21
+checks). As an analytics layer they are classified **DERIVED**: no view
+introduces a new fact, each is a reprojection/aggregation of already-registered
+warehouse tables. **Provenance is not laundered by a view.** A column keeps the
+class of its input — SOURCE fields (real Medicare billed charge, the one real
+Medicare paid amount) stay SOURCE, `sim_*`-derived measures stay SIMULATED,
+REFERENCE code descriptions (`drg_desc`, etc.) stay REFERENCE and are display-only.
+Per-column provenance is stated authoritatively in each view's SQL header block
+(grain, sources, per-column class, and the control query it must reconcile to);
+those headers are the register's cited source of truth for this layer, and
+`view_reconciliation.py` asserts the labeled invariants stay true against live PG.
+
+Two honesty rules are enforced structurally, not just documented:
+
+- **Payer views are 100% SIMULATED (§3.5).** `vw_payer_performance` and every
+  payer-dimension measure elsewhere describe invented archetypes, never any real
+  insurer; the header carries the mandatory banner and every dashboard/export on
+  them must too.
+- **Facility/provider grain keys on the synthetic `prvdr_num`, never on
+  `facility_ccn`/`facility_name`** (§3.2 crosswalk ruling — the crosswalk
+  multiplexes 4,876 synthetic providers onto 2,857 real CCNs). Real CCN/name are
+  carried display-only; the reconciliation gate check
+  `clean_claim:grain_is_synthetic_prvdr_num` fails the build if a view keys on CCN.
+
+Two views are explicitly pre-Phase-4 scaffolds, self-declaring in every row:
+`vw_work_queue_priority` is a HEURISTIC PLACEHOLDER (`is_heuristic_placeholder`
+true, `heuristic_*` score — not a model, not a probability, not an Expected Net
+Recovery) and `vw_model_monitoring` is a DRIFT SCAFFOLD (`is_drift_scaffold`
+true — observed input distributions only, no score/prediction). Phase 4 Model A/C
+replace them.
+
+The `notebooks/` EDA layer (`01`–`06`) reads these views + `sim_*` tables and is
+DERIVED analysis output that writes nothing to the warehouse; every notebook
+renders the SIMULATED banner and frames anything it flags as a review signal,
+never fraud. Notebook 06 (interrupted time series) is illustrative-only, on a
+clearly-labeled hypothetical intervention, and persists no intervention field.

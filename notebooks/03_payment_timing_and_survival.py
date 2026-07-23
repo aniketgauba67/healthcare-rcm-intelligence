@@ -164,9 +164,13 @@ print(
 )
 print(f"concordance={cph.concordance_index_:.3f}")
 
-# proportional-hazards assumption test
-ph = cph.check_assumptions(cox_df, p_value_threshold=0.05, show_plots=False)
-violating = sorted({r[0] for r in ph}) if ph else []
+# proportional-hazards assumption test (Schoenfeld residuals). check_assumptions()
+# returns plot axes, not violators, so derive the count from the test summary itself.
+from lifelines.statistics import proportional_hazard_test
+
+ph = proportional_hazard_test(cph, cox_df, time_transform="rank")
+print(ph.summary[["test_statistic", "p"]].round(4).to_string())
+violating = ph.summary.index[ph.summary["p"] < 0.05].tolist()
 print(f"\nPH assumption: {len(violating)} covariate(s) violate proportional hazards: {violating}")
 
 # assumption-respecting refit: stratify on payer (the main violator)
