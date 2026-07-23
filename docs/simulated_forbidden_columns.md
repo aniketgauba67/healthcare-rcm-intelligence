@@ -161,6 +161,32 @@ DERIVED surrogate key. Neither should be a feature. `claim_sk` in particular is
 assigned in source-file order, so it correlates with time and will act as a
 smuggled date feature if a model is allowed to see it.
 
+## 8. Notes for the modeling layer (non-leakage, data-shape only)
+
+These are properties of the data's shape, not of the generator's internals, so
+they are safe to state here and you need them before choosing a split or reading
+a metric. They are not new constraints — the §4.5 firewall stands.
+
+- **Temporal split: quantile-based, not hold-out-last-year.** Submission dates
+  span 2015–2024, but the tail years are sparse: 2023 holds ~700 claims (~3.4%)
+  and 2024 only a handful. Holding out the final calendar year gives a tiny,
+  skewed test fold. Use an 80/20 split on `sim_submission_date` instead — the
+  80th-percentile cut lands near 2021-12-28 and yields a clean ~4,170-claim
+  (20%) forward test fold. Use a temporal split, never a random one, wherever a
+  time-dependent feature exists (CLAUDE.md §4.3).
+- **Irreducible-noise ceiling.** The label carries deliberate noise. Scoring
+  with the true latent probability — which no model can beat — tops out at
+  **AUC ≈ 0.68**, and roughly **one third of the positive (denied) labels carry
+  no mechanism signal at all**; they are pure noise by construction. Compare
+  Phase 4 models against that ceiling, not against 1.0, and do not attempt to
+  "explain" the noise-created denials. Full derivation: assumptions.md §2.
+- **Service line is a weak stratifier.** Per-service-line denial rates are a
+  noisy, unreliable ranking here (rank correlation to the underlying mechanism
+  is weak and non-significant), because the source DRG mix is concentrated and
+  several service lines are small. Show volumes alongside any per-service-line
+  rate, and prefer payer-level slices for stable directional signal.
+  Detail: assumptions.md §5.
+
 ---
 
 Maintained by simulation-engineer, in the same commit as any change to the
