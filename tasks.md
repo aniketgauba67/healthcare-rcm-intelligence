@@ -204,16 +204,26 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > features placeholder is the Phase 4 GATE below, owned by ml-engineer — I will
 > add the model.yaml-vs-doc leakage test then; (b) crosswalk strict-prefix tech
 > debt is data-engineer's, tracked above.
-- [~] ACCEPTANCE (qa-reviewer-p2): all criteria PASS on branch HEAD 69c2736
-  (seed-reproducible + validity + honesty + leakage + live-PG, verified by my own
-  commands). Box left unchecked pending the final verification run on MERGED main.
-  MERGE LANDED 2026-07-23 by team-lead (user-authorized; builder+qa both offline
-  on session limit, reset 12:50am ET): fast-forward feat/phase2-simulation → main,
-  main now at 58cc170, PUSHED to origin. Team-lead verified `make test` 81 passed
-  + ruff clean on merged main (unit only; live-PG acceptance is qa's to run).
-  REMAINING: qa-reviewer-p2 runs its on-main acceptance verification (live PG
-  warehouse→simulate→simulate-warehouse→validate) and CHECKS THIS BOX — the box
-  is qa's authority, team-lead did NOT check it. Phase 2 is DONE only then.
+- [x] ACCEPTANCE (qa-reviewer-p2): Phase 2 ACCEPTED. Signed off 2026-07-23 on
+  MERGED main (HEAD ea3b747, code 58cc170), verified by commands I ran myself:
+  live-PG ordered run warehouse 42/42 → simulate 63/63 (denial rate 12.7618%,
+  identical metrics to the branch — reproducibility carried to main) →
+  simulate-warehouse 52/52 → validate-warehouse integration 6/6; DB end-state
+  queried directly (7 sim_ tables carry FKs, 20,867 adjudication rows, 0 orphans,
+  0 non-SIMULATED rows). Earlier on-branch verification (69c2736): 78 unit pass,
+  ruff clean, TWO independent builds byte-identical, DuckDB mirror 52/52, honesty
+  pass clean (every sim_ column prefixed, register+dictionary in the DDL commit,
+  every range DESIGN CHOICE with bracketing citations, §11 disclaims realism, no
+  fraud framing, forbidden-columns doc authoritative+complete via drift test).
+  LEAKAGE independently re-verified (team-lead requested): single-feature AUC of
+  every PERMITTED column tops out at 0.557 (sim_auth_required); FORBIDDEN columns
+  reconstruct the label (sim_denied_amount 1.000, sim_denial_review_date-not-null
+  1.000, sim_latent_p 0.678) — the §4.5 firewall boundary is empirically correct.
+  Directional validity (mechanism-strength bar) holds; per team-lead ruling,
+  GB-not-beating-logistic is NOT a Phase 2 criterion (Phase 4 §7 = comparison
+  REPORTED) and did not gate this. MERGE LANDED 2026-07-23 by team-lead
+  (user-authorized; fast-forward feat/phase2-simulation → main, pushed to origin).
+  Test-ordering bug FIXED + guarded by me (69c2736, on main). PHASE 2 DONE.
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
 - [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
