@@ -56,9 +56,12 @@ def chi2_report(col, label):
 # label-only per §3.7) against WHY the generator denied it (driver mechanism).
 
 # %%
+# carc_category_label is a project-authored taxonomy label (DERIVED, §3.7),
+# NOT copyrighted X12 CARC description text; display-only.
 rc = pd.read_sql(
     """
-    select sim_denial_category, sim_denial_carc_group, sim_denial_driver_mechanism,
+    select sim_denial_category, sim_denial_carc_group, carc_category_label,
+           sim_denial_driver_mechanism,
            denial_count, share_of_denials, appeal_rate, overturn_rate_of_appealed,
            sim_denied_amt
     from rcm.vw_denial_root_cause order by denial_count desc

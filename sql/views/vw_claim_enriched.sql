@@ -18,6 +18,9 @@
 --   DERIVED    (computed here from SOURCE/SIMULATED inputs):
 --     claim_sk (warehouse surrogate), diagnosis_count, clean_claim_flag,
 --     first_pass_paid_flag, ar_open_flag, ar_balance_amt, submission_year_month
+--   REFERENCE  (official code-set display text, FY2023 vintage §2; DISPLAY-ONLY,
+--              never a grouping key — join on SOURCE codes, misses stay NULL):
+--     drg_desc (MS-DRG v40 title), prncpal_dgns_desc + admtg_dgns_desc (ICD-10-CM)
 --   SIMULATED  (generated adjudication layer, CLAUDE.md §3 — NOT real payer
 --              behaviour; every sim_* column below is invented):
 --     sim_payer_id, sim_payer_name, sim_service_line_id/name, all denial fields,
@@ -60,8 +63,8 @@ select
 
     -- ---- clinical / source claim attributes (SOURCE) ----
     fic.bene_key,
-    drg.drg_cd,
-    drg.drg_desc,                                -- SOURCE code; REFERENCE text (null until MS-DRG ref loaded)
+    drg.drg_cd,                                  -- SOURCE (synthetic claim's DRG)
+    drg.drg_desc,                                -- REFERENCE display text (MS-DRG v40 FY2023 title), display-only
     ds.discharge_status_cd,
     fic.nch_clm_type_cd,
     fic.admtg_dgns_cd,
@@ -145,7 +148,15 @@ select
         and not coalesce(dc.sim_duplicate_submission_flag, false)) as clean_claim_flag,
     (adj.sim_payment_date is not null and not adj.sim_denial_flag) as first_pass_paid_flag,
     (adj.sim_payment_date is null) as ar_open_flag,   -- not yet paid = outstanding
-    greatest(adj.sim_allowed_amount - adj.sim_paid_amount, 0) as ar_balance_amt
+    greatest(adj.sim_allowed_amount - adj.sim_paid_amount, 0) as ar_balance_amt,
+
+    -- ---- REFERENCE display text (ICD-10-CM FY2023), DISPLAY-ONLY, never a key.
+    -- Appended at the end of the select so `create or replace view` only ADDS
+    -- columns (PostgreSQL forbids mid-list column insertion). Exact-code join;
+    -- ~25% of synthetic dx codes are 6-char stems lacking the FY2023 7th char, so
+    -- they stay NULL by design (no fuzzy guess — see vw_data_quality_scorecard #15).
+    icd_pr.long_desc as prncpal_dgns_desc,       -- REFERENCE display text, display-only
+    icd_ad.long_desc as admtg_dgns_desc          -- REFERENCE display text, display-only
 from rcm.fact_inpatient_claim fic
 join rcm.dim_provider          prov  on prov.provider_key = fic.provider_key
 join rcm.dim_drg               drg   on drg.drg_key = fic.drg_key
@@ -161,6 +172,10 @@ left join rcm.sim_documentation_coding      dc on dc.claim_sk = fic.claim_sk
 left join rcm.sim_operating_costs           oc on oc.claim_sk = fic.claim_sk
 -- facility crosswalk: display-only left join keyed on the SYNTHETIC prvdr_num
 left join rcm.sim_facility_crosswalk fx on fx.sim_prvdr_num = prov.prvdr_num
+-- ICD-10-CM display text (REFERENCE, FY2023): display-only left joins on the
+-- claim's dotless diagnosis codes; misses stay NULL (never a grouping key).
+left join rcm.ref_icd10cm icd_pr on icd_pr.icd10cm_code = fic.prncpal_dgns_cd
+left join rcm.ref_icd10cm icd_ad on icd_ad.icd10cm_code = fic.admtg_dgns_cd
 -- diagnosis count per claim (DERIVED from the diagnosis bridge)
 left join (
     select claim_sk, count(*) as diagnosis_count

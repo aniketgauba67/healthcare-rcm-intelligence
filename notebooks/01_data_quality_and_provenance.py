@@ -100,8 +100,9 @@ print(
 # file, not the simulation, and it thins every DRG/service-line interaction.
 
 # %%
+# drg_desc is REFERENCE display text (MS-DRG v40 FY2023 title), display-only.
 drg = (
-    claims.groupby("drg_cd")
+    claims.groupby(["drg_cd", "drg_desc"], dropna=False)
     .size()
     .sort_values(ascending=False)
     .head(8)
@@ -112,7 +113,8 @@ drg["share"] = (drg.claims / n).round(4)
 print(drg.to_string(index=False))
 top = drg.iloc[0]
 print(
-    f"\nINSIGHT 3: DRG {top.drg_cd} alone is {top.share:.1%} of claims (SOURCE skew). "
+    f"\nINSIGHT 3: DRG {top.drg_cd} ({top.drg_desc}) alone is {top.share:.1%} of "
+    f"claims (SOURCE skew). "
     f"Per-service-line and DRG-interaction signals are therefore thin — quantify "
     f"effects with volumes shown alongside rates, and do not over-read a single DRG."
 )

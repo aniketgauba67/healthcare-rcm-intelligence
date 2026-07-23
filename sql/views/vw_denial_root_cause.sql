@@ -11,6 +11,9 @@
 --                 sim_denial_category / _carc_group / _driver_mechanism = SIMULATED
 --                 sim_denial_carc_group is a CARC code used as a LABEL ONLY (§3.7);
 --                   it is NOT sourced from an AMA/CMS description file.
+--                 carc_category_label = project-authored taxonomy label from
+--                   ref_carc (DERIVED, §3.7 — NOT copyrighted X12 text); display
+--                   only, 1:1 with carc_group so the grain is unchanged.
 --                 all counts, shares, amounts, appeal/overturn rates = DERIVED from SIMULATED.
 --
 -- HONESTY:      These are SIMULATED denials (the CMS synthetic claims contain no
@@ -64,9 +67,18 @@ select
     round(
         count(*) filter (where ap.overturned)::numeric
         / nullif(count(*) filter (where ap.appealed), 0), 4)      as overturn_rate_of_appealed,
-    round(coalesce(sum(ap.recovered_amt), 0), 2)                   as sim_recovered_amt
+    round(coalesce(sum(ap.recovered_amt), 0), 2)                   as sim_recovered_amt,
+
+    -- CARC display label (project-authored taxonomy, DERIVED §3.7; NOT X12 text),
+    -- display-only, 1:1 with sim_denial_carc_group. Appended last so
+    -- `create or replace view` only ADDS a column (no mid-list insertion).
+    max(carc.category_label)                                       as carc_category_label
 from denied d
 left join appeal_agg ap on ap.claim_sk = d.claim_sk
+-- CARC display label (project-authored taxonomy, §3.7): display-only left join.
+-- category_label is 1:1 with carc_group, so it is taken via max() rather than
+-- added to GROUP BY — the grain stays the original 3 dimensions (grain unchanged).
+left join rcm.ref_carc carc on carc.carc_code = d.sim_denial_carc_group
 group by d.sim_denial_category, d.sim_denial_carc_group, d.sim_denial_driver_mechanism;
 
 comment on view rcm.vw_denial_root_cause is

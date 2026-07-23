@@ -128,11 +128,21 @@ with claims as (select count(*) n from rcm.fact_inpatient_claim),
            (select count(*) from rcm.fact_inpatient_claim where drg_key = 0)::numeric,
            (select n from claims)::numeric, null::numeric, 'info'
 
-    -- 14. DRG display-name coverage (0 until the MS-DRG REFERENCE file lands).
+    -- 14. DRG display-name coverage (MS-DRG v40 FY2023 REFERENCE now loaded).
     union all select 'drg_description_coverage', 'reference_enrichment', 'REFERENCE',
-           'Share of DRG dim members with a description (0 until MS-DRG ref loaded)',
+           'Share of DRG dim members with a REFERENCE description (MS-DRG v40 FY2023)',
            (select count(*) from rcm.dim_drg where drg_desc is not null)::numeric,
            (select count(*) from rcm.dim_drg)::numeric, 1.0::numeric, 'info'
+
+    -- 15. Principal-diagnosis display-name coverage (ICD-10-CM FY2023 REFERENCE).
+    --     DISPLAY-ONLY exact-code join; ~25% of synthetic RIF dx codes are 6-char
+    --     injury/poisoning stems lacking the FY2023-required 7th-char extension,
+    --     so they stay NULL by design (no fuzzy guess — honesty over coverage).
+    union all select 'principal_dx_description_coverage', 'reference_enrichment', 'REFERENCE',
+           'Share of claims whose principal dx exact-matches ICD-10-CM FY2023 text (display-only)',
+           (select count(*) from rcm.fact_inpatient_claim f
+              join rcm.ref_icd10cm r on r.icd10cm_code = f.prncpal_dgns_cd)::numeric,
+           (select n from claims)::numeric, null::numeric, 'info'
 )
 select
     check_id,
