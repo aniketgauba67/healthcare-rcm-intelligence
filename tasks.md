@@ -328,12 +328,17 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   standardization O/E + Poisson funnel, keyed on synthetic prvdr_num (nb04);
   process mining variants/rework/bottlenecks/automation (nb05). Reconciliation
   gate added: sql/quality/view_reconciliation.py (21/21 pass), wired into
-  `make views`. ITS still deferred (see NOTE below). Pending qa.
+  `make views`. ITS built as illustrative harness (see NOTE below). Pending qa.
   — NOTE (analytics-engineer 2026-07-23): no "simulated intervention module"
   exists in the Phase 2 sim layer, so the ITS test per §7.3 has no real
-  intervention to analyze. Raised to team-lead; the other tests (chi-square +
+  intervention to analyze. Raised to team-lead; other tests (chi-square +
   Cramér's V + adjusted logistic auth↔denial, Kruskal-Wallis payment times,
-  risk-adjusted facility, KM + Cox PH survival, process mining) proceed now.
+  risk-adjusted facility, KM + Cox PH survival, process mining) all done.
+  ITS implemented in notebooks/06 as an ILLUSTRATIVE harness (segmented
+  regression + Newey-West): validated on a synthetic series with a known
+  injected effect, then run on the real monthly series at a HYPOTHETICAL cut —
+  correctly finds no break, asserts no effect. Subject to team-lead confirming
+  option (a) illustrative vs defer; reversible if they prefer defer.
 - [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
 
 ## Phase 4 — ML (lead: ml-engineer)

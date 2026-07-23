@@ -30,6 +30,7 @@ Prereqs: the docker Postgres warehouse is up and loaded (`make warehouse-all`),
 | `03_payment_timing_and_survival` | time-to-payment; P(paid by 30/60/90/120d) | Kruskal-Wallis, Kaplan-Meier, Cox PH + PH-assumption check + stratified refit |
 | `04_risk_adjusted_facility` | provider comparison free of case-mix confounding | case-mix expected model, indirect standardization (O/E), Poisson funnel |
 | `05_process_mining` | dominant paths, rework, bottlenecks, automation | variant analysis, touch-minute bottlenecks |
+| `06_interrupted_time_series` | ITS **methodology, illustrative only** — no intervention module exists | segmented regression with Newey-West SEs; validated on a synthetic series, run on the real series (finds no break, as expected) |
 
 ## Honesty rules (CLAUDE.md §3, enforced in every notebook)
 
@@ -43,8 +44,12 @@ Prereqs: the docker Postgres warehouse is up and loaded (`make warehouse-all`),
   simulated outlier is ever attached to a real hospital's name.
 - Outliers and anomalies are **review flags**, never "fraud".
 
-## Not yet included
+## Interrupted time series (§7.3) — illustrative
 
-Interrupted time series (§7.3) is pending a team-lead decision: the Phase 2 sim
-layer contains no intervention module, so there is no real intervention to analyze.
-See `tasks.md` Phase 3.
+`06_interrupted_time_series` implements the ITS estimator but asserts **no effect**:
+the Phase 2 sim layer has no intervention module, so there is nothing real to
+analyze. The notebook validates the segmented-regression estimator on a synthetic
+series with a known injected effect, then runs it on the real monthly series at a
+hypothetical cut (correctly finding no break). It is the harness ready for a future
+simulated-intervention module. Subject to the team-lead scope decision noted in
+`tasks.md` Phase 3.
