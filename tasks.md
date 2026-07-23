@@ -283,6 +283,15 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > Opus 4.8 per the model pin): analytics-engineer (lead) + data-engineer
 > (re-spawned for the reference-code-set prerequisite only) + a fresh
 > qa-reviewer (one reviewer for the phase). Standard kickoff pattern; feature
+> RE-SPAWN 2026-07-23 ~09:10 (team-lead): the first Phase 3 workers
+> (data-engineer-p3, analytics-engineer) hit the ~5-hour account usage cap and
+> died ~05:30 having committed no code; re-spawned as "data-engineer-refs" and
+> "analytics-engineer-2" (both Opus). qa-reviewer-p4 survived (idle) and remains
+> the reviewer. analytics-engineer's only WIP — an idempotent view-runner
+> sql/views/apply_views.py — was preserved as 5bea9fe on feat/phase3-analytics.
+> NOTE ON CRASHES: reset times run 2:50/7:50/12:50/5:50 — a hard ~5-hour ACCOUNT
+> usage window, NOT Fable-specific; the Opus pin did not prevent it. Agents must
+> commit early/often + post state to main before a suspected limit.
 > branches; live PG single-writer + quiet-window rules in force (see the Phase 1
 > TEAM RULE incl. the claim_sk warehouse-reload mechanism).
 > MANDATORY RULING (from Phase 2 crosswalk audit, team-lead): every facility- or
