@@ -283,6 +283,25 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > Opus 4.8 per the model pin): analytics-engineer (lead) + data-engineer
 > (re-spawned for the reference-code-set prerequisite only) + a fresh
 > qa-reviewer (one reviewer for the phase). Standard kickoff pattern; feature
+> RE-SPAWN 2026-07-23 ~09:10 (team-lead): the first Phase 3 workers
+> (data-engineer-p3, analytics-engineer) hit the ~5-hour account usage cap and
+> died ~05:30 having committed no code; re-spawned as "data-engineer-refs" and
+> "analytics-engineer-2" (both Opus). qa-reviewer-p4 survived (idle) and remains
+> the reviewer. analytics-engineer's only WIP — an idempotent view-runner
+> sql/views/apply_views.py — was preserved as 5bea9fe on feat/phase3-analytics.
+> NOTE ON CRASHES: reset times run 2:50/7:50/12:50/5:50 — a hard ~5-hour ACCOUNT
+> usage window, NOT Fable-specific; the Opus pin did not prevent it. Agents must
+> commit early/often + post state to main before a suspected limit.
+> RE-SPAWN #2 2026-07-23 ~14:40 (team-lead): ALL THREE Phase 3 agents hit the ~5h
+> cap together at 13:41 (reset 2pm); qa-reviewer-p4 died too because it was ACTIVE
+> mid-review, not idle. Re-spawned as data-engineer-refs2 / analytics-engineer-3 /
+> qa-reviewer-p5 (Opus). PRESERVED: analytics fully committed (feat/phase3-
+> analytics through 9dc31a5, incl. ITS notebook 06); data-engineer's uncommitted
+> reference work saved as f32098e on feat/phase3-references. WAREHOUSE: the
+> reference additive write HAD executed pre-crash — dim_drg.drg_desc 167/168 + 5
+> ref_* tables live; analytics reconciled against the pre-populate (NULL) state,
+> so qa must re-reconcile against the populated state. OPEN: analytics 70-vs-81
+> unit-test regression to resolve; DRG name enrichment now unblocked.
 > branches; live PG single-writer + quiet-window rules in force (see the Phase 1
 > TEAM RULE incl. the claim_sk warehouse-reload mechanism).
 > MANDATORY RULING (from Phase 2 crosswalk audit, team-lead): every facility- or
@@ -305,6 +324,29 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   group (CARC as labels, §3.7-clean), driver_mechanism, and named service lines.
   So all 8 views build in parallel; only the DRG/diagnosis/procedure display-name
   enrichment waits for these tables.
+  DONE 2026-07-23 (data-engineer, branch feat/phase3-references; pending qa-reviewer-p4).
+  All FY2023 vintage (§2-clean, no ICD-9). Downloaded from www.cms.gov (curl
+  works in-sandbox), parsed, loaded ADDITIVELY on live PG (no fact_/sim_ drop —
+  verified fact_inpatient_claim=20,867 and sim_facility_crosswalk=4,876 unchanged
+  across the load; idempotent). MEASURED (url + sha256 recorded in config/sources.yaml):
+    - ICD-10-CM FY2023  → ref_icd10cm  73,674 dx  | zip sha256 cc7158228f6de01a…5cfe1e06
+      (2023-code-descriptions-tabular-order.zip, 2,387,419 B)
+    - ICD-10-PCS FY2023 → ref_icd10pcs 78,530 proc| zip sha256 e35b6e2e170ea1ef…61947c93e
+      (2023-icd-10-pcs-codes-file.zip, 653,881 B)
+    - HCPCS 2023 Lvl II → ref_hcpcs    7,404 codes| zip sha256 127c62b4f7745…77ca0f1cc8
+      (january-2023-alpha-numeric-hcpcs-file.zip, 2,282,796 B). §3.7: CPT Lvl I,
+      2-char modifiers, D-series (ADA) excluded at load.
+    - MS-DRG v40 FY2023 → ref_msdrg    767 DRGs   | zip sha256 eda9acaa4b90339c…ba0fcb53
+      (IPPS FY2023 Final Rule Table 5, fy2023-ipps-fr-table-5.zip, 78,312 B)
+    - CARC (§3.7 labels-only, NO file, NO X12 text) → ref_carc 10 project-authored
+      labels aligned to config/simulation.yaml carc_groups (16,18,22,27,29,50,96,97,181,197).
+  dim_drg.drg_desc ENRICHED: 167/167 real DRGs matched ref_msdrg (0 unmatched);
+  enriched rows now provenance='REFERENCE'. Files: sql/ddl/60_reference_codes.sql,
+  src/ingestion/reference_codes.py, tests/contracts/test_reference_codes.py,
+  tests/integration/test_reference_codes_postgres.py, Makefile `reference-codes`,
+  docs/data_dictionary.md + docs/provenance_register.md updated same commit.
+  Unit suite 81 passed / 5 skipped; new live-PG integration test PASS. analytics-
+  engineer-2: naming enrichment can now join dim_drg.drg_desc + ref_* tables.
 - [~] 8 metric-contract views with control queries
   — analytics-engineer, feat/phase3-analytics (f13285e). BUILT + reconciled on
   live PG, pending qa. vw_claim_enriched base (1:1, 20,867) + all 8 contract
@@ -314,7 +356,8 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   carry the 100%-simulated banner (§3.5). work_queue_priority = HEURISTIC
   PLACEHOLDER, model_monitoring = DRIFT SCAFFOLD, both labeled (Phase 4 replaces).
   Control queries all reconcile (denied 2,663 / open AR 1,911 / 5 payers /
-  baseline-driver 1,222). Applied via sql/views/apply_views.py.
+  baseline-driver 1,222). Applied via sql/views/apply_views.py. DRG/diagnosis/
+  procedure DISPLAY-name enrichment wired after the ref_* merge (item below).
 - [~] EDA notebooks: >= 12 insights with statistical support
   — analytics-engineer (43752ef). 5 numbered jupytext-percent notebooks in
   notebooks/ (re-runnable top-to-bottom vs live PG via analytics_common.py),
@@ -328,17 +371,23 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   standardization O/E + Poisson funnel, keyed on synthetic prvdr_num (nb04);
   process mining variants/rework/bottlenecks/automation (nb05). Reconciliation
   gate added: sql/quality/view_reconciliation.py (21/21 pass), wired into
-  `make views`. ITS built as illustrative harness (see NOTE below). Pending qa.
-  — NOTE (analytics-engineer 2026-07-23): no "simulated intervention module"
-  exists in the Phase 2 sim layer, so the ITS test per §7.3 has no real
-  intervention to analyze. Raised to team-lead; other tests (chi-square +
-  Cramér's V + adjusted logistic auth↔denial, Kruskal-Wallis payment times,
-  risk-adjusted facility, KM + Cox PH survival, process mining) all done.
-  ITS implemented in notebooks/06 as an ILLUSTRATIVE harness (segmented
-  regression + Newey-West): validated on a synthetic series with a known
-  injected effect, then run on the real monthly series at a HYPOTHETICAL cut —
-  correctly finds no break, asserts no effect. Subject to team-lead confirming
-  option (a) illustrative vs defer; reversible if they prefer defer.
+  `make views`. ITS built as illustrative harness (notebooks/06). Pending qa.
+  ITS RULING (team-lead 2026-07-23): §7.3 lists an
+  interrupted time series for "the simulated intervention module", but Phase 2
+  built NO intervention module (plan/build gap). Resolution: implement ITS
+  methodology on a CLEARLY-LABELED ILLUSTRATIVE hypothetical intervention in a
+  NOTEBOOK ONLY (no intervention field/table written to the warehouse; every
+  caption states "illustrative, not real/simulated operational event, no causal
+  claim"; best done by inserting a KNOWN synthetic step and showing ITS recover
+  it, or by demonstrating on a no-effect date). Must not leak into the KPI views
+  or headline metrics. qa-reviewer-p4 verifies the labeling. Optional FUTURE
+  enhancement (NOT required for Phase 3, do not reopen Phase 2 now): a real
+  sim-layer intervention module with a designed ground-truth effect + treated/
+  control cohorts so ITS validates against known truth.
+- [ ] (milestone) 8 metric-contract views + vw_claim_enriched — BUILT + reconciled
+  on live PG (analytics-engineer-2, f13285e, feat/phase3-analytics); synthetic-id
+  keying verified (distinct prvdr_num == row count), payer=simulated banner,
+  heuristic/drift scaffolds labeled. Sent to qa-reviewer-p4 for review.
 - [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
 
 ## Phase 4 — ML (lead: ml-engineer)
