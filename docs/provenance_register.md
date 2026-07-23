@@ -20,6 +20,21 @@ Checksums, sizes, and row counts are measured at download time and recorded in
 | `reference/hospital_general_information.csv` | hospital_general_information | REFERENCE | 2026-04 | CMS Hospital General Information; 5,432 real facilities (real CCNs). Facility crosswalk target, never joined directly. |
 | `reference/medicare_providers_extract.csv` | medicare_providers | REFERENCE | 2024 | Medicare Physician & Other Practitioners by Provider; 1,296,739 real providers (NPI/specialty/state). Nationwide provider crosswalk pool. Real NPIs, never joined directly. |
 
+### Code-set reference artifacts (Phase 3 prerequisite, added 2026-07-23)
+
+Public CMS code files matching the **FY2023 / 2023** claims vintage (CLAUDE.md §2
+vintage rule — never ICD-9). Downloaded as zips into `data/raw/reference/`
+(gitignored); only the code + description text is parsed. Loaded by
+`src/ingestion/reference_codes.py`.
+
+| Artifact | Source group | Classification | Vintage | Notes |
+|---|---|---|---|---|
+| `reference/icd10cm_2023.zip` | icd10 | REFERENCE | FY2023 | CMS ICD-10-CM tabular descriptions; 73,674 dx codes parsed (member `icd10cm_codes_2023.txt`). |
+| `reference/icd10pcs_2023.zip` | icd10 | REFERENCE | FY2023 | CMS ICD-10-PCS codes file; 78,530 proc codes parsed (member `icd10pcs_codes_2023.txt`). |
+| `reference/hcpcs_2023.zip` | hcpcs | REFERENCE | 2023 | CMS Jan-2023 Alpha-Numeric file; 7,404 **Level II** codes parsed. CPT Level I (numeric, AMA), 2-char modifiers, and D-series (ADA) excluded at load (§3.7). |
+| `reference/msdrg_v40_table5.zip` | ms_drg | REFERENCE | FY2023 | IPPS FY2023 Final Rule Table 5 (MS-DRG v40); 767 DRGs (title, MDC, type). |
+| _(no file)_ | carc_codes | REFERENCE | labels-only | CARC used as denial-category LABELS only (§3.7). No X12 file downloaded, no X12 description text reproduced; `ref_carc` pairs 10 public CARC code identifiers with **project-authored** labels. |
+
 ## Validated layer — typed Parquet (`data/validated/`, gitignored)
 
 Typed representations of the raw RIF SOURCE files (dtype standardization only —
@@ -53,7 +68,7 @@ and all `sim_`-prefixed tables are added here by their owning agents.
 | dim_date | all | DERIVED | generated calendar | from fact date columns; key 0 = Unknown. |
 | dim_beneficiary | all except `bene_key` | SOURCE | beneficiary_2024 | `bene_key` surrogate is DERIVED; Unknown row DERIVED. |
 | dim_provider | `prvdr_num`, `org_npi_num`, `provider_state_cd` | SOURCE | inpatient | synthetic ids (`is_synthetic_id=true`); NOT real CCN/NPI. `provider_key` DERIVED. |
-| dim_drg | `drg_cd` | SOURCE | inpatient | `drg_desc` will be REFERENCE (MS-DRG file); `drg_key` DERIVED. |
+| dim_drg | `drg_cd` | SOURCE | inpatient | `drg_key` DERIVED. `drg_desc` is **REFERENCE** — enriched by value join from `ref_msdrg` (MS-DRG v40, FY2023). Enriched rows carry `provenance='REFERENCE'`; 167/167 real DRGs matched (2026-07-23). |
 | dim_discharge_status | `discharge_status_cd` | SOURCE | inpatient | `discharge_status_key` DERIVED. |
 | fact_inpatient_claim | measures, degenerate `clm_id`, diagnosis codes | SOURCE | inpatient | surrogate/FK keys DERIVED; `length_of_stay_days` DERIVED. |
 | fact_claim_revenue_line | `clm_line_num`, `rev_cntr`, `hcpcs_cd` | SOURCE | inpatient | surrogate/FK keys DERIVED. |
@@ -61,6 +76,11 @@ and all `sim_`-prefixed tables are added here by their owning agents.
 | **sim_facility_crosswalk** | all | **SIMULATED** | seeded assignment | synthetic billing provider (`sim_prvdr_num`, FK to dim_provider) → REAL facility CCN, stratified by state+type. Not a real linkage. |
 | **sim_provider_crosswalk** | all | **SIMULATED** | seeded assignment | synthetic attending physician (`sim_at_physn_npi`) → REAL Medicare NPI, stratified by coherent state + inpatient-plausible specialty. Not a real linkage. |
 | dq_quarantine | all | DERIVED | contract engine | one row per data-contract violation (table, contract, entity key, reason). No SOURCE values beyond the offending key. |
+| ref_icd10cm | `icd10cm_code`, `long_desc` | REFERENCE | FY2023 ICD-10-CM file | 73,674 diagnosis descriptions. Dotless tabular codes. |
+| ref_icd10pcs | `icd10pcs_code`, `long_desc` | REFERENCE | FY2023 ICD-10-PCS file | 78,530 procedure descriptions. 7-char codes. |
+| ref_hcpcs | `hcpcs_code`, `long_desc`, `short_desc` | REFERENCE | 2023 HCPCS Alpha-Numeric | 7,404 Level II descriptions. CPT Level I / modifiers / D-series excluded (§3.7). |
+| ref_msdrg | `drg_cd`, `drg_title`, `mdc`, `drg_type` | REFERENCE | IPPS FY2023 Table 5 | 767 MS-DRG v40 titles. Enriches `dim_drg.drg_desc`. |
+| ref_carc | `carc_code` | REFERENCE | X12 CARC identifiers | Code identifiers only (§3.7). `category_label` is **DERIVED** (project-authored); NO X12 description text reproduced. Join target for `sim_denial_carc_group`. |
 | **sim_payer** | all | **SIMULATED** | config/simulation.yaml | invented payer archetypes. Medicare FFS has ONE payer; this dimension is entirely simulated (§3.5). Not modelled on or named after any real insurer. |
 | **sim_service_line** | all | **SIMULATED** | config/simulation.yaml | coarse MS-DRG numeric-range buckets. The boundaries are a design choice of the simulation, NOT an official CMS MS-DRG/MDC taxonomy — which is why the column is SIMULATED although its input `drg_cd` is SOURCE. |
 | **sim_authorization_eligibility** | all | **SIMULATED** | `src/simulation/` | pre-submission authorization + eligibility facts. The CMS synthetic claims contain none of this. |
