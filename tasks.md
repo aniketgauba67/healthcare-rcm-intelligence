@@ -31,6 +31,14 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > share the main pool. NOTE: this team-lead session itself is still on Fable 5
 > (a /model switch only affects NEW sessions, not the running one) — so the
 > coordinator may still hit limits, but spawned teammates now come up on Opus.
+> TEAM RULE — WORKTREE HYGIENE (2026-07-23, after an agent's Bash cwd resolved to
+> the shared main checkout and accidentally committed dc35be0 onto main, bypassing
+> review; team-lead reset it out, no work lost — content was safe on the branch).
+> The primary checkout at repo root is on branch `main`. EVERY agent MUST operate
+> in its own worktree (.claude/worktrees/feat+<branch>) and run
+> `git branch --show-current` before ANY commit to confirm it is on its feature
+> branch, NEVER main. Never commit/reset on the shared main checkout — merges to
+> main happen only after qa PASS, performed by the author on their branch.
 - [x] Download scripts + manifest + checksums for all sources in config/sources.yaml
   — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (fc850f1).
   qa non-blocking notes folded: manifest `filename` now repo-relative (data/raw/…,
@@ -311,7 +319,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > 8-to-1), so grouping by facility_ccn silently merges up to 8 distinct synthetic
 > hospitals. Real CCN/name are DISPLAY-ONLY enrichment. qa-reviewer must reject
 > any view violating this.
-- [ ] PREREQUISITE (data-engineer): download + load REFERENCE code sets matching
+- [x] PREREQUISITE (data-engineer): REFERENCE code sets — qa-reviewer-p5 PASS
+  2026-07-23; MERGED to main 4e0adea by team-lead (authorized post-PASS merge,
+  author offline on usage cap). Live counts reconcile: ICD-10-CM 73,674 /
+  ICD-10-PCS 78,530 / HCPCS L2 7,404 / MS-DRG v40 767 / CARC 10 labels; dim_drg.
+  drg_desc 167/168 (Unknown NULL correct); §3.7-clean; additive/idempotent, no
+  fact/sim touch. `make test` 85 passed / 8 skipped on merged main. Original task:
+  download + load REFERENCE code sets matching
   the 2023-04 claims vintage — ICD-10-CM/PCS FY2023, HCPCS 2023, MS-DRG (FY2023,
   ~v40), CARC codes (category labels only, §3.7). Record vintage + sha256 in
   config/sources.yaml per manifest rules; add REFERENCE dim tables in sql/ddl/;
