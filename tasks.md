@@ -206,9 +206,14 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > debt is data-engineer's, tracked above.
 - [~] ACCEPTANCE (qa-reviewer-p2): all criteria PASS on branch HEAD 69c2736
   (seed-reproducible + validity + honesty + leakage + live-PG, verified by my own
-  commands). Box left unchecked pending the final verification run on MERGED main
-  state per team-lead protocol — merge can proceed; I will re-run and check this
-  box immediately after.
+  commands). Box left unchecked pending the final verification run on MERGED main.
+  MERGE LANDED 2026-07-23 by team-lead (user-authorized; builder+qa both offline
+  on session limit, reset 12:50am ET): fast-forward feat/phase2-simulation → main,
+  main now at 58cc170, PUSHED to origin. Team-lead verified `make test` 81 passed
+  + ruff clean on merged main (unit only; live-PG acceptance is qa's to run).
+  REMAINING: qa-reviewer-p2 runs its on-main acceptance verification (live PG
+  warehouse→simulate→simulate-warehouse→validate) and CHECKS THIS BOX — the box
+  is qa's authority, team-lead did NOT check it. Phase 2 is DONE only then.
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
 - [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
