@@ -18,6 +18,19 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > transient reconciliation failure from interleaving is expected noise; re-run
 > in a quiet window before treating it as a bug. CI is unaffected (own service
 > container).
+> MECHANISM (confirmed Phase 2 by qa-reviewer-p3): claim_sk is a SURROGATE key
+> reassigned on every warehouse reload, so a concurrent or later `make warehouse`
+> invalidates freshly-generated sim_ FKs — symptom is 100% claim_sk FK-join
+> failures, which looks catastrophic but is just interleaving. Run
+> `make warehouse-all` (warehouse → simulate → simulate-warehouse) as ONE
+> quiet-window unit; never reload the warehouse alone while the sim_ layer must
+> stay valid. Relevant to every Phase 3+ agent that touches the warehouse.
+> TEAM MODEL (2026-07-23, team-lead per human): all teammates run on Opus 4.8,
+> pinned via `model: opus` in every .claude/agents/*.md. Fable 5 is on a smaller
+> usage pool and caused repeated mid-flight session-limit crashes; Opus/Sonnet
+> share the main pool. NOTE: this team-lead session itself is still on Fable 5
+> (a /model switch only affects NEW sessions, not the running one) — so the
+> coordinator may still hit limits, but spawned teammates now come up on Opus.
 - [x] Download scripts + manifest + checksums for all sources in config/sources.yaml
   — data-engineer, feat/phase1-ingestion; qa-reviewer PASS 2026-07-22 (fc850f1).
   qa non-blocking notes folded: manifest `filename` now repo-relative (data/raw/…,

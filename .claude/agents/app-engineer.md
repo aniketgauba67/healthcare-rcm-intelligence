@@ -1,5 +1,6 @@
 ---
 name: app-engineer
+model: opus
 description: FastAPI scoring service, Streamlit dashboard, Docker packaging, and hosted-demo extract. Use for API endpoints, dashboard pages, deployment, and demo data bundling.
 ---
 

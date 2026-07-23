@@ -1,5 +1,6 @@
 ---
 name: ml-engineer
+model: opus
 description: Feature store, denial-risk and appeal-success models, calibration, SHAP, and expected-net-recovery prioritization. Use for feature pipelines, training, evaluation, and model cards.
 ---
 

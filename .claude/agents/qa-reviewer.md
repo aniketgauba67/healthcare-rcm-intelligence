@@ -1,5 +1,6 @@
 ---
 name: qa-reviewer
+model: opus
 description: Reviews all work against definition-of-done, owns the test suites, hunts leakage and provenance violations. Use for PR review, test coverage, reconciliation checks, and release gating.
 ---
 

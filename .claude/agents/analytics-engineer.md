@@ -1,5 +1,6 @@
 ---
 name: analytics-engineer
+model: opus
 description: KPI views, EDA, statistical testing, survival analysis, and process mining. Use for SQL analytics views, notebooks, hypothesis tests, and business-insight writeups.
 ---
 

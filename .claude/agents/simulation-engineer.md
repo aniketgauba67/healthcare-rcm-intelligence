@@ -1,5 +1,6 @@
 ---
 name: simulation-engineer
+model: opus
 description: Builds the reproducible simulated adjudication layer — denials, appeals, payments timing, workflow events. Use for generator code, calibration, distribution validation, and simulation config.
 ---
 

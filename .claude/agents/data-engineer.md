@@ -1,5 +1,6 @@
 ---
 name: data-engineer
+model: opus
 description: Ingestion, validation, and warehouse DDL for CMS synthetic claims and reference data. Use for download scripts, Parquet staging, Postgres schema, data-contract tests, and reconciliation.
 ---
 
