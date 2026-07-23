@@ -305,9 +305,23 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   group (CARC as labels, §3.7-clean), driver_mechanism, and named service lines.
   So all 8 views build in parallel; only the DRG/diagnosis/procedure display-name
   enrichment waits for these tables.
-- [ ] 8 metric-contract views with control queries
+- [~] 8 metric-contract views with control queries
+  — analytics-engineer, feat/phase3-analytics (f13285e). BUILT + reconciled on
+  live PG, pending qa. vw_claim_enriched base (1:1, 20,867) + all 8 contract
+  views. Every header: grain/sources/per-column provenance/control query.
+  Facility+provider grain keyed on synthetic prvdr_num (real CCN/name display-only
+  left join; verified no CCN merge: distinct prvdr_num == row count). Payer views
+  carry the 100%-simulated banner (§3.5). work_queue_priority = HEURISTIC
+  PLACEHOLDER, model_monitoring = DRIFT SCAFFOLD, both labeled (Phase 4 replaces).
+  Control queries all reconcile (denied 2,663 / open AR 1,911 / 5 payers /
+  baseline-driver 1,222). Applied via sql/views/apply_views.py.
 - [ ] EDA notebooks: >= 12 insights with statistical support
 - [ ] Statistical tests, survival analysis, process mining modules
+  — NOTE (analytics-engineer 2026-07-23): no "simulated intervention module"
+  exists in the Phase 2 sim layer, so the ITS test per §7.3 has no real
+  intervention to analyze. Raised to team-lead; the other tests (chi-square +
+  Cramér's V + adjusted logistic auth↔denial, Kruskal-Wallis payment times,
+  risk-adjusted facility, KM + Cox PH survival, process mining) proceed now.
 - [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
 
 ## Phase 4 — ML (lead: ml-engineer)
