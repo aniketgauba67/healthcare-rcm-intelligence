@@ -163,32 +163,85 @@ sources:
         columns: [Rndrng_NPI, Rndrng_Prvdr_Ent_Cd, Rndrng_Prvdr_State_Abrvtn, Rndrng_Prvdr_Type, Rndrng_Prvdr_Last_Org_Name]
 
   icd10:
-    name: ICD-10-CM/PCS code files (match claims vintage)
+    name: ICD-10-CM/PCS code files (FY2023 — matches the 2023-04 claims vintage)
     url: https://www.cms.gov/medicare/coding-billing/icd-10-codes
+    provider: www.cms.gov
     classification: REFERENCE
-    license_note: Public CMS code files. Never mix ICD-9 references (CLAUDE.md locked decision).
-    artifacts: {}
+    license_note: Public CMS code files. Never mix ICD-9 references (CLAUDE.md §2 locked decision).
+    vintage: "FY2023"  # §2 vintage rule — claims are 2023-04, so FY2023 codes (NOT current year)
+    # FY2023 files carry the CMS "updated-01/11/2023" revision; the canonical
+    # /files/zip/ URL below 301-redirects to it (requests follows redirects).
+    # Only the description text is parsed; the zips also contain PDFs we ignore.
+    artifacts:
+      icd10cm_2023:
+        role: reference
+        url: https://www.cms.gov/files/zip/2023-code-descriptions-tabular-order.zip
+        member: icd10cm_codes_2023.txt  # <code><spaces><long description>, dotless codes
+        filename: data/raw/reference/icd10cm_2023.zip
+        vintage: "FY2023"
+        sha256: cc7158228f6de01aa08650cc3afe446973a879dd78d44f1fec7150d45cfe1e06
+        size_bytes: 2387419
+        row_count: 73674  # diagnosis codes in the tabular descriptions file
+      icd10pcs_2023:
+        role: reference
+        url: https://www.cms.gov/files/zip/2023-icd-10-pcs-codes-file.zip
+        member: icd10pcs_codes_2023.txt  # 7-char code + space + long description
+        filename: data/raw/reference/icd10pcs_2023.zip
+        vintage: "FY2023"
+        sha256: e35b6e2e170ea1ef96e641b891a3e1fb3e47298eafeff6813cbb7b561947c93e
+        size_bytes: 653881
+        row_count: 78530  # procedure codes
 
   hcpcs:
-    name: HCPCS Level II quarterly update
+    name: HCPCS Level II Alpha-Numeric file (January 2023 annual)
     url: https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system
+    provider: www.cms.gov
     classification: REFERENCE
-    license_note: Public HCPCS Level II descriptions ONLY. NO CPT descriptions in repo (AMA-licensed, CLAUDE.md §3.7).
-    artifacts: {}
+    license_note: Public HCPCS Level II descriptions ONLY. CPT Level I (5-digit numeric, AMA-licensed) and 2-char modifiers are excluded at load (CLAUDE.md §3.7).
+    vintage: "2023"  # January 2023 annual HCPCS update (matches claims period)
+    artifacts:
+      hcpcs_2023:
+        role: reference
+        url: https://www.cms.gov/files/zip/january-2023-alpha-numeric-hcpcs-file.zip
+        member: HCPC2023_JAN_ANWEB_v3.txt  # fixed-width: code 1-5, long 12-91, short 92-119
+        filename: data/raw/reference/hcpcs_2023.zip
+        vintage: "2023"
+        sha256: 127c62b4f77453e4587312c281a4fa678e807620edb37d0351dc4877ca0f1cc8
+        size_bytes: 2282796
+        row_count: 7404  # unique Level II codes kept (letter+4 digits); modifiers + CPT/D-series excluded (§3.7)
 
   ms_drg:
-    name: MS-DRG definitions (IPPS tables, matching year)
-    url: https://www.cms.gov/medicare/payment/prospective-payment-systems/acute-inpatient-pps
+    name: MS-DRG v40 definitions — IPPS FY2023 Final Rule Table 5
+    url: https://www.cms.gov/medicare/payment/prospective-payment-systems/acute-inpatient-pps/ms-drg-classifications-and-software
+    provider: www.cms.gov
     classification: REFERENCE
-    license_note: Public IPPS MS-DRG tables.
-    artifacts: {}
+    license_note: Public IPPS MS-DRG tables (Version 40, FY2023). Titles + MDC + type.
+    vintage: "FY2023"  # MS-DRG v40 = FY2023, matches the 2023-04 claims vintage
+    artifacts:
+      msdrg_v40_table5:
+        role: reference
+        url: https://www.cms.gov/files/zip/fy2023-ipps-fr-table-5.zip
+        member: "CMS-1771-F Table 5.txt"  # tab-delimited; MS-DRG, MDC, TYPE, Title, weights, LOS
+        filename: data/raw/reference/msdrg_v40_table5.zip
+        vintage: "FY2023"
+        sha256: eda9acaa4b90339c21273c7897869a22084d9b007d505ac75ce589f0ba0fcb53
+        size_bytes: 78312
+        row_count: 767  # MS-DRGs v40 (incl. 999 ungroupable)
 
   carc_codes:
-    name: X12 Claim Adjustment Reason Codes
-    url: https://x12.org/codes
+    name: X12 Claim Adjustment Reason Codes (denial-category LABELS only)
+    url: https://x12.org/codes/claim-adjustment-reason-codes
+    provider: x12.org
     classification: REFERENCE
-    license_note: Use as denial-category taxonomy LABELS only (CLAUDE.md §3.7).
-    artifacts: {}
+    license_note: >-
+      Used as denial-category taxonomy LABELS only (CLAUDE.md §3.7). The X12
+      CARC list is not freely bulk-downloadable and its description text is
+      copyrighted; we therefore record NO file and reproduce NO X12 description
+      text. rcm.ref_carc holds the public CARC code identifiers used by the
+      simulation (config/simulation.yaml denial_categories) paired with
+      PROJECT-AUTHORED short labels. Codes: 16, 18, 22, 27, 29, 50, 96, 97, 181, 197.
+    vintage: "labels-only"  # no dated file; CARC identifiers are stable long-standing X12 codes
+    artifacts: {}  # intentionally no download (§3.7 — labels seeded in src/ingestion/reference_codes.py)
 
 benchmarks_for_calibration:
   note: Cited in docs/assumptions.md to justify simulation ranges; data not ingested.

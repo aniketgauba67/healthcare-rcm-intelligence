@@ -1,4 +1,4 @@
-.PHONY: setup ingest stage contracts warehouse warehouse-all warehouse-check validate-warehouse simulate simulate-warehouse simulate-check validate-simulation views train score dashboard api test lint demo-extract
+.PHONY: setup ingest stage contracts warehouse warehouse-all warehouse-check validate-warehouse simulate simulate-warehouse simulate-check validate-simulation reference-codes views train score dashboard api test lint demo-extract
 
 setup:
 	uv sync
@@ -43,6 +43,13 @@ warehouse-check:
 
 validate-warehouse:
 	uv run pytest -m integration -q
+
+# REFERENCE code sets (FY2023): download + ADDITIVE load. Safe to run any time —
+# applies only sql/ddl/60_reference_codes.sql (create-if-not-exists) and enriches
+# dim_drg.drg_desc; never drops/reloads fact_* or sim_*. Re-run after `warehouse`
+# (a full reload recreates dim_drg with a null drg_desc).
+reference-codes:
+	uv run python -m src.ingestion.reference_codes
 
 views:
 	uv run python -m src.ingestion.build_views

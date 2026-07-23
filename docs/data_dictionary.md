@@ -166,7 +166,7 @@ Dimensions:
 | `dim_date` | one calendar day | `date_key` (yyyymmdd) | key 0 = Unknown/undated; keys are date-ordered ints. |
 | `dim_beneficiary` | one beneficiary | `bene_id` | demographics + coverage months; SOURCE. |
 | `dim_provider` | one billing provider | `prvdr_num` | synthetic CCN/NPI; `is_synthetic_id`. |
-| `dim_drg` | one MS-DRG code | `drg_cd` | `drg_desc` null until MS-DRG REFERENCE loaded. |
+| `dim_drg` | one MS-DRG code | `drg_cd` | `drg_desc` enriched (REFERENCE) from `ref_msdrg` (MS-DRG v40, FY2023); see reference code sets below. |
 | `dim_discharge_status` | one status code | `discharge_status_cd` | SOURCE. |
 
 Facts:
@@ -193,6 +193,33 @@ real linkage; seed in `config/simulation.yaml:linkage.crosswalk_seed`):
 Each row carries `match_rule`, `same_state`, `crosswalk_seed`, and
 `provenance='SIMULATED'`. On this subset: 4,876 facility rows and 2,463 provider
 rows, 100% same-state matches. Same seed reproduces an identical crosswalk.
+
+REFERENCE code-set tables (`sql/ddl/60_reference_codes.sql`, loaded by
+`src/ingestion/reference_codes.py`). Vintage matches the 2023-04 claims period
+(CLAUDE.md §2 — FY2023, never ICD-9). Loaded ADDITIVELY: the loader applies only
+the create-if-not-exists DDL and enriches `dim_drg.drg_desc`, never dropping or
+reloading `fact_*` / `sim_*`. Give SOURCE claim codes human-readable names:
+
+| Table | Grain | Key | Columns | Rows | Provenance |
+|---|---|---|---|---|---|
+| `ref_icd10cm` | one ICD-10-CM code | `icd10cm_code` (dotless) | `long_desc` | 73,674 | REFERENCE (FY2023) |
+| `ref_icd10pcs` | one ICD-10-PCS code | `icd10pcs_code` (7-char) | `long_desc` | 78,530 | REFERENCE (FY2023) |
+| `ref_hcpcs` | one HCPCS Level II code | `hcpcs_code` | `long_desc`, `short_desc` | 7,404 | REFERENCE (2023) |
+| `ref_msdrg` | one MS-DRG (v40) | `drg_cd` (3-digit) | `drg_title`, `mdc`, `drg_type` | 767 | REFERENCE (FY2023) |
+| `ref_carc` | one CARC code | `carc_code` | `category_label` | 10 | code=REFERENCE; label=DERIVED |
+
+§3.7 boundaries enforced at load: `ref_hcpcs` keeps **Level II only** (letter +
+4 digits) — CPT Level I (5-digit numeric, AMA-licensed), 2-character modifiers,
+and the D-series (dental CDT, ADA-copyright) are dropped. `ref_carc` reproduces
+**no X12 description text**: `carc_code` holds public code identifiers used as
+category labels only, and `category_label` is a project-authored short label
+(kept in sync with `config/simulation.yaml` denial categories). Join
+`sim_denial_carc_group = ref_carc.carc_code` for the denial-category name.
+
+`dim_drg.drg_desc` enrichment: `update dim_drg set drg_desc = ref_msdrg.drg_title
+where drg_cd = drg_cd`; 167/167 real DRGs in this subset matched, enriched rows
+flip `provenance` to `REFERENCE`. Re-run after any full `make warehouse` reload
+(which recreates `dim_drg` with a null `drg_desc`).
 
 ## Raw layer — Medicare Physician & Other Practitioners by Provider (REFERENCE, vintage 2024)
 
