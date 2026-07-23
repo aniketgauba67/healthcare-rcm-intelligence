@@ -314,6 +314,29 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   group (CARC as labels, §3.7-clean), driver_mechanism, and named service lines.
   So all 8 views build in parallel; only the DRG/diagnosis/procedure display-name
   enrichment waits for these tables.
+  DONE 2026-07-23 (data-engineer, branch feat/phase3-references; pending qa-reviewer-p4).
+  All FY2023 vintage (§2-clean, no ICD-9). Downloaded from www.cms.gov (curl
+  works in-sandbox), parsed, loaded ADDITIVELY on live PG (no fact_/sim_ drop —
+  verified fact_inpatient_claim=20,867 and sim_facility_crosswalk=4,876 unchanged
+  across the load; idempotent). MEASURED (url + sha256 recorded in config/sources.yaml):
+    - ICD-10-CM FY2023  → ref_icd10cm  73,674 dx  | zip sha256 cc7158228f6de01a…5cfe1e06
+      (2023-code-descriptions-tabular-order.zip, 2,387,419 B)
+    - ICD-10-PCS FY2023 → ref_icd10pcs 78,530 proc| zip sha256 e35b6e2e170ea1ef…61947c93e
+      (2023-icd-10-pcs-codes-file.zip, 653,881 B)
+    - HCPCS 2023 Lvl II → ref_hcpcs    7,404 codes| zip sha256 127c62b4f7745…77ca0f1cc8
+      (january-2023-alpha-numeric-hcpcs-file.zip, 2,282,796 B). §3.7: CPT Lvl I,
+      2-char modifiers, D-series (ADA) excluded at load.
+    - MS-DRG v40 FY2023 → ref_msdrg    767 DRGs   | zip sha256 eda9acaa4b90339c…ba0fcb53
+      (IPPS FY2023 Final Rule Table 5, fy2023-ipps-fr-table-5.zip, 78,312 B)
+    - CARC (§3.7 labels-only, NO file, NO X12 text) → ref_carc 10 project-authored
+      labels aligned to config/simulation.yaml carc_groups (16,18,22,27,29,50,96,97,181,197).
+  dim_drg.drg_desc ENRICHED: 167/167 real DRGs matched ref_msdrg (0 unmatched);
+  enriched rows now provenance='REFERENCE'. Files: sql/ddl/60_reference_codes.sql,
+  src/ingestion/reference_codes.py, tests/contracts/test_reference_codes.py,
+  tests/integration/test_reference_codes_postgres.py, Makefile `reference-codes`,
+  docs/data_dictionary.md + docs/provenance_register.md updated same commit.
+  Unit suite 81 passed / 5 skipped; new live-PG integration test PASS. analytics-
+  engineer-2: naming enrichment can now join dim_drg.drg_desc + ref_* tables.
 - [ ] 8 metric-contract views with control queries
 - [ ] EDA notebooks: >= 12 insights with statistical support
 - [ ] Statistical tests, survival analysis, process mining modules
