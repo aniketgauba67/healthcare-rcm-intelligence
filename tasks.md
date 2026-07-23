@@ -298,7 +298,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   config/sources.yaml per manifest rules; add REFERENCE dim tables in sql/ddl/;
   update provenance_register + data_dictionary same commit. §2 vintage rule is
   binding: FY2023 codes, NOT current year; NO CPT descriptions (AMA-licensed),
-  HCPCS Level II public descriptions only. Blocks the naming-dependent views.
+  HCPCS Level II public descriptions only. SCOPE CLARIFICATION (analytics-engineer
+  verified 2026-07-23 on live PG): this blocks ONLY the code-NAME enrichment
+  (dim_drg.drg_desc is 100% NULL; HCPCS/ICD-10/CARC human-readable text), NOT the
+  8 core views — the sim layer already carries denial_category, sim_denial_carc_
+  group (CARC as labels, §3.7-clean), driver_mechanism, and named service lines.
+  So all 8 views build in parallel; only the DRG/diagnosis/procedure display-name
+  enrichment waits for these tables.
 - [ ] 8 metric-contract views with control queries
 - [ ] EDA notebooks: >= 12 insights with statistical support
 - [ ] Statistical tests, survival analysis, process mining modules
