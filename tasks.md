@@ -361,8 +361,12 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   docs/data_dictionary.md + docs/provenance_register.md updated same commit.
   Unit suite 81 passed / 5 skipped; new live-PG integration test PASS. analytics-
   engineer-2: naming enrichment can now join dim_drg.drg_desc + ref_* tables.
-- [~] 8 metric-contract views with control queries
-  — analytics-engineer, feat/phase3-analytics (f13285e). BUILT + reconciled on
+- [x] 8 metric-contract views with control queries
+  — analytics-engineer, feat/phase3-analytics (f13285e). qa-reviewer-p7 PASS on
+  merged main (72d74b7) 2026-07-24: 9 vw_ views live (base + 8 metric-contract),
+  21/21 reconciliation gate PASS, synthetic-id keying verified (no group-by
+  facility_ccn; grain_is_synthetic_prvdr_num check + distinct_claim_sk==rowcount).
+  BUILT + reconciled on
   live PG, pending qa. vw_claim_enriched base (1:1, 20,867) + all 8 contract
   views. Every header: grain/sources/per-column provenance/control query.
   Facility+provider grain keyed on synthetic prvdr_num (real CCN/name display-only
@@ -372,13 +376,18 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   Control queries all reconcile (denied 2,663 / open AR 1,911 / 5 payers /
   baseline-driver 1,222). Applied via sql/views/apply_views.py. DRG/diagnosis/
   procedure DISPLAY-name enrichment wired after the ref_* merge (item below).
-- [~] EDA notebooks: >= 12 insights with statistical support
-  — analytics-engineer (43752ef). 5 numbered jupytext-percent notebooks in
+- [x] EDA notebooks: >= 12 insights with statistical support
+  — analytics-engineer (43752ef). qa-reviewer-p7 PASS on merged main 2026-07-24:
+  6 numbered notebooks live (01-06, ITS=06) + analytics_common.py, 19 distinct
+  INSIGHT labels (>=12 required). 5 numbered jupytext-percent notebooks in
   notebooks/ (re-runnable top-to-bottom vs live PG via analytics_common.py),
   17 insights total, all printed `INSIGHT n:`. ruff check+format clean; all 5
   execute clean. Pending qa.
-- [~] Statistical tests, survival analysis, process mining modules
-  — analytics-engineer (43752ef). chi-square + Cramer's V + adjusted logistic
+- [x] Statistical tests, survival analysis, process mining modules
+  — analytics-engineer (43752ef). qa-reviewer-p7 PASS on merged main 2026-07-24:
+  stat/survival/process-mining in nb02-05; ITS (nb06) confirmed NOTEBOOK-ONLY
+  (0 intervention/ITS refs in sql/ddl or sql/views, no warehouse table).
+  chi-square + Cramer's V + adjusted logistic
   (auth↔denial, nb02); Kruskal-Wallis payment times (nb03); KM + Cox PH with
   Schoenfeld PH-assumption check + stratified refit → P(paid by 30/60/90/120)
   (nb03); risk-adjusted facility via case-mix expected model + indirect
@@ -398,11 +407,35 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   enhancement (NOT required for Phase 3, do not reopen Phase 2 now): a real
   sim-layer intervention module with a designed ground-truth effect + treated/
   control cohorts so ITS validates against known truth.
-- [ ] (milestone) 8 metric-contract views + vw_claim_enriched — BUILT + reconciled
+- [x] (milestone) 8 metric-contract views + vw_claim_enriched — BUILT + reconciled
   on live PG (analytics-engineer-2, f13285e, feat/phase3-analytics); synthetic-id
   keying verified (distinct prvdr_num == row count), payer=simulated banner,
-  heuristic/drift scaffolds labeled. Sent to qa-reviewer-p4 for review.
-- [ ] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
+  heuristic/drift scaffolds labeled. qa-reviewer-p7 PASS on merged main 2026-07-24.
+- [x] ACCEPTANCE (qa-reviewer): views reconcile, notebooks run clean
+  — qa-reviewer-p7 FINAL ACCEPTANCE on MERGED main (72d74b7) 2026-07-24. PHASE 3
+  DONE. Evidence (commands I ran myself):
+  * `make test` on merged-main tree GREEN: 74 passed / 19 skipped / 0 failed.
+    (85/8 figure needs destructive live-PG integration + gitignored data/raw;
+    deliberately NOT run to preserve the enriched DB per team-lead constraint. All
+    19 skips are environmental: 7 live-PG integration [no .env in worktree] + 12
+    data-file [raw not in fresh worktree]; zero failures. 74+19 == 85+8 == 93.)
+  * REFERENCE stream live: dim_drg.drg_desc 167/168 (Unknown NULL correct);
+    ref_icd10cm 73,674 / ref_icd10pcs 78,530 / ref_hcpcs 7,404 / ref_msdrg 767 /
+    ref_carc 10. Enrichment intact (no warehouse reload performed).
+  * ANALYTICS stream live: 9 vw_ views (vw_claim_enriched base + 8 metric-contract),
+    6 EDA notebooks (01-06, ITS=06), 19 INSIGHT labels; stat/survival/process-mining
+    in nb02-05; ITS notebook-only (0 refs in sql/, no warehouse table).
+  * Reconciliation: `view_reconciliation.py` 21/21 PASS against live PG. Control
+    spot-checks reconcile: denied 2,663; 5 payers; clean-claim rows 4877 ==
+    distinct prvdr_num 4877 (no CCN merge).
+  * Synthetic-id keying: no `group by facility_ccn/name` in any view; reconciliation
+    asserts grain_is_synthetic_prvdr_num + distinct_claim_sk==rowcount.
+  * Sim layer intact: fact_inpatient_claim 20,867, fact lines 58,066, diagnoses
+    338,024, sim_claim_adjudication 20,867, 0 orphans (claim_sk FK), crosswalk 4,876.
+  * Honesty pass CLEAN: payer view carries the §3.5 100%-SIMULATED banner; every
+    "fraud" mention is an explicit negation ("never a fraud flag"); work_queue
+    labeled HEURISTIC + model_monitoring labeled SCAFFOLD (reconciliation-enforced).
+  * Docs: 9 views registered (data_dictionary 11 vw_ hits, provenance_register 4).
 
 ## Phase 4 — ML (lead: ml-engineer)
 > GATE — FIRST TASK OF PHASE 4, BEFORE ANY FEATURE CODE (team-lead, verified
