@@ -379,6 +379,4 @@ The interrupted time-series example is explicitly labeled illustrative and does 
 Computer Science graduate with minors in Data Analytics and Physics  
 [LinkedIn](https://www.linkedin.com/in/aniket-gauba/) | [GitHub](https://github.com/aniketgauba67) | [Portfolio](https://aniketgauba.com)
 
-## License
 
-A project license has not yet been selected. Until one is added, the repository remains publicly viewable but does not grant permission for reuse, modification, or redistribution.
