@@ -176,10 +176,21 @@ Two honesty rules are enforced structurally, not just documented:
   insurer; the header carries the mandatory banner and every dashboard/export on
   them must too.
 - **Facility/provider grain keys on the synthetic `prvdr_num`, never on
-  `facility_ccn`/`facility_name`** (§3.2 crosswalk ruling — the crosswalk
+  `sim_facility_ccn`/`sim_facility_name`** (§3.2 crosswalk ruling — the crosswalk
   multiplexes 4,876 synthetic providers onto 2,857 real CCNs). Real CCN/name are
   carried display-only; the reconciliation gate check
   `clean_claim:grain_is_synthetic_prvdr_num` fails the build if a view keys on CCN.
+- **The `sim_` prefix survives the view boundary (§3.2, team-lead ruling
+  2026-07-27).** The simulated-linkage columns are emitted by `vw_claim_enriched`
+  as `sim_facility_ccn`/`sim_facility_name`/`sim_facility_state`/
+  `sim_facility_type` with no alias back to a bare name, re-exported by
+  `vw_clean_claim_performance` as `sim_display_facility_*` and by
+  `vw_work_queue_priority` as `sim_facility_name`. Rationale: `vw_claim_enriched`
+  is the flattened matrix the Phase 4 feature store consumes and the §4 leakage
+  blacklist matches on COLUMN NAMES, so aliasing the prefix away at the view
+  boundary would delete the provenance marker exactly where §4 depends on it.
+  Guarded by `tests/contracts/test_view_sim_prefix.py` (static) and
+  `tests/integration/test_crosswalk_prefix_postgres.py` (live catalog).
 
 Two views are explicitly pre-Phase-4 scaffolds, self-declaring in every row:
 `vw_work_queue_priority` is a HEURISTIC PLACEHOLDER (`is_heuristic_placeholder`

@@ -28,11 +28,16 @@
 --     timeline dates + day-count intervals, late-filing flag, all pre-submission
 --     auth/eligibility + documentation/coding facts, all operating-cost fields.
 --   SIMULATED-LINKAGE / DISPLAY-ONLY (CLAUDE.md §3.4, tasks.md crosswalk ruling):
---     facility_ccn, facility_name, facility_state, facility_type.
+--     sim_facility_ccn, sim_facility_name, sim_facility_state, sim_facility_type.
 --     These come from sim_facility_crosswalk (a SEEDED RANDOM assignment, NOT a
---     real correspondence) and are DISPLAY-ONLY. The crosswalk multiplexes 4,876
---     synthetic providers onto 2,857 real CCNs (worst 8:1), so aggregation MUST
---     key on the synthetic prvdr_num, NEVER on facility_ccn/facility_name.
+--     real correspondence) and are DISPLAY-ONLY. They keep the `sim_` prefix all
+--     the way out of this view (§3.2, team-lead ruling 2026-07-27): this view is
+--     the flattened matrix the Phase 4 feature store consumes and the §4 leakage
+--     blacklist is COLUMN-NAME based, so stripping the prefix here would strip
+--     the provenance marker exactly where it matters most. No alias-back.
+--     The crosswalk multiplexes 4,876 synthetic providers onto 2,857 real CCNs
+--     (worst 8:1), so aggregation MUST key on the synthetic prvdr_num, NEVER on
+--     sim_facility_ccn/sim_facility_name.
 --
 -- Payer note: sim_payer_* is 100% SIMULATED (Medicare FFS has one payer,
 --             CLAUDE.md §3.5). Any view grouping by payer carries the banner.
@@ -43,6 +48,14 @@
 --   select count(*) filter (where sim_denial_flag) ...          -- = 2663
 --   Row count and every claim_sk must equal rcm.fact_inpatient_claim.
 -- ============================================================================
+
+-- `create or replace view` cannot RENAME an output column, and the §3.2 crosswalk
+-- prefix fix renames four of them (facility_* -> sim_facility_*). Drop first so
+-- the runner is re-runnable against a warehouse holding either shape. CASCADE
+-- takes the dependent vw_* views with it; sql/views/apply_views.py applies this
+-- file FIRST and every dependent view after it, in ONE transaction, so they are
+-- all rebuilt before the transaction commits.
+drop view if exists rcm.vw_claim_enriched cascade;
 
 create or replace view rcm.vw_claim_enriched as
 select
@@ -56,10 +69,10 @@ select
     prov.provider_state_cd,                      -- SOURCE
 
     -- ---- facility: DISPLAY-ONLY simulated linkage (never a grouping key) ----
-    fx.sim_facility_ccn   as facility_ccn,       -- SIMULATED linkage, display only
-    fx.sim_facility_name  as facility_name,      -- SIMULATED linkage, display only
-    fx.sim_facility_state as facility_state,     -- SIMULATED linkage, display only
-    fx.sim_facility_type  as facility_type,      -- SIMULATED linkage, display only
+    fx.sim_facility_ccn,                         -- SIMULATED linkage, display only
+    fx.sim_facility_name,                        -- SIMULATED linkage, display only
+    fx.sim_facility_state,                       -- SIMULATED linkage, display only
+    fx.sim_facility_type,                        -- SIMULATED linkage, display only
 
     -- ---- clinical / source claim attributes (SOURCE) ----
     fic.bene_key,
@@ -185,6 +198,7 @@ left join (
 
 comment on view rcm.vw_claim_enriched is
   'Analytics base: one row per claim (claim_sk). SOURCE claim + SIMULATED '
-  'adjudication/auth/documentation/costs, facility linkage DISPLAY-ONLY. '
-  'Group facility/provider analytics on synthetic prvdr_num, never facility_ccn '
-  '(crosswalk multiplexes 8:1). Payer dimension is 100 percent SIMULATED (§3.5).';
+  'adjudication/auth/documentation/costs, facility linkage DISPLAY-ONLY and '
+  'sim_-prefixed all the way out (§3.2). Group facility/provider analytics on '
+  'synthetic prvdr_num, never sim_facility_ccn (crosswalk multiplexes 8:1). '
+  'Payer dimension is 100 percent SIMULATED (§3.5).';

@@ -247,59 +247,70 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   Test-ordering bug FIXED + guarded by me (69c2736, on main). PHASE 2 DONE.
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
-- [x] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE). FIXED on branch
-  `feat/crosswalk-sim-prefix` (data-engineer, 2026-07-24) — awaiting qa §3.2
-  sign-off before merge. Every column of BOTH crosswalk tables now carries the
-  `sim_` prefix. Pure identifier rename — NO re-randomization (accepted Phase-1
-  crosswalk rows preserved; live DB migrated via `ALTER TABLE ... RENAME COLUMN`,
-  not a loader re-run).
-    - Renamed (sim_facility_crosswalk): facility_ccn/_name/_state/_type,
+- [x] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE) — DONE 2026-07-27 by
+  data-engineer-p4 on `feat/crosswalk-sim-prefix`; awaiting qa-reviewer-p8 sign-off
+  before merge (do NOT self-merge). Every column of BOTH crosswalk tables now
+  carries `sim_`, AND the prefix propagates through the view layer with no
+  alias-back, per the team-lead ruling below. Verified against LIVE PG, not source.
+  This closes the Phase 4 gate on the leakage blacklist.
+    - Renamed (sim_facility_crosswalk, 8): facility_ccn/_name/_state/_type,
       match_rule, same_state, crosswalk_seed, provenance → sim_ prefixed.
-    - Renamed (sim_provider_crosswalk): assigned_postal_state, real_npi,
+    - Renamed (sim_provider_crosswalk, 7): assigned_postal_state, real_npi,
       real_provider_state, real_specialty, match_rule, same_state,
       crosswalk_seed, provenance → sim_ prefixed.
+    - PREFIX PROPAGATED (supersedes the 2026-07-24 Option A alias-back):
+      `vw_claim_enriched` now emits sim_facility_ccn/_name/_state/_type under
+      their prefixed names; `vw_clean_claim_performance` re-exports them as
+      sim_display_facility_ccn/_name/_state; `vw_work_queue_priority` emits
+      sim_facility_name. `create or replace view` cannot rename an output column,
+      so vw_claim_enriched.sql now drop-cascades first — apply_views.py runs it
+      first and rebuilds every dependent view in the SAME transaction.
     - Files: sql/ddl/30_sim_crosswalk.sql, src/ingestion/crosswalk.py,
       src/ingestion/warehouse_sql_checks.py (provenance→sim_provenance),
-      sql/views/vw_claim_enriched.sql (BASE-column aliases only; view OUTPUT
-      names preserved — Option A, team-lead ruling 2026-07-24), docs.
+      sql/views/{vw_claim_enriched,vw_clean_claim_performance,vw_work_queue_priority}.sql,
+      notebooks/{01,04,README}, docs/{data_dictionary,provenance_register}.md.
+    - CARVE-OUTS KEPT (documented, not violations): `claim_sk`, `prvdr_num`,
+      `clm_id` and the other join keys mirror a SOURCE/DERIVED warehouse column
+      and stay unprefixed. Inside src/ingestion/crosswalk.py, load_facilities()/
+      load_providers() keep bare facility_ccn/real_npi/... — those are the REAL
+      reference-file frames (Hospital General Information / Medicare Physician),
+      classified REFERENCE, not crosswalk output columns.
     - Regression guards ADDED: tests/contracts/test_crosswalk.py
-      (test_every_crosswalk_column_carries_sim_prefix) +
-      tests/integration/test_crosswalk_prefix_postgres.py (live information_schema).
+      (test_every_crosswalk_column_carries_sim_prefix, builder frames);
+      tests/contracts/test_view_sim_prefix.py (NEW — static, DB-free: no view SQL
+      may read or alias a bare simulated-linkage column, base view still emits all
+      four, drop-cascade present); tests/integration/test_crosswalk_prefix_postgres.py
+      (live catalog: both crosswalk tables AND the three views' output columns).
+    - LIVE VERIFICATION (data-engineer-p4, write window 2026-07-27): crosswalk
+      DDL re-applied + loader re-run (not ALTER RENAME) so the shipped code path is
+      what produced the live shape. Reproducibility RE-PROVEN before and after:
+      rebuilding from crosswalk_seed=20260722 reproduces the accepted Phase-1
+      assignment row-for-row (4,876 facility / 2,463 provider, all columns, both
+      tables). Counts unchanged. `make views` clean, reconciliation 21/21 PASS.
     - Blast-radius note: team-lead's original `git grep -nE '\b...\b'` returns a
-      FALSE NEGATIVE here (\b under -E); a plain grep found the facility columns
-      are consumed by analytics-engineer's sql/views/vw_claim_enriched.sql — hence
-      the authorized minimal alias edit. sim_provider_crosswalk columns had no
-      external consumers.
-  Not merely cosmetic: the §4 leakage blacklist is column-name based, so an
-  unprefixed column escaping into a flattened feature matrix loses its provenance
-  marker. This unblocks Phase 4 (leakage blacklist).
+      FALSE NEGATIVE here (\b under -E); use a plain grep.
+  Not merely cosmetic: the §4 leakage blacklist is column-name based, and
+  vw_claim_enriched is exactly the flattened matrix the Phase 4 feature store
+  consumes — an unprefixed simulated column arriving there loses its provenance
+  marker. That is why the alias-back was overruled.
   NOTE: simulation-engineer adopts STRICT prefixing for all new sim_ tables —
   team-lead RATIFIED; that is the standard going forward.
-  SCHEDULED 2026-07-27 as the Phase 4 gate task → data-engineer-p4,
-  branch feat/crosswalk-sim-prefix (branch exists, currently 0 commits ahead of
-  main — no prior work was done on it). Still open: verified today by reading
-  sql/ddl/30_sim_crosswalk.sql — sim_facility_crosswalk has 8 unprefixed columns
-  (facility_ccn/_name/_state/_type, match_rule, same_state, crosswalk_seed,
-  provenance) and sim_provider_crosswalk 7 (assigned_postal_state, real_npi,
-  real_provider_state, real_specialty, match_rule, same_state, crosswalk_seed,
-  provenance).
   DELEGATED AUTHORITY (team-lead ruling, §5 exception, one task only): the rename
-  has a downstream blast radius outside data-engineer's ownership — measured today
-  it is sql/views/vw_claim_enriched.sql, sql/views/vw_clean_claim_performance.sql,
-  notebooks/01_data_quality_and_provenance.py, notebooks/04_risk_adjusted_facility.py,
-  notebooks/README.md (analytics-engineer's files) plus docs/. analytics-engineer
-  is NOT being re-spawned for a mechanical rename, so data-engineer-p4 MAY edit
-  those downstream references, in the SAME commit, RENAME-ONLY — no logic, grain,
-  join, or metric change. qa-reviewer-p8 verifies by re-running the 21/21
-  reconciliation gate and executing the two touched notebooks.
+  has a downstream blast radius outside data-engineer's ownership — sql/views/ and
+  notebooks/ (analytics-engineer's files) plus docs/. analytics-engineer is NOT
+  being re-spawned for a mechanical rename, so data-engineer-p4 MAY edit those
+  downstream references, in the SAME commit, RENAME-ONLY — no logic, grain, join,
+  or metric change. qa-reviewer-p8 verifies by re-running the 21/21 reconciliation
+  gate and executing the two touched notebooks.
   CARRY-FORWARD ITEM 2 (samples-with-replacement) is NOT reopened by this: the
-  synthetic-id keying rule stands unchanged and the rename must not alter it.
+  synthetic-id keying rule stands unchanged and the rename did not alter it.
 - [ ] CROSSWALK SAMPLES WITH REPLACEMENT (analytic fidelity, not provenance).
   Distinct synthetic providers collide onto the same real CCN (within-state pools
   are small). Team-lead ruling: do NOT re-randomize the accepted Phase 1 crosswalk
   for this. Instead — the real facility/NPI is DISPLAY-ONLY enrichment; every
   facility- or provider-level analysis MUST key on the synthetic prvdr_num /
-  claim_sk, never on facility_ccn or facility_name, or it silently merges several
+  claim_sk, never on sim_facility_ccn or sim_facility_name (renamed 2026-07-27;
+  bare facility_* no longer exists anywhere), or it silently merges several
   distinct synthetic hospitals. Binding on analytics-engineer (Phase 3) and
   app-engineer (Phase 5). If a 1:1 mapping is ever wanted, fix = sample without
   replacement within stratum then fall back.
@@ -309,20 +320,27 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   worst carries 8. So a naive `group by facility_ccn` merges up to 8 distinct
   synthetic hospitals into one row and inflates its volume ~8x. The keying rule
   above is therefore MANDATORY for Phase 3/5, not advisory.
-- [ ] VIEW OUTPUT COLUMNS — STRICT §3.2 TIGHTENING (Phase 5 honesty pass, NOT a
-  Phase 4 blocker). Split off from the CROSSWALK STRICT COLUMN PREFIX fix
-  (team-lead ruling 2026-07-24, Option A). The crosswalk BASE columns are now
-  `sim_`-prefixed, but `vw_claim_enriched` still EXPOSES the display-only
-  simulated-linkage columns under their bare names `facility_ccn` / `facility_name`
-  / `facility_state` / `facility_type` (aliased from `fx.sim_facility_*`), and
-  `vw_clean_claim_performance` re-exports them as `display_facility_*`. A strict
-  read of §3.2 says a SIMULATED-classified column exposed by a view should also
-  signal that in its name. Deferred deliberately because renaming view OUTPUT
-  columns cascades into sql/views/vw_clean_claim_performance.sql and the notebooks
-  (01/04 + README) — all analytics-engineer's — and is display-layer polish, not a
-  leakage-blacklist concern (Phase 4 gate is crosswalk-TABLE-column based, already
-  satisfied). Owner when scheduled: analytics-engineer, alongside the crosswalk
-  collision/keying-rule item above and the payer/sim_ provenance banners.
+- [x] VIEW OUTPUT COLUMNS — STRICT §3.2 TIGHTENING. CLOSED 2026-07-27 by
+  data-engineer-p4 in the same commit as the crosswalk prefix fix, NOT deferred to
+  Phase 5. Originally split off under the 2026-07-24 Option A ruling (view OUTPUT
+  names preserved, `fx.sim_facility_ccn as facility_ccn`); team-lead OVERRULED that
+  on 2026-07-27 because the alias-back defeats the purpose — vw_claim_enriched is
+  the flattened matrix the Phase 4 feature store consumes and the §4 blacklist is
+  column-name based, so it IS a leakage-blacklist concern, not display polish.
+  Resolution: `vw_claim_enriched` exposes sim_facility_ccn/_name/_state/_type;
+  `vw_work_queue_priority` exposes sim_facility_name; `vw_clean_claim_performance`
+  exposes sim_display_facility_ccn/_name/_state.
+  DECISION on the display_* aliases (data-engineer-p4, flagged for qa): RENAMED to
+  `sim_display_facility_*` rather than left alone. Reasons — (1) §3.2 is
+  column-name based and these hold SIMULATED-linkage values; (2) §4.2 names
+  "provider clean-claim rate" as a Phase 4 historical-rate feature, so this view is
+  a plausible feature source and the same argument that overruled the alias-back
+  applies one hop later; (3) they had ZERO consumers repo-wide at the time of the
+  rename (grep: only the view's own SQL and this file), so the cost was nil now and
+  only grows once Phase 4/5 read it; (4) leaving them would have made
+  display_facility_* the single remaining unprefixed simulated column name in the
+  whole view stack. `sim_` leads because §3.2 says "prefixed"; `display_` is kept
+  so the display-only signal survives.
 
 ## Phase 3 — Analytics + KPI Views (lead: analytics-engineer)
 > CARRY-FORWARD from Phase 1 (team-lead, 2026-07-22): Phase 1 task 1 was scoped
@@ -362,7 +380,9 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > TEAM RULE incl. the claim_sk warehouse-reload mechanism).
 > MANDATORY RULING (from Phase 2 crosswalk audit, team-lead): every facility- or
 > provider-level view MUST key on the SYNTHETIC ids (prvdr_num / claim_sk /
-> sim_at_physn_npi), NEVER on facility_ccn or facility_name. The crosswalk maps
+> sim_at_physn_npi), NEVER on sim_facility_ccn or sim_facility_name (those columns
+> were bare facility_ccn/facility_name until the §3.2 prefix fix on 2026-07-27; the
+> rule itself is unchanged). The crosswalk maps
 > 4,876 synthetic providers onto only 2,857 real CCNs (45.9% multiplexed, worst
 > 8-to-1), so grouping by facility_ccn silently merges up to 8 distinct synthetic
 > hospitals. Real CCN/name are DISPLAY-ONLY enrichment. qa-reviewer must reject
@@ -513,6 +533,15 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   `make warehouse-all && make reference-codes && make views`. Any agent that
 >   reloads the warehouse MUST run those last two afterwards and re-check 21/21,
 >   or the next agent inherits a silently degraded DB. Applies to Phase 4 and 5.
+> WAREHOUSE WRITE WINDOW (data-engineer-p4, 2026-07-27): OPENED then CLOSED for the
+> crosswalk-prefix rename. Scope was deliberately narrow — sql/ddl/30_sim_crosswalk.sql
+> re-applied (drop/create the two sim_*_crosswalk tables only) + crosswalk loader
+> re-run + `make views`. `make warehouse` / `make warehouse-all` were NOT run, so
+> fact_/dim_/sim_ adjudication and the reference code sets were never dropped and no
+> sim regeneration was triggered. Post-window state re-verified: fact_inpatient_claim
+> 20,867, sim_claim_adjudication 20,867, crosswalk 4,876 / 2,463, 9 vw_ views,
+> dim_drg.drg_desc 167 enriched, reconciliation 21/21 PASS. ml-engineer's read-only
+> access was unaffected except during the single view-rebuild transaction.
 > GATE — FIRST TASK OF PHASE 4, BEFORE ANY FEATURE CODE (team-lead, verified
 > 2026-07-22 by reading config/model.yaml against the real Phase 2 schema).
 > §4 is NON-NEGOTIABLE and the current `forbidden_features` list is a
