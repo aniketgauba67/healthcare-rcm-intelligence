@@ -141,8 +141,8 @@ class CrosswalkResult:
             ("sim_provider_crosswalk", self.provider),
         ):
             d = df.copy()
-            d["crosswalk_seed"] = seed
-            d["provenance"] = "SIMULATED"
+            d["sim_crosswalk_seed"] = seed
+            d["sim_provenance"] = "SIMULATED"
             out[name] = d
         return out
 
@@ -227,12 +227,12 @@ def build_facility_crosswalk(
                 "sim_prvdr_num": prvdr_num,
                 "sim_provider_ssa_state": ssa,
                 "sim_provider_postal_state": postal,
-                "facility_ccn": chosen["facility_ccn"],
-                "facility_name": chosen["facility_name"],
-                "facility_state": chosen["facility_state"],
-                "facility_type": chosen["facility_type"],
-                "match_rule": match,
-                "same_state": bool(postal is not None and chosen["facility_state"] == postal),
+                "sim_facility_ccn": chosen["facility_ccn"],
+                "sim_facility_name": chosen["facility_name"],
+                "sim_facility_state": chosen["facility_state"],
+                "sim_facility_type": chosen["facility_type"],
+                "sim_match_rule": match,
+                "sim_same_state": bool(postal is not None and chosen["facility_state"] == postal),
             }
         )
     return pd.DataFrame(rows)
@@ -275,12 +275,12 @@ def build_provider_crosswalk(
         rows.append(
             {
                 "sim_at_physn_npi": npi,
-                "assigned_postal_state": postal,
-                "real_npi": chosen["real_npi"],
-                "real_provider_state": chosen["real_state"],
-                "real_specialty": chosen["real_specialty"],
-                "match_rule": match,
-                "same_state": bool(chosen["real_state"] == postal),
+                "sim_assigned_postal_state": postal,
+                "sim_real_npi": chosen["real_npi"],
+                "sim_real_provider_state": chosen["real_state"],
+                "sim_real_specialty": chosen["real_specialty"],
+                "sim_match_rule": match,
+                "sim_same_state": bool(chosen["real_state"] == postal),
             }
         )
     return pd.DataFrame(rows)
@@ -302,12 +302,12 @@ def build_crosswalk(inpatient_parquet=None, seed: int | None = None) -> Crosswal
     report = {
         "crosswalk_seed": used_seed,
         "facility_rows": int(len(fac)),
-        "facility_same_state_rate": round(float(fac["same_state"].mean()), 4),
-        "facility_nationwide_fallback": int((fac["match_rule"] == "nationwide_fallback").sum()),
+        "facility_same_state_rate": round(float(fac["sim_same_state"].mean()), 4),
+        "facility_nationwide_fallback": int((fac["sim_match_rule"] == "nationwide_fallback").sum()),
         "provider_rows": int(len(prov)),
-        "provider_same_state_rate": round(float(prov["same_state"].mean()), 4),
+        "provider_same_state_rate": round(float(prov["sim_same_state"].mean()), 4),
         "provider_plausible_rate": round(
-            float((prov["match_rule"] == "state+plausible_specialty").mean()), 4
+            float((prov["sim_match_rule"] == "state+plausible_specialty").mean()), 4
         ),
     }
     return CrosswalkResult(facility=fac, provider=prov, report=report)

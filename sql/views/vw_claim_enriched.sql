@@ -56,10 +56,10 @@ select
     prov.provider_state_cd,                      -- SOURCE
 
     -- ---- facility: DISPLAY-ONLY simulated linkage (never a grouping key) ----
-    fx.facility_ccn,                             -- SIMULATED linkage, display only
-    fx.facility_name,                            -- SIMULATED linkage, display only
-    fx.facility_state,                           -- SIMULATED linkage, display only
-    fx.facility_type,                            -- SIMULATED linkage, display only
+    fx.sim_facility_ccn   as facility_ccn,       -- SIMULATED linkage, display only
+    fx.sim_facility_name  as facility_name,      -- SIMULATED linkage, display only
+    fx.sim_facility_state as facility_state,     -- SIMULATED linkage, display only
+    fx.sim_facility_type  as facility_type,      -- SIMULATED linkage, display only
 
     -- ---- clinical / source claim attributes (SOURCE) ----
     fic.bene_key,

@@ -247,17 +247,32 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   Test-ordering bug FIXED + guarded by me (69c2736, on main). PHASE 2 DONE.
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
-- [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
-  2026-07-22 reading sql/ddl/30_sim_crosswalk.sql). §3.2 requires every simulated
-  table AND column name prefixed `sim_`. In sim_facility_crosswalk only 3 of 11
-  columns comply (facility_ccn/_name/_state/_type, match_rule, same_state,
-  crosswalk_seed, provenance do not); sim_provider_crosswalk likewise. Raised by
-  simulation-engineer at Phase 2 kickoff. Not merely cosmetic: the §4 leakage
-  blacklist is column-name based, so an unprefixed column escaping into a
-  flattened feature matrix loses its provenance marker. Owner: data-engineer
-  (re-spawn; owns src/ingestion/ + sql/ddl/). MUST land before Phase 4 opens
-  (leakage blacklist) and before the Phase 5 honesty pass. Deferred now only to
-  avoid shared-Postgres contention with Phase 2 acceptance runs.
+- [x] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE). FIXED on branch
+  `feat/crosswalk-sim-prefix` (data-engineer, 2026-07-24) — awaiting qa §3.2
+  sign-off before merge. Every column of BOTH crosswalk tables now carries the
+  `sim_` prefix. Pure identifier rename — NO re-randomization (accepted Phase-1
+  crosswalk rows preserved; live DB migrated via `ALTER TABLE ... RENAME COLUMN`,
+  not a loader re-run).
+    - Renamed (sim_facility_crosswalk): facility_ccn/_name/_state/_type,
+      match_rule, same_state, crosswalk_seed, provenance → sim_ prefixed.
+    - Renamed (sim_provider_crosswalk): assigned_postal_state, real_npi,
+      real_provider_state, real_specialty, match_rule, same_state,
+      crosswalk_seed, provenance → sim_ prefixed.
+    - Files: sql/ddl/30_sim_crosswalk.sql, src/ingestion/crosswalk.py,
+      src/ingestion/warehouse_sql_checks.py (provenance→sim_provenance),
+      sql/views/vw_claim_enriched.sql (BASE-column aliases only; view OUTPUT
+      names preserved — Option A, team-lead ruling 2026-07-24), docs.
+    - Regression guards ADDED: tests/contracts/test_crosswalk.py
+      (test_every_crosswalk_column_carries_sim_prefix) +
+      tests/integration/test_crosswalk_prefix_postgres.py (live information_schema).
+    - Blast-radius note: team-lead's original `git grep -nE '\b...\b'` returns a
+      FALSE NEGATIVE here (\b under -E); a plain grep found the facility columns
+      are consumed by analytics-engineer's sql/views/vw_claim_enriched.sql — hence
+      the authorized minimal alias edit. sim_provider_crosswalk columns had no
+      external consumers.
+  Not merely cosmetic: the §4 leakage blacklist is column-name based, so an
+  unprefixed column escaping into a flattened feature matrix loses its provenance
+  marker. This unblocks Phase 4 (leakage blacklist).
   NOTE: simulation-engineer adopts STRICT prefixing for all new sim_ tables —
   team-lead RATIFIED; that is the standard going forward.
 - [ ] CROSSWALK SAMPLES WITH REPLACEMENT (analytic fidelity, not provenance).
@@ -275,6 +290,20 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   worst carries 8. So a naive `group by facility_ccn` merges up to 8 distinct
   synthetic hospitals into one row and inflates its volume ~8x. The keying rule
   above is therefore MANDATORY for Phase 3/5, not advisory.
+- [ ] VIEW OUTPUT COLUMNS — STRICT §3.2 TIGHTENING (Phase 5 honesty pass, NOT a
+  Phase 4 blocker). Split off from the CROSSWALK STRICT COLUMN PREFIX fix
+  (team-lead ruling 2026-07-24, Option A). The crosswalk BASE columns are now
+  `sim_`-prefixed, but `vw_claim_enriched` still EXPOSES the display-only
+  simulated-linkage columns under their bare names `facility_ccn` / `facility_name`
+  / `facility_state` / `facility_type` (aliased from `fx.sim_facility_*`), and
+  `vw_clean_claim_performance` re-exports them as `display_facility_*`. A strict
+  read of §3.2 says a SIMULATED-classified column exposed by a view should also
+  signal that in its name. Deferred deliberately because renaming view OUTPUT
+  columns cascades into sql/views/vw_clean_claim_performance.sql and the notebooks
+  (01/04 + README) — all analytics-engineer's — and is display-layer polish, not a
+  leakage-blacklist concern (Phase 4 gate is crosswalk-TABLE-column based, already
+  satisfied). Owner when scheduled: analytics-engineer, alongside the crosswalk
+  collision/keying-rule item above and the payer/sim_ provenance banners.
 
 ## Phase 3 — Analytics + KPI Views (lead: analytics-engineer)
 > CARRY-FORWARD from Phase 1 (team-lead, 2026-07-22): Phase 1 task 1 was scoped

@@ -185,14 +185,19 @@ routed to the Unknown member (reported as data-quality metrics, not errors).
 SIMULATED crosswalk tables (CLAUDE.md §3.4 — seeded random assignment, NOT a
 real linkage; seed in `config/simulation.yaml:linkage.crosswalk_seed`):
 
+Per CLAUDE.md §3.2, both tables are SIMULATED so **every** column carries the
+`sim_` prefix (enforced by `tests/contracts/test_crosswalk.py` and
+`tests/integration/test_crosswalk_prefix_postgres.py`).
+
 | Table | Grain | Maps | Stratified by |
 |---|---|---|---|
-| `sim_facility_crosswalk` | one synthetic billing provider (`sim_prvdr_num`, FK to `dim_provider`) | → real facility CCN (Hospital General Information) | state (SSA→postal) + acute-care type |
-| `sim_provider_crosswalk` | one synthetic attending physician (`sim_at_physn_npi`) | → real Medicare NPI (Medicare Physician by Provider) | coherent state + inpatient-plausible specialty |
+| `sim_facility_crosswalk` | one synthetic billing provider (`sim_prvdr_num`, FK to `dim_provider`) | → real facility CCN (`sim_facility_ccn`, Hospital General Information; plus `sim_facility_name`/`sim_facility_state`/`sim_facility_type`) | state (SSA→postal, `sim_provider_ssa_state`/`sim_provider_postal_state`) + acute-care type |
+| `sim_provider_crosswalk` | one synthetic attending physician (`sim_at_physn_npi`) | → real Medicare NPI (`sim_real_npi`, Medicare Physician by Provider; plus `sim_real_provider_state`/`sim_real_specialty`) | coherent state (`sim_assigned_postal_state`) + inpatient-plausible specialty |
 
-Each row carries `match_rule`, `same_state`, `crosswalk_seed`, and
-`provenance='SIMULATED'`. On this subset: 4,876 facility rows and 2,463 provider
-rows, 100% same-state matches. Same seed reproduces an identical crosswalk.
+Each row carries `sim_match_rule`, `sim_same_state`, `sim_crosswalk_seed`, and
+`sim_provenance='SIMULATED'`. On this subset: 4,876 facility rows and 2,463
+provider rows, 100% same-state matches. Same seed reproduces an identical
+crosswalk.
 
 REFERENCE code-set tables (`sql/ddl/60_reference_codes.sql`, loaded by
 `src/ingestion/reference_codes.py`). Vintage matches the 2023-04 claims period
