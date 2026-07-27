@@ -1,5 +1,12 @@
 """The dollars-at-risk comparison needs a PAIRED instrument, not two intervals.
 
+QA-AUTHORED REVIEW GATE. This file lives in tests/models/, which is
+ml-engineer's directory, but it is a reviewer's gate on a team-lead ruling and is
+qa's under the 2026-07-27 test-ownership ruling. It is expected to be RED until
+the ruling is met. Satisfy the ruling; do not edit or delete this file to make
+the suite green — raise it with qa-reviewer or team-lead if you think the gate
+itself is wrong.
+
 TEAM-LEAD RULING (tasks.md, Phase 4, 2026-07-27): the champion's top-decile
 capture is reported at 38.4% with a bootstrap interval of [16.0%, 59.3%] while a
 constant scorer lands at 20.4% — inside that interval. The required fix was to

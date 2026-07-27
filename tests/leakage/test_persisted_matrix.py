@@ -12,6 +12,26 @@ find, and the discovery contract it publishes is satisfied here by
 
 The first is checked here without a database. The second needs the warehouse and
 is marked `integration`.
+
+OWNERSHIP: written by ml-engineer in cd3e30c, ADOPTED by qa-reviewer-p10 under
+team-lead's 2026-07-27 ruling that tests/leakage/ is qa's — a guard authored by
+the party it constrains is not a guard. It stays here rather than moving to
+tests/features/ because its subject is the discovery contract THIS directory
+publishes, not the behaviour of src/features/store.py. Adopting it meant
+reviewing it, which turned up the defect below.
+
+DEFECT FOUND AND FIXED ON ADOPTION (qa-reviewer-p10). The staleness check called
+`store.build_training_matrix(refresh=True)`, and that function PERSISTS what it
+builds. So the guard rewrote the committed artifact as a side effect of checking
+it, with two consequences. `uv run pytest` left `git status` dirty on any machine
+with a warehouse — qa hit exactly that churn and reverted it by hand before it
+could be committed. Worse, the guard repaired the condition it existed to detect:
+a genuinely stale file failed the first run and then passed every run afterwards,
+because the first run had overwritten it. A guard whose act of measuring fixes
+its subject reports the warehouse-restore failure mode in miniature — from
+outside, "was never stale" and "was stale and got quietly rewritten" look
+identical. The check now builds through the same code path WITHOUT persisting,
+and asserts the artifact's digest is byte-identical before and after itself.
 """
 
 from __future__ import annotations
@@ -139,15 +159,29 @@ def test_the_manifest_matches_the_current_leakage_config(manifest: dict) -> None
 
 @pytest.mark.integration
 def test_the_exported_matrix_matches_a_fresh_build(matrix: pd.DataFrame) -> None:
-    """Staleness check. Needs the warehouse; skips without it."""
+    """Staleness check. Needs the warehouse; skips without it.
+
+    Builds through the same path as `build_training_matrix(refresh=True)` but
+    stops short of `persist_training_matrix`, so checking the artifact cannot
+    rewrite it. See the module docstring: the persisting version healed the
+    staleness it was there to find, and left the working tree dirty besides.
+    """
     from sqlalchemy import create_engine
 
+    from src.features.build import build_model_a_frame
     from src.ingestion.load_postgres import database_url
 
     url = database_url()
     if not url:
         pytest.skip("no Postgres configured (set POSTGRES_* in .env)")
-    fresh = store.build_training_matrix(engine=create_engine(url), refresh=True)
+
+    before = store._file_digest(store.MATRIX_PATH)
+    cfg = load_model_config()
+    fresh = store.label_and_split(build_model_a_frame(create_engine(url), cfg), cfg)
     pd.testing.assert_frame_equal(
         fresh.reset_index(drop=True), matrix.reset_index(drop=True), check_dtype=False
+    )
+    assert store._file_digest(store.MATRIX_PATH) == before, (
+        "checking the persisted matrix rewrote it. A staleness guard that repairs its own "
+        "subject can only ever fail once, and it dirties the working tree on every run."
     )

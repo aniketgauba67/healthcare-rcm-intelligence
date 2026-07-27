@@ -985,16 +985,35 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > factors, no citations. The comment block describes the degeneracy honestly but
 > the ruling asked for the parameter to be REBUILT from named cited factors, and
 > the sensitivity sweep is not a substitute for it.
->   AND A CONSTRAINT-1 CROSSING, verified on live PG rather than inferred: the
->   appeal_economics comment anchors $45 against "the simulation's own realized
->   denial rework + appeal cost is $29.88 per DENIED claim". qa measured it —
->   avg(sim_denial_rework_cost + sim_appeal_cost) over the 2,663 denied claims is
->   29.8818, exact. So a forbidden table (sim_operating_costs, blocked for BOTH
->   models) was queried to validate a business parameter, which is precisely what
->   constraint 1 forbids. No code reads it and no model is affected; the harm is
->   that the operating point became a function of the layer the §4.5 firewall
->   exists to hide, and the repo now records the crossing. Cite the benchmark and
->   stop there.
+>   AND A CONSTRAINT-1 ANCHORING. The appeal_economics comment anchors $45
+>   against "the simulation's own realized denial rework + appeal cost is $29.88
+>   per DENIED claim". qa measured it on live PG: avg(sim_denial_rework_cost +
+>   sim_appeal_cost) over the 2,663 denied claims is 29.8818, exact. The match is
+>   not coincidence.
+>   ATTRIBUTION CORRECTED 2026-07-27 (team-lead challenged qa-reviewer-p10's first
+>   write-up; qa verified the challenge and it is right). qa wrote that "a
+>   forbidden table was queried". THAT DID NOT FOLLOW and is withdrawn. The figure
+>   is PUBLISHED in two places ml-engineer is expected to read — tasks.md:164 (the
+>   Phase 2 record) and docs/assumptions.md:379 — and §4.5 firewalls
+>   `src/simulation/` and config/simulation.yaml, NOT the board. qa confirmed both
+>   citations by grep before accepting the correction. The board is the
+>   overwhelmingly likely route. ESTABLISHED: a generator-realized figure
+>   influenced a business parameter. NOT ESTABLISHED: by what path. Recorded this
+>   way on purpose — a §4.5 breach is the most serious accusation available in
+>   this project and must not rest on an inference when a published source
+>   explains it. This is p9's own lesson (a fixture misreading its input would
+>   have produced a false leak report) applied to the reviewer.
+>   THE SUBSTANTIVE FINDING SURVIVES and team-lead has RULED: the reference comes
+>   OUT of config/model.yaml regardless of route. Even as a consistency remark,
+>   anchoring makes the operating point a function of the layer the firewall
+>   exists to hide. Published benchmarks only. Recorded rather than scrubbed —
+>   an honest record of a near-miss is worth more than a clean-looking config.
+>   FIREWALL HOLE EXPOSED, nobody's fault, FOR PHASE 5: docs/assumptions.md and
+>   tasks.md republish generator-realized values (denial rate, appeal rate,
+>   overturn rate, rework cost) to an agent that is firewalled from the generator.
+>   The firewall is enforced on SOURCE FILES and leaks through DOCUMENTATION. Any
+>   §4.5 discipline that assumes ml-engineer cannot see realized generator output
+>   is currently false by construction.
 > RULING 2 — PAIRED CI ON THE DOLLARS-AT-RISK DIFFERENCE: NOT SATISFIED, and the
 > conclusion everyone has been carrying is WRONG. train.py:440 still reports three
 > SEPARATE unpaired intervals plus a note inviting the reader to compare their
@@ -1028,10 +1047,35 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >       (967 level-1 appeals, 0 mismatched, so the substitution is SOUND) and
 >       pinned it in tests/leakage/test_model_c_boundary.py so a future load
 >       cannot silently invalidate it. Same defect class as covered days.
->   OWNERSHIP NOTE, non-blocking: cd3e30c adds tests/leakage/test_persisted_matrix.py.
->   §5 gives tests/ to qa. tests/models/ by ml is established precedent and fine;
->   tests/leakage/ is the guard qa owns and is where a well-meant edit can widen a
->   hole. Coordinate before the next one.
+> TEST OWNERSHIP — TEAM-LEAD RULING 2026-07-27, following the Phase 1 precedent
+> (data-engineer wrote tests/contracts/). tests/leakage/ is QA'S: it is the guard,
+> and a guard authored by the party it constrains is not a guard. tests/models/
+> and tests/features/ are ml-engineer's for their own modules. qa owns tests/
+> overall and may amend anywhere.
+>   DISPOSITION of cd3e30c's tests/leakage/test_persisted_matrix.py (qa's call per
+>   the ruling): ADOPTED by qa, kept in tests/leakage/ rather than moved to
+>   tests/features/. Its subject is the discovery contract THIS directory
+>   publishes, not the behaviour of src/features/store.py; moving it would put a
+>   guard on qa's contract inside the constrained party's directory, which is the
+>   same inversion the ruling rejects. It is well built and qa would have written
+>   substantially the same file.
+>   ADOPTING IT MEANT REVIEWING IT, AND THAT FOUND A DEFECT. The staleness check
+>   called `store.build_training_matrix(refresh=True)`, and that function
+>   PERSISTS what it builds — so the guard rewrote the committed artifact as a
+>   side effect of checking it. Two consequences: `uv run pytest` left git status
+>   DIRTY on any machine with a warehouse (qa hit exactly that churn earlier in
+>   the session and reverted it by hand before it could be committed), and worse,
+>   the guard REPAIRED THE CONDITION IT EXISTED TO DETECT — a genuinely stale file
+>   fails the first run and passes every run after, because the first run
+>   overwrote it. From outside, "was never stale" and "was stale and got quietly
+>   rewritten" are indistinguishable, which is the warehouse-restore failure mode
+>   in miniature. FIXED on adoption: the check now builds through the same path
+>   without persisting, and asserts the artifact's sha256 is unchanged across
+>   itself. VERIFIED — digest 479ea5b57d605acc before and after, 11 passed, git
+>   status clean on artifacts/.
+>   qa's own gate tests in tests/models/ (cost matrix, dollars at risk) carry a
+>   header saying they are qa-authored review gates: ml owns that directory, and a
+>   red gate the constrained party can edit needs the boundary written down.
 > ANSWER TO p9'S TWO QUESTIONS (qa-reviewer-p10, asked by team-lead; both are
 > tests/ and therefore qa's call — implemented and PROVEN, not just decided):
 >   Q1 "should a failed restore be loud and distinguishable?" YES, and the real
