@@ -130,6 +130,9 @@ class WarehouseBaseline:
     # dim_drg natural key (drg_cd) -> (drg_desc, provenance). Keyed on drg_cd and
     # deliberately NOT on drg_key, which is a surrogate the reload reassigns.
     drg_desc: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # rcm table -> its column names, for the sim_-prefixed tables. Used to detect a
+    # run that rewrote the warehouse into an older schema shape.
+    sim_table_columns: dict[str, set[str]] = field(default_factory=dict)
 
 
 _VIEW_SQL = """
@@ -142,6 +145,12 @@ _DRG_SQL = """
 select drg_cd, drg_desc, provenance
 from rcm.dim_drg
 where drg_desc is not null
+"""
+
+_SIM_COLUMNS_SQL = """
+select table_name, column_name
+from information_schema.columns
+where table_schema = 'rcm' and table_name like 'sim\\_%'
 """
 
 
@@ -166,7 +175,12 @@ def warehouse_baseline() -> WarehouseBaseline:
         with engine.connect() as conn:
             views = {name: body for name, body in conn.execute(text(_VIEW_SQL))}
             drg = {cd: (desc, prov) for cd, desc, prov in conn.execute(text(_DRG_SQL))}
+            sim_columns: dict[str, set[str]] = {}
+            for table, column in conn.execute(text(_SIM_COLUMNS_SQL)):
+                sim_columns.setdefault(table, set()).add(column)
         engine.dispose()
     except Exception:  # noqa: BLE001 - unreachable DB, missing schema, driver error
         return WarehouseBaseline()
-    return WarehouseBaseline(reachable=True, views=views, drg_desc=drg)
+    return WarehouseBaseline(
+        reachable=True, views=views, drg_desc=drg, sim_table_columns=sim_columns
+    )

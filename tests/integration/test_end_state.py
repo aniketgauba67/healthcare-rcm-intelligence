@@ -125,6 +125,55 @@ def test_the_analytics_view_layer_survived_the_run(pg_engine_session, warehouse_
     )
 
 
+def test_the_run_did_not_strip_the_sim_prefix_from_any_column(
+    pg_engine_session, warehouse_baseline
+):
+    """No column that carried the §3.2 `sim_` prefix before the run has lost it.
+
+    Not hypothetical — I did this to the shared warehouse while proving the guard
+    above. `apply_ddl` rewrites the crosswalk tables from the DDL of whichever
+    BRANCH the suite runs from, so running it from a branch that predates the §3.2
+    prefix rename silently reverts the live crosswalk to the bare column names,
+    taking the provenance marker with it. Everything else about the warehouse looks
+    healthy afterwards, which is what makes it worth an assertion.
+
+    This is not something the restore can fix — re-applying the branch's own SQL is
+    the correct behaviour for that branch — so the guard makes it visible instead.
+    The rule it protects is CLAUDE.md §3.2, and the §4 blacklist matches on column
+    names, so a stripped prefix is a leakage-surface change, not cosmetics.
+    """
+    if not warehouse_baseline.reachable or not warehouse_baseline.sim_table_columns:
+        pytest.skip("no sim_ tables were present before the run")
+
+    with pg_engine_session.connect() as conn:
+        live: dict[str, set[str]] = {}
+        for table, column in conn.execute(
+            text(
+                "select table_name, column_name from information_schema.columns "
+                "where table_schema = 'rcm' and table_name like 'sim\\_%'"
+            )
+        ):
+            live.setdefault(table, set()).add(column)
+
+    regressions = {}
+    for table, before in warehouse_baseline.sim_table_columns.items():
+        after = live.get(table)
+        if after is None:
+            continue  # table absence is a different failure, covered above
+        lost_prefix = {c for c in before if c.startswith("sim_")} - after
+        if lost_prefix:
+            regressions[table] = sorted(lost_prefix)
+
+    assert not regressions, (
+        f"columns that carried the `sim_` prefix before this run no longer exist "
+        f"after it: {regressions}. CLAUDE.md §3.2 requires every simulated column to "
+        f"be prefixed, and the §4 leakage blacklist matches on column names. The "
+        f"usual cause is running the integration suite from a branch whose "
+        f"sql/ddl/ predates a rename: apply_ddl rewrote the table into the older "
+        f"shape. Re-apply the current DDL and reload before handing the warehouse on."
+    )
+
+
 def test_the_reference_enrichment_survived_the_run(pg_engine_session, warehouse_baseline):
     """dim_drg.drg_desc still carries every FY2023 MS-DRG title it carried before.
 

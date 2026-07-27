@@ -630,6 +630,48 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > prove the new guard catches it. `uv run pytest -m integration` will run twice on
 > feat/phase4-qa. I restore with `make reference-codes && make views` and re-verify
 > 21/21 before closing the window. No `make warehouse-all`, no sim regeneration.
+> WINDOW CLOSED 14:32Z. Live warehouse verified back at the known-good baseline:
+> 9 vw_ views, fact 20,867 / sim_claim_adjudication 20,867, 0 orphans, 7 sim_
+> tables with FKs, crosswalk 4,876 / 2,463, dim_drg.drg_desc 167/168,
+> reconciliation 21/21 PASS, 0 unprefixed crosswalk columns and 0 bare
+> facility_*/display_facility_* columns anywhere in rcm (i.e. data-engineer-p4's
+> post-rename shape, restored via their worktree's shipped DDL + loader + views).
+- [x] DRIFT GUARD (qa-reviewer-p9): the integration suite may no longer degrade
+  the warehouse. DONE 2026-07-27 on feat/phase4-qa (dea1444, a1dd591).
+  Two halves, because either alone is worse than useless. `tests/integration/
+  test_warehouse_restore.py` (rank 80) re-runs the documented repair inside the
+  suite — views from the SHIPPED sql/views/apply_views.py, dim_drg.drg_desc from a
+  pre-run snapshot (the reference loader needs the gitignored raw downloads, and
+  src/ingestion/ is not qa's to refactor). `tests/integration/test_end_state.py`
+  (rank 90) then asserts both actually came back. Restoring without asserting
+  moves the blind spot; asserting without restoring makes `make test` permanently
+  red on any populated dev warehouse, and a guard that can never go green gets
+  deleted.
+  Compared against a baseline captured BEFORE the first integration test, so the
+  property is "no worse than we found it", not "fully materialised" — a fresh
+  clone with no views passes, losing views that were there fails. The precondition
+  is OBSERVED, not assumed, which is what stops this guard from excusing itself
+  when its subject goes missing.
+  PROVEN, not asserted: with the repair module deselected (the pre-fix world) the
+  run FAILS with "the integration run destroyed 9 analytics view(s) and did not
+  restore them: [all 9 named]" — the same run previously reported fully green.
+  With the repair enabled: 34 passed / 2 skipped, and afterwards 9 views,
+  drg_desc 167/168, 21/21.
+  ALSO FOUND, from walking into it myself: `apply_ddl` rewrites the crosswalk
+  tables from the DDL of whichever BRANCH the suite runs from, so running the
+  integration suite from a branch predating the §3.2 rename silently reverts the
+  live crosswalk to bare column names while everything else looks healthy. Added
+  a third end-state assertion for it (no column that carried `sim_` before the run
+  may lose it); replayed against the degraded shape my own run produced, it names
+  all 8 stripped columns. Not something the restore can fix — re-applying a
+  branch's own SQL is correct for that branch — so the guard makes it visible.
+  NOTE for anyone running the integration suite before feat/crosswalk-sim-prefix
+  merges: it WILL revert the live crosswalk. Re-apply from that branch's worktree
+  afterwards, as I did.
+> QA FINDINGS ON feat/phase4-ml (qa-reviewer-p9, 2026-07-27) — see the GATE 2 /
+> Model A items. One BLOCKING item for ml-engineer (the §4.1 training-matrix guard
+> is not wired to the feature store, so the value probes have never run on it) and
+> five defects in tests/leakage/ that were mine and are fixed (2a9a69d).
 - [x] Point-in-time feature store + forbidden-column leakage tests
   DONE 2026-07-27 on feat/phase4-ml. 40 declared features over 20,867 claims,
   built from the BASE TABLES with an explicit column allowlist rather than from
