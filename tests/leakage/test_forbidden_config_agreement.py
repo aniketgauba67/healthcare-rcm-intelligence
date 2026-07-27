@@ -45,12 +45,30 @@ def _resolve(patterns: list[str], universe: set[str]) -> dict[str, set[str]]:
 
 
 def _names(block) -> set[str]:
-    """Column names out of a config block, whether it is a list or an annotated dict.
+    """Column names out of a config block, in any of the three shapes it uses.
 
-    The config uses both shapes: plain lists where the name is all there is, and
-    dicts whose keys are the column and whose values say what it was derived from.
+    The config carries forbidden columns three ways, and the difference matters —
+    reading one as another is how this fixture originally lost the whole-table
+    expansion and reported seven `sim_operating_costs` columns as unblocked when
+    they were blocked all along:
+
+      * a plain list, where the name is all there is
+        (`forbidden_features: [sim_denial_flag, ...]`);
+      * an ANNOTATED dict, keyed by column, valued by a note saying what the
+        column was derived from (`forbidden_derived_features: {clean_claim_flag:
+        "function of sim_denial_flag"}`) — the names are the KEYS;
+      * a GROUPED dict, keyed by TABLE, valued by that table's column list
+        (`forbidden_table_columns: {sim_appeals: [sim_appeal_sk, ...]}`) — the
+        names are the VALUES, and the keys are table names that are not columns
+        at all.
+
+    The two dict shapes are told apart by their values, not by hardcoding the key,
+    so a new grouped block is read correctly without editing this function.
     """
     if isinstance(block, dict):
+        values = list(block.values())
+        if values and all(isinstance(v, list) for v in values):
+            return {str(c) for group in values for c in group}
         return {str(k) for k in block}
     if isinstance(block, list):
         return {str(v) for v in block}
@@ -91,13 +109,24 @@ def configured(model_config) -> list[str]:
     return sorted(union)
 
 
-def test_no_configured_pattern_matches_zero_columns(configured, generated_schema):
+def test_no_configured_pattern_matches_zero_columns(model_config, generated_schema):
     """A pattern that matches nothing is worse than an absent one: it reads as coverage.
 
     This is the check that would have caught the placeholder on the day it was written.
+
+    Scoped to `forbidden_features`, because the generated schema is the only universe
+    available without a database and it is the only universe that key is allowed to
+    draw from — `forbidden_features` must equal the firewall document exactly, and the
+    document describes generator output. The other blocks deliberately name columns the
+    generator never emits (DERIVED view columns, real CMS SOURCE columns, crosswalk
+    linkage columns), so resolving them here would report every one of them as dead.
+    They get the same treatment against the full live catalog in
+    tests/leakage/test_live_leakage.py, where those columns actually exist.
     """
+    patterns = list(model_config.get(FORBIDDEN_KEY) or [])
+    assert patterns, f"config/model.yaml has no `{FORBIDDEN_KEY}` entries"
     universe = _all_columns(generated_schema)
-    dead = sorted(p for p, matched in _resolve(configured, universe).items() if not matched)
+    dead = sorted(p for p, matched in _resolve(patterns, universe).items() if not matched)
     assert not dead, (
         f"{len(dead)} pattern(s) in config/model.yaml `{FORBIDDEN_KEY}` match no column "
         f"in the generated schema: {dead}\n"
@@ -144,23 +173,51 @@ def test_config_blocks_nothing_the_document_permits(
     )
 
 
-def test_latent_columns_are_forbidden_in_every_configured_list(model_config, firewall):
+def test_latent_columns_are_forbidden_for_every_model(model_config, firewall):
     """§1 latent internals are forbidden "in any model", Model C included.
 
     Model C's boundary is the denial rather than the submission, so it legitimately
     permits the denial outcome and money columns. It never permits the answer keys.
+
+    Checked per MODEL, against that model's effective blacklist. The earlier version
+    of this test iterated every `forbidden_*` key that happened to be a YAML list and
+    required all of them to name every latent column, which asked `forbidden_tables`
+    — a list of TABLE names — to contain a column, and failed on a category error
+    rather than on a leak.
     """
-    lists = {
-        key: value
-        for key, value in model_config.items()
-        if key.startswith("forbidden") and isinstance(value, list)
-    }
-    assert lists, "config/model.yaml declares no forbidden-feature list"
-    for key, patterns in lists.items():
-        for column in sorted(firewall.latent_columns):
-            assert any(fnmatch.fnmatchcase(column, p) for p in patterns), (
-                f"latent answer key {column} is not blocked by `{key}` — §1 of "
+    latents = sorted(firewall.latent_columns)
+    assert latents, "the firewall document declares no §1 latent columns"
+
+    model_a = set().union(*_column_bearing_blocks(model_config).values())
+    model_c = _names((model_config.get("model_c") or {}).get("forbidden_features"))
+    assert model_c, "config/model.yaml declares no `model_c.forbidden_features`"
+
+    for label, blacklist in (("Model A", model_a), ("Model C", model_c)):
+        for column in latents:
+            assert any(fnmatch.fnmatchcase(column, p) for p in blacklist), (
+                f"latent answer key {column} is not blocked for {label} — §1 of "
                 "docs/simulated_forbidden_columns.md forbids it in any model"
+            )
+
+
+def test_forbidden_tables_hold_table_names_not_column_names(model_config, generated_schema):
+    """The table-name keys must really name tables.
+
+    `forbidden_tables` is excluded from the column union above on the grounds that it
+    names tables. If a column name were ever added to it, that column would be excluded
+    from the union AND matched by nothing — silently unblocked by the very exclusion
+    that was supposed to be a formality.
+    """
+    for key in sorted(TABLE_NAME_KEYS):
+        entries = model_config.get(key) or []
+        not_tables = sorted(e for e in entries if e not in generated_schema)
+        # Crosswalk tables are not generator output, so they are absent from the
+        # generated schema legitimately; only assert on the generator-owned key.
+        if key == "forbidden_tables":
+            assert not not_tables, (
+                f"`{key}` contains {not_tables}, which are not tables in the generated "
+                f"schema. Entries here are excluded from the column blacklist, so a "
+                f"column placed here is blocked by nothing."
             )
 
 

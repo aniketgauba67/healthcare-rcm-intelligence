@@ -42,6 +42,7 @@ reviewer sees anything sitting in the suspicious 0.59-0.68 band by hand.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from dataclasses import dataclass
 
@@ -130,6 +131,16 @@ def _codes(series: pd.Series, bins: int = _FEATURE_BINS) -> np.ndarray:
     a forbidden column is derived from it just as surely as one whose values do.
     """
     values = series
+    if not pd.api.types.is_datetime64_any_dtype(values) and _is_datelike(values):
+        # A PostgreSQL `date` arrives as dtype `object` holding `datetime.date`, which
+        # is neither datetime64 nor numeric — so it fell through to `factorize` and
+        # entered at FULL cardinality (~3,000 levels) while the same column from the
+        # in-memory generator, as datetime64, was binned to _TRUTH_BINS. The two sides
+        # of every live comparison were therefore discretised at different resolutions,
+        # and the thresholds calibrated on the generated frame did not mean the same
+        # thing live. Normalise first so resolution is a property of the code, not of
+        # which pandas reader produced the column.
+        values = pd.to_datetime(values, errors="coerce")
     if pd.api.types.is_datetime64_any_dtype(values):
         values = values.astype("int64").where(values.notna())
     if pd.api.types.is_bool_dtype(values):
@@ -171,9 +182,23 @@ def _is_row_key(series: pd.Series) -> bool:
 
 
 def _is_datelike(series: pd.Series) -> bool:
-    return pd.api.types.is_datetime64_any_dtype(series) or isinstance(
-        series.dropna().iloc[0] if series.notna().any() else None, (pd.Timestamp,)
-    )
+    """True for date columns in any of the shapes this suite sees.
+
+    `datetime.date` matters as much as `pd.Timestamp` here. A PostgreSQL `date`
+    column comes back through pandas as dtype `object` holding `datetime.date`, so
+    the earlier `pd.Timestamp`-only check answered False for every date in the live
+    truth frame — and the date carve-out in `dependency_findings`, which is
+    conditioned on this function, silently did not apply where it was designed to.
+    It was calibrated against the in-memory generated frame, where the same columns
+    arrive as Timestamps and the check works. The gap only became visible once a
+    real feature matrix existed to run the probe against.
+    """
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return True
+    non_null = series.dropna()
+    if non_null.empty:
+        return False
+    return isinstance(non_null.iloc[0], (pd.Timestamp, dt.date, dt.datetime))
 
 
 def dependency_findings(

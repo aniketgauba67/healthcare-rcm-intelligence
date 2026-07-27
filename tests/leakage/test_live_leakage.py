@@ -123,19 +123,151 @@ def test_every_live_simulated_column_is_classified(live_schema, firewall):
     )
 
 
+# The config keys that actually block a column, enumerated rather than globbed.
+# `forbidden_features` alone is NOT the blacklist: the team-lead ruling of
+# 2026-07-27 approved carrying §2's whole-table forbids in `forbidden_tables` /
+# `forbidden_table_columns` so that the `forbidden_features`-vs-document surface
+# could stay exactly equal (that equality is pinned by
+# test_forbidden_config_agreement.py — this test must not be the one that
+# enforces it, or a column could be moved between keys unnoticed).
+#
+# Listed explicitly, and asserted to exist below, so that a NEW key invented
+# later does not silently widen what counts as "blocked" here.
+_BLOCKING_LIST_KEYS = (
+    "forbidden_features",
+    "forbidden_derived_features",
+    "forbidden_source_features",
+    "forbidden_features_defensive",
+    "forbidden_crosswalk_display_features",
+)
+_BLOCKING_MAP_KEYS = ("forbidden_table_columns",)
+
+
+def _configured_patterns(model_config) -> set[str]:
+    patterns: set[str] = set()
+    for key in _BLOCKING_LIST_KEYS:
+        patterns |= set(model_config.get(key) or [])
+    for key in _BLOCKING_MAP_KEYS:
+        for columns in (model_config.get(key) or {}).values():
+            patterns |= set(columns)
+    return patterns
+
+
 def test_config_covers_every_forbidden_column_in_the_warehouse(live_schema, firewall, model_config):
     """The config-vs-document agreement, resolved against the live schema.
 
     The CI test resolves the same patterns against the generator. This one is what
     actually protects a training run.
+
+    `firewall.model_a_forbidden(live_schema)` expands §2's whole-table forbids
+    (sim_appeals, sim_operating_costs) into real column names, so the config side
+    has to be resolved across every key that blocks a column — not `forbidden_features`
+    alone, which by design no longer carries them.
     """
-    patterns = model_config.get("forbidden_features", [])
+    for key in _BLOCKING_LIST_KEYS + _BLOCKING_MAP_KEYS:
+        assert key in model_config, (
+            f"config/model.yaml no longer defines `{key}`; this test resolves the "
+            f"blacklist from a fixed list of keys and must be updated deliberately, "
+            f"not left silently resolving a smaller set"
+        )
+
+    patterns = _configured_patterns(model_config)
     universe = {c for columns in live_schema.values() for c in columns}
     resolved = {c for c in universe for p in patterns if fnmatch.fnmatchcase(c, p)}
     missing = sorted(firewall.model_a_forbidden(live_schema) - resolved)
     assert not missing, (
         f"{len(missing)} column(s) present in the warehouse and forbidden by the "
         f"firewall document are not blocked by config/model.yaml: {missing}"
+    )
+
+
+# Keys allowed to name a column that does not exist, and why. Everywhere else a
+# pattern matching nothing is the Phase 2 placeholder defect: it reads as coverage
+# and provides none.
+#
+#   forbidden_features_defensive — CLAUDE.md §4 names `sim_denial_reason` in its
+#     minimum list and the generator never emitted such a column. Keeping it
+#     honours the text of the rule; the key's own name says it is belt-and-braces.
+#   forbidden_crosswalk_display_features — deliberately carries BOTH the pre- and
+#     post-rename spellings of the crosswalk linkage columns, so the in-flight
+#     §3.2 prefix change cannot open a window in either direction. One spelling is
+#     necessarily dead at any moment; which one flips when the rename merges.
+_DEAD_PATTERNS_PERMITTED_IN = frozenset(
+    {"forbidden_features_defensive", "forbidden_crosswalk_display_features"}
+)
+
+
+def test_no_configured_pattern_is_dead_against_the_live_catalog(pg_engine, model_config):
+    """Every configured pattern matches something that really exists.
+
+    The CI twin of this check (tests/leakage/test_forbidden_config_agreement.py) can
+    only resolve `forbidden_features` against the generated schema, because that is the
+    only universe available without a database. The remaining blocks name DERIVED view
+    columns, real CMS SOURCE columns and crosswalk linkage columns, none of which the
+    generator emits — so they go unchecked there and are checked here instead, against
+    the whole `rcm` catalog, tables and views together, where all of them do exist.
+
+    A dead pattern is the specific defect that let the Phase 2 placeholder read as
+    coverage while blocking almost nothing. Two keys are exempt for stated reasons
+    (see above) — the exemption is per key and enumerated, so "defensive" cannot
+    become the drawer that dead patterns get swept into unnoticed.
+    """
+    with pg_engine.connect() as conn:
+        universe = {
+            r[0]
+            for r in conn.execute(
+                text(
+                    "select column_name from information_schema.columns where table_schema = 'rcm'"
+                )
+            )
+        }
+    assert universe, "the rcm schema reported no columns at all"
+
+    def is_dead(pattern: str) -> bool:
+        return not any(fnmatch.fnmatchcase(c, pattern) for c in universe)
+
+    dead_by_key: dict[str, list[str]] = {}
+    for key in _BLOCKING_LIST_KEYS:
+        if key in _DEAD_PATTERNS_PERMITTED_IN:
+            continue
+        if found := sorted(p for p in (model_config.get(key) or []) if is_dead(p)):
+            dead_by_key[key] = found
+    for key in _BLOCKING_MAP_KEYS:
+        entries = [c for cols in (model_config.get(key) or {}).values() for c in cols]
+        if found := sorted(p for p in entries if is_dead(p)):
+            dead_by_key[key] = found
+
+    assert not dead_by_key, (
+        f"configured forbidden pattern(s) match no column anywhere in the live rcm "
+        f"catalog: {dead_by_key}. A pattern that matches nothing reads as coverage and "
+        f"provides none — check the `sim_` prefix and the post-rename spellings."
+    )
+
+
+def test_every_forbidden_warehouse_column_is_actually_rejected(live_schema, firewall):
+    """Membership in a config key is bookkeeping; being refused is the property.
+
+    The test above proves each forbidden column is named somewhere in the config.
+    This one puts every one of them into a one-column frame and requires the guard
+    the training path calls to raise. A column that is listed but not enforced —
+    because it landed in a key nothing reads — fails here and passes there.
+    """
+    from src.features.leakage import LeakageError, assert_no_forbidden_columns
+
+    forbidden = sorted(firewall.model_a_forbidden(live_schema))
+    assert forbidden, "the firewall document resolved to no forbidden columns at all"
+
+    unenforced = []
+    for column in forbidden:
+        try:
+            assert_no_forbidden_columns([column], model="A")
+        except LeakageError:
+            continue
+        unenforced.append(column)
+
+    assert not unenforced, (
+        f"{len(unenforced)} column(s) the firewall document forbids were accepted by "
+        f"assert_no_forbidden_columns: {unenforced}. They are configured but not enforced."
     )
 
 
@@ -171,7 +303,20 @@ def test_crosswalk_tables_are_deliberately_out_of_scope(pg_engine, firewall):
 
 @pytest.fixture(scope="module")
 def live_truth(pg_engine, firewall, live_schema) -> pd.DataFrame:
-    """Forbidden columns for every claim, keyed by `claim_sk`."""
+    """Forbidden columns for every claim, keyed by `claim_sk`.
+
+    Column labels are de-duplicated after the concat. `sim_claim_adjudication` and
+    `sim_operating_costs` both carry the §6 provenance stamps (`sim_provenance`,
+    `sim_config_version`, `sim_seed`), so joining them produces repeated labels, and
+    `truth[label]` then returns a DataFrame where every consumer expects a Series —
+    which raises "The truth value of a Series is ambiguous" from inside the detector
+    rather than reporting a leak. The stamps are per-run constants, so keeping the
+    first occurrence loses nothing.
+
+    This only surfaced once a real matrix existed to run the value probes against;
+    until then the probes skipped and the bug sat behind the skip. It is the same
+    lesson as the drift guard: a check that has never executed is not a check.
+    """
     forbidden = firewall.model_a_forbidden(live_schema)
     frames = []
     with pg_engine.connect() as conn:
@@ -183,7 +328,8 @@ def live_truth(pg_engine, firewall, live_schema) -> pd.DataFrame:
             frames.append(
                 pd.read_sql(text(f"select {columns} from rcm.{table}"), conn).set_index("claim_sk")
             )
-    return pd.concat(frames, axis=1).sort_index()
+    truth = pd.concat(frames, axis=1).sort_index()
+    return truth.loc[:, ~truth.columns.duplicated()]
 
 
 @pytest.fixture(scope="module")
