@@ -769,6 +769,31 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   provider rate DOES break all three, so the checks are known to be sensitive.
   Feature names keep the sim_ prefix through engineering (§3.2) so provenance
   survives into the matrix, the SHAP plots and the dashboard.
+  DETAIL preserved from ml-engineer's own board entry when team-lead reconciled
+  the merge conflict (main's block is authoritative; these facts existed only on
+  the branch):
+    - A fifth config key beyond the three team-lead ruled on: `forbidden_tables`
+      + `forbidden_table_columns` expand §2's WHOLE-TABLE forbids (sim_appeals,
+      sim_operating_costs) into real column names, with an integration test
+      re-checking the expansion against information_schema. NOTE: this is the key
+      qa-reviewer-p9's fixture later misread as an annotated dict and took the
+      KEYS of, folding two table names into the blacklist and dropping fourteen
+      real column names — the protection held; the test reading it did not.
+    - Split numbers: cut 2021-12-28, train 16,694 / test 4,173 (20.0%), test base
+      rate 0.1205 vs train 0.1294 — matches firewall doc §8 exactly. Calibration
+      fold carved off the END of train (fit 13,356 / calibrate 3,338; latest
+      calibration row 2021-12-28 < earliest test row 2021-12-29), so isotonic sees
+      neither the fit rows nor the test fold.
+    - Historical-rate shrinkage m=20 toward the prior-period book rate, which
+      itself moves. No history ⇒ null, never a silent zero.
+    - Leak canaries: no single numeric feature exceeds ROC-AUC 0.75 alone, and no
+      categorical level with ≥100 claims determines the label.
+    - CORRECTION ml-engineer recorded against itself: it first assumed provider
+      history would be sparse ("median provider has 2 claims"). Wrong at the CLAIM
+      level — volume is concentrated (top 10% of providers hold 53% of claims), so
+      72% of all claims and 83% of post-2019 claims DO have provider history.
+      Provider-weighted and claim-weighted are different questions; the model card
+      must say the latter.
 - [x] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
   — ml-engineer-2, 5097f08, `make train` runs it end to end. PENDING qa-reviewer-p9.
   Forward test fold 4,173 claims / 503 denials / base rate 0.1205:

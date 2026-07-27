@@ -48,7 +48,6 @@ select
     dc.sim_duplicate_submission_flag,
     f.clm_tot_chrg_amt as billed_charge_amt,
     f.length_of_stay_days,
-    f.clm_utlztn_day_cnt,
     pv.prvdr_num,
     pv.provider_state_cd,
     drg.drg_cd,
@@ -98,6 +97,7 @@ group by e.claim_sk
 DENIAL_QUERY = f"""
 select
     a.claim_sk,
+    a.sim_adjudication_date,
     a.sim_denial_review_date,
     a.sim_denial_type,
     a.sim_denial_category,
@@ -116,6 +116,17 @@ APPEAL_TARGET_QUERY = f"""
 select claim_sk, sim_appeal_outcome, sim_appeal_recovered_amount, sim_appeal_disputed_amount
 from {SCHEMA}.sim_appeals
 where sim_appeal_level = 1
+"""
+
+
+# EVALUATION ONLY. Denied dollars are an adjudication result and are forbidden
+# as a Model A feature; they are read here to answer "how much of the money at
+# risk does the top decile capture?", which is an outcome-side question. Kept in
+# its own frame, joined only inside the evaluation functions, so it can never
+# arrive in a feature matrix by being sat next to one.
+OUTCOME_ECONOMICS_QUERY = f"""
+select claim_sk, sim_denied_amount, sim_allowed_amount
+from {SCHEMA}.sim_claim_adjudication
 """
 
 
@@ -147,3 +158,8 @@ def fetch_denials(engine: Engine) -> pd.DataFrame:
 def fetch_appeal_targets(engine: Engine) -> pd.DataFrame:
     """First-level appeal outcomes. Targets only — never features."""
     return _read(engine, APPEAL_TARGET_QUERY)
+
+
+def fetch_outcome_economics(engine: Engine) -> pd.DataFrame:
+    """Denied and allowed dollars. EVALUATION ONLY — never join this to features."""
+    return _read(engine, OUTCOME_ECONOMICS_QUERY)

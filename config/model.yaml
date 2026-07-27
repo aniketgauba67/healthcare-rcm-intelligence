@@ -178,6 +178,20 @@ forbidden_source_features:
   nch_ip_ncvrd_chrg_amt: same column, star-schema name
   bene_deductible_amt: deductible applied is an adjudication determination
   nch_bene_ip_ddctbl_amt: same column, star-schema name
+  # Measured 2026-07-27 before classifying, because a covered-day count that is
+  # only ever a fixed offset from the calendar stay would carry no information
+  # and the call would be moot. It is not a fixed offset. length_of_stay_days is
+  # (discharge - admission) + 1 on 100% of 20,867 claims — pure calendar
+  # arithmetic, knowable at submission. clm_utlztn_day_cnt equals
+  # (discharge - admission) on 92.5% and is one day SHORT of it on the other
+  # 7.53% (1,572 claims), and that deficit cohort carries 7.2x the mean
+  # non-covered charge ($2,784 vs $385) and a higher rate of any non-covered
+  # charge at all (47.2% vs 37.9%). The short day is therefore a benefit
+  # determination — a day the payer did not count as covered — which is the same
+  # adjudication event nch_ip_ncvrd_chrg_amt above records in dollars.
+  # length_of_stay_days stays PERMITTED; it is the calendar stay, not the
+  # covered stay.
+  clm_utlztn_day_cnt: covered/utilization days is a benefit determination
 
 # Names CLAUDE.md §4 or an older config called out that match no column in the
 # schema today. Kept so a future rename cannot reintroduce them silently.
@@ -281,12 +295,106 @@ model_c:
     - clm_id
 
 # ---------------------------------------------------------------------------
+# Estimators. Fixed, declared, and deliberately NOT searched.
+#
+# No hyperparameter search is run anywhere in this project, and that is a
+# decision rather than an omission. The label carries deliberate noise with an
+# oracle ceiling near ROC-AUC 0.68 (sanity_bounds below), the forward test fold
+# is ~4,200 claims holding ~500 denials, and a search over that surface would be
+# selecting on differences smaller than the bootstrap interval — it would buy a
+# better number and a worse model. The values below are ordinary regularized
+# defaults: shallow trees, strong minimum child weight, subsampling, and an L2
+# penalty on the linear model.
+# ---------------------------------------------------------------------------
+estimators:
+  logistic:
+    # Regularized, unweighted. class_weight="balanced" would improve nothing that
+    # matters here — ranking is unchanged by a constant reweighting and the
+    # probabilities go through isotonic afterwards anyway — while making the
+    # uncalibrated Brier score meaningless.
+    C: 1.0
+    max_iter: 2000
+    solver: lbfgs
+  xgboost:
+    n_estimators: 300
+    max_depth: 4
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    # ~1.5% of the fit fold. Leaves that thin cannot form on 500-ish positives
+    # without memorising individual claims.
+    min_child_weight: 20.0
+    reg_lambda: 2.0
+    n_jobs: 4
+
+# ---------------------------------------------------------------------------
 # Decision thresholds and economics
 # ---------------------------------------------------------------------------
 cost_matrix:
   review_cost_usd: 25
   prevented_denial_value_multiplier: 1.0
   false_negative_penalty: full_expected_reimbursement_loss
+
+# MEASURED 2026-07-27, and it changes how the threshold must be read: with a $25
+# review, a mean $3,800 at stake on a denied claim and a 12% denial rate, the
+# expected value of reviewing an AVERAGE claim is about $456. Reviewing
+# everything is therefore optimal and the cost-maximising threshold flags ~99% of
+# the queue — a correct answer to the question the cost matrix asks, and a
+# useless operating point, because no billing office has reviewers for 99% of its
+# claims. The binding constraint here is capacity, not economics, so a second
+# operating point is reported: work the top share of the queue by score. Both are
+# in the model card, and the multiplier sensitivity sweep shows how much of the
+# cost-optimal answer is the multiplier assumption rather than the model.
+operating_point:
+  review_capacity_share: 0.10
+  multiplier_sensitivity: [0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
+
+# ---------------------------------------------------------------------------
+# Model C economics and the work-queue rules.
+#
+# Expected Net Recovery = P(overturn) x recoverable - processing cost.
+#
+# Note what the processing cost does and does not do. It is a constant
+# subtracted from every claim, so it does NOT change the ORDER of the queue —
+# ranking by ENR and ranking by P(overturn) x recoverable give the same list.
+# What it sets is the cutoff: which claims clear zero and are worth working at
+# all. So the number below is load-bearing for the go/no-go decision and
+# irrelevant to the ordering, and the model card says so rather than implying
+# the whole ranking rests on it.
+# ---------------------------------------------------------------------------
+appeal_economics:
+  # docs/assumptions.md §9 anchors the cost to rework a denied claim at roughly
+  # $25-$120, citing MGMA (~$25/appealed claim) at the low end and Premier's 2024
+  # ~$44 per contested claim above it. $45 is the Premier-anchored figure for
+  # preparing an APPEAL specifically. The simulation's own realized denial rework
+  # + appeal cost is $29.88 per DENIED claim, which averages over the two thirds
+  # of denials nobody appeals, so an appeal-specific cost above it is consistent
+  # rather than contradictory. sim_operating_costs is a forbidden table for both
+  # models, so this is an assumption from published benchmarks and not a value
+  # read out of the generator.
+  appeal_processing_cost_usd: 45.0
+
+  # Medicare Part A/B redetermination: an appeal must be filed within 120 days of
+  # receiving the initial determination. Used to derive days-to-deadline for the
+  # urgency rule. Consistent with this warehouse: 965 of 967 simulated appeals
+  # were filed within 120 days of the denial posting (median 15 days).
+  filing_window_days: 120
+  # Inside this many days of the deadline a claim is worked regardless of score.
+  deadline_critical_days: 14
+
+  # Categories a human reviews regardless of expected value. These are a stated
+  # PROJECT POLICY, not a claim about regulation: writing off a coverage or
+  # coordination-of-benefits denial without review can shift balance onto the
+  # beneficiary, and a medical-necessity denial is a clinical determination that
+  # a dollar threshold should not silently close. They are configured rather
+  # than hardcoded so the policy can be argued with.
+  mandatory_review_categories:
+    - MEDICAL_NECESSITY
+    - ELIGIBILITY_COVERAGE
+    - COORDINATION_BENEFITS
+
+  # Work-queue evaluation: the share of the denial queue a team can work.
+  queue_capacity_share: 0.10
 
 calibration: isotonic
 
