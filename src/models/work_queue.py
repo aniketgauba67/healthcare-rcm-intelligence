@@ -236,6 +236,27 @@ def assert_no_deadline_claim_was_outranked(queue: pd.DataFrame) -> None:
             )
 
 
+def priority_score(queue: pd.DataFrame, claim_sk: pd.Series) -> np.ndarray:
+    """The tiered queue re-expressed as a score, aligned to `claim_sk`.
+
+    The point is that everything comparable then becomes a score vector, and the
+    headline table and its confidence interval can be computed from the SAME
+    object. They were not, and it showed: the table compared the TIERED queue
+    against a size sort while the paired bootstrap beside it compared the raw
+    Expected Net Recovery against the same size sort. Those are different
+    rankings, so the reported point difference (-2.2 points) and the reported
+    interval's centre (0.0) disagreed, and nothing in the output said why.
+
+    `-queue_position` reproduces the queue exactly, tiers included, and has no
+    ties. Claims absent from the queue score NaN rather than silently sorting
+    last.
+    """
+    lookup = pd.Series(
+        -queue["queue_position"].to_numpy(dtype=float), index=queue["claim_sk"].to_numpy()
+    )
+    return pd.Series(claim_sk).map(lookup).to_numpy(dtype=float)
+
+
 def capture_at_capacity(
     score: np.ndarray, recovered: np.ndarray, capacity_share: float, seed: int = 1337
 ) -> float:
@@ -292,22 +313,31 @@ def bootstrap_capture_difference(
 
 
 def realised_recovery_at_capacity(
-    queue: pd.DataFrame,
-    recovered: pd.Series,
+    score: np.ndarray,
+    recovered: np.ndarray,
     capacity_share: float,
+    seed: int = 1337,
 ) -> dict[str, float]:
-    """What the top of this queue would actually have recovered.
+    """What the top of a ranking would actually have recovered.
 
     Ranking metrics say the order is sensible; this says what the order is worth.
-    Recovered dollars are an outcome quantity and are joined in here, at
-    evaluation time, never in the feature store.
+    Recovered dollars are an outcome quantity and are joined in at evaluation
+    time, never in the feature store.
+
+    Takes a SCORE rather than an already-ordered queue, so that this and
+    `capture_at_capacity` — the function the bootstrap resamples — are the same
+    computation on the same input. When they were two computations on two
+    differently-ordered objects, the table and its interval disagreed.
     """
-    k = max(1, int(round(len(queue) * capacity_share)))
-    realised = np.asarray(recovered, float)
-    total = float(np.nansum(realised))
-    captured = float(np.nansum(realised[:k]))
+    score = np.asarray(score, dtype=float)
+    realised = np.nan_to_num(np.asarray(recovered, dtype=float))
+    k = max(1, int(round(len(score) * capacity_share)))
+    shuffled = np.random.default_rng(seed).permutation(len(score))
+    top = shuffled[np.argsort(-score[shuffled], kind="stable")[:k]]
+    total = float(realised.sum())
+    captured = float(realised[top].sum())
     return {
-        "queue_rows": int(len(queue)),
+        "queue_rows": int(len(score)),
         "worked": k,
         "capacity_share": capacity_share,
         "recovered_dollars_captured": round(captured, 2),
