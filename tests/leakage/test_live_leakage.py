@@ -223,6 +223,20 @@ def test_no_configured_pattern_is_dead_against_the_live_catalog(pg_engine, model
         }
     assert universe, "the rcm schema reported no columns at all"
 
+    # Some forbidden patterns name DERIVED columns that exist only in sql/views/.
+    # Resolving them against a warehouse whose view layer has not been applied
+    # reports every one of them as dead, which is a statement about the warehouse
+    # rather than about the config. The integration suite is ordered so this module
+    # runs after the view repair (rank 85); a warehouse that has simply never had
+    # `make views` run is a different situation and is not this test's to fail.
+    # Views going MISSING is caught by tests/integration/test_end_state.py.
+    with pg_engine.connect() as conn:
+        view_count = conn.execute(
+            text("select count(*) from information_schema.views where table_schema = 'rcm'")
+        ).scalar()
+    if not view_count:
+        pytest.skip("no rcm views present — run `make views`; view-DERIVED patterns unresolvable")
+
     def is_dead(pattern: str) -> bool:
         return not any(fnmatch.fnmatchcase(c, pattern) for c in universe)
 

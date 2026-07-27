@@ -67,6 +67,11 @@ _MODULE_ORDER: dict[str, int] = {
     # Repair: rebuild the materializations the rebuild above CASCADE-dropped,
     # before anything asserts on them.
     "test_warehouse_restore": 80,
+    # The live leakage boundary reads the FULL rcm catalog, views included: some
+    # forbidden columns it resolves are DERIVED columns that exist only in
+    # sql/views/. Run it after the repair, or it measures a half-built warehouse
+    # and reports view-derived patterns as dead when they are merely dropped.
+    "test_live_leakage": 85,
     # Final guard: the database is left coherent.
     "test_end_state": 90,
 }
