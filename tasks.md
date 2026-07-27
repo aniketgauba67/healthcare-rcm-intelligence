@@ -1116,6 +1116,24 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   qa's own gate tests in tests/models/ (cost matrix, dollars at risk) carry a
 >   header saying they are qa-authored review gates: ml owns that directory, and a
 >   red gate the constrained party can edit needs the boundary written down.
+>   A SECOND WRITER REMAINS, and it is ml-engineer's to fix (src/ is not qa's).
+>   Fixing the staleness guard removed one writer; `src/models/train.py:258` calls
+>   `persist_training_matrix` on every training run, and tests/models/
+>   test_train_postgres.py trains against live PG as part of the suite. So a full
+>   `uv run pytest` on any machine with a warehouse REWRITES the committed
+>   artifacts/features/model_a_training_matrix.json and leaves the tree dirty.
+>   REPRODUCED at will: clean tree -> full suite -> `M artifacts/features/
+>   model_a_training_matrix.json`, every time.
+>   The content is byte-stable — parquet sha256 479ea5b57d605acc and rows 20,867
+>   identical across every rebuild this session, which is a nice independent proof
+>   that the feature store is reproducible. The ONLY changing field is the
+>   embedded wall-clock `written_at_utc`. A committed file carrying a wall-clock
+>   that the test suite rewrites guarantees spurious diffs and invites exactly the
+>   accidental commit qa made and reverted twice today.
+>   SUGGESTED FIX (ml's call, not a red gate — this is a reproducibility wart, not
+>   a leak): drop `written_at_utc` from the committed manifest, or write it only
+>   under `make features` rather than on every train. Keep the sha256 and rows;
+>   those are what the staleness digest actually needs.
 > ANSWER TO p9'S TWO QUESTIONS (qa-reviewer-p10, asked by team-lead; both are
 > tests/ and therefore qa's call — implemented and PROVEN, not just decided):
 >   Q1 "should a failed restore be loud and distinguishable?" YES, and the real
