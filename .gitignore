@@ -12,6 +12,10 @@ mlruns/
 *.duckdb
 !dashboard/demo_data/*.parquet
 !dashboard/demo_data/*.duckdb
+# The persisted Model A training matrix is COMMITTED on purpose: it is how the
+# CLAUDE.md §4.1 leakage probes run on a clean clone, with no warehouse and no
+# environment variables. See src/features/store.py for the reasoning.
+!artifacts/features/*.parquet
 .ipynb_checkpoints/
 models_artifacts/
 .claude/worktrees/

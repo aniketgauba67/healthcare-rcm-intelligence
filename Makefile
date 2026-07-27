@@ -1,4 +1,4 @@
-.PHONY: setup ingest stage contracts warehouse warehouse-all warehouse-check validate-warehouse simulate simulate-warehouse simulate-check validate-simulation reference-codes views train score dashboard api test lint demo-extract
+.PHONY: setup ingest stage contracts warehouse warehouse-all warehouse-check validate-warehouse simulate simulate-warehouse simulate-check validate-simulation reference-codes views features train train-appeal score dashboard api test lint demo-extract
 
 setup:
 	uv sync
@@ -55,8 +55,18 @@ views:
 	uv run python sql/views/apply_views.py
 	uv run python sql/quality/view_reconciliation.py
 
+# Rebuild the committed Model A feature matrix under artifacts/features/. That
+# file is what the CLAUDE.md §4.1 leakage probes run against on a clean clone,
+# so it has to be regenerated (and re-committed) whenever the feature store or
+# the warehouse changes. `make train` writes it as a side effect too.
+features:
+	uv run python -m src.features
+
 train:
 	uv run python -m src.models.train
+
+train-appeal:
+	uv run python -m src.models.model_c
 
 score:
 	uv run python -m src.models.score
