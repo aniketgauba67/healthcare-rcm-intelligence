@@ -44,7 +44,7 @@ from src.features.extract import fetch_outcome_economics
 from src.features.leakage import assert_no_forbidden_columns, load_model_config
 from src.features.splits import TemporalSplit, calibration_split, split_from_config
 from src.models.advanced import gradient_boosted_model
-from src.models.baselines import BaseRateBaseline, PayerRuleBaseline, logistic_baseline
+from src.models.baselines import BaseRateBaseline, GroupRateBaseline, logistic_baseline
 from src.models.calibrate import calibrate, method_from_config
 from src.models.evaluate import (
     apply_threshold,
@@ -268,7 +268,7 @@ def run_model_a(
 
     fitted: dict[str, Any] = {
         "base_rate": BaseRateBaseline().fit(x_fit, y_fit),
-        "payer_rule": PayerRuleBaseline().fit(x_fit, y_fit),
+        "payer_rule": GroupRateBaseline("sim_payer_id").fit(x_fit, y_fit),
         "logistic": logistic_baseline(MODEL_A_FEATURES, cfg).fit(x_fit, y_fit),
         "xgboost": gradient_boosted_model(MODEL_A_FEATURES, cfg).fit(x_fit, y_fit),
     }

@@ -57,31 +57,37 @@ class BaseRateBaseline(ClassifierMixin, BaseEstimator):
         return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
 
 
-class PayerRuleBaseline(ClassifierMixin, BaseEstimator):
-    """Scores each claim with its payer's denial rate, learned on the training fold.
+class GroupRateBaseline(ClassifierMixin, BaseEstimator):
+    """Scores each row with its group's observed outcome rate on the training fold.
 
-    Deliberately reads the payer's *observed training-fold* rate rather than the
-    point-in-time `sim_payer_prior_denial_rate` feature: this is meant to be the
-    spreadsheet rule, and the spreadsheet is refreshed periodically from history,
-    not recomputed per claim. Unseen payers fall back to the base rate.
+    This is the spreadsheet a manager already has, and it is the bar that matters:
+    beating a coin is easy, beating the rule in use is the question. Model A
+    groups on the payer (payer denial rate); Model C groups on the denial
+    category (overturn rate by denial reason), which is exactly how appeal
+    decisions get made without a model.
+
+    Deliberately reads the group's *observed training-fold* rate rather than the
+    point-in-time prior-period feature: a spreadsheet is refreshed periodically
+    from history, not recomputed per claim. Unseen groups fall back to the base
+    rate.
     """
 
-    def __init__(self, payer_column: str = "sim_payer_id") -> None:
-        self.payer_column = payer_column
+    def __init__(self, group_column: str = "sim_payer_id") -> None:
+        self.group_column = group_column
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray) -> PayerRuleBaseline:  # noqa: N803
-        if self.payer_column not in X.columns:
-            raise KeyError(f"{self.payer_column} is not in the feature matrix")
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> GroupRateBaseline:  # noqa: N803
+        if self.group_column not in X.columns:
+            raise KeyError(f"{self.group_column} is not in the feature matrix")
         self.classes_ = np.array([0, 1])
-        frame = pd.DataFrame({"payer": X[self.payer_column].astype("string"), "y": np.asarray(y)})
+        frame = pd.DataFrame({"group": X[self.group_column].astype("string"), "y": np.asarray(y)})
         self.base_rate_ = float(frame["y"].mean())
-        self.rates_ = frame.groupby("payer")["y"].mean().to_dict()
+        self.rates_ = frame.groupby("group")["y"].mean().to_dict()
         return self
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:  # noqa: N803
         check_is_fitted(self, "rates_")
-        payers = X[self.payer_column].astype("string")
-        p = payers.map(self.rates_).astype(float).fillna(self.base_rate_).to_numpy()
+        groups = X[self.group_column].astype("string")
+        p = groups.map(self.rates_).astype(float).fillna(self.base_rate_).to_numpy()
         return np.column_stack([1.0 - p, p])
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:  # noqa: N803

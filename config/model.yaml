@@ -349,6 +349,53 @@ operating_point:
   review_capacity_share: 0.10
   multiplier_sensitivity: [0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
 
+# ---------------------------------------------------------------------------
+# Model C economics and the work-queue rules.
+#
+# Expected Net Recovery = P(overturn) x recoverable - processing cost.
+#
+# Note what the processing cost does and does not do. It is a constant
+# subtracted from every claim, so it does NOT change the ORDER of the queue —
+# ranking by ENR and ranking by P(overturn) x recoverable give the same list.
+# What it sets is the cutoff: which claims clear zero and are worth working at
+# all. So the number below is load-bearing for the go/no-go decision and
+# irrelevant to the ordering, and the model card says so rather than implying
+# the whole ranking rests on it.
+# ---------------------------------------------------------------------------
+appeal_economics:
+  # docs/assumptions.md §9 anchors the cost to rework a denied claim at roughly
+  # $25-$120, citing MGMA (~$25/appealed claim) at the low end and Premier's 2024
+  # ~$44 per contested claim above it. $45 is the Premier-anchored figure for
+  # preparing an APPEAL specifically. The simulation's own realized denial rework
+  # + appeal cost is $29.88 per DENIED claim, which averages over the two thirds
+  # of denials nobody appeals, so an appeal-specific cost above it is consistent
+  # rather than contradictory. sim_operating_costs is a forbidden table for both
+  # models, so this is an assumption from published benchmarks and not a value
+  # read out of the generator.
+  appeal_processing_cost_usd: 45.0
+
+  # Medicare Part A/B redetermination: an appeal must be filed within 120 days of
+  # receiving the initial determination. Used to derive days-to-deadline for the
+  # urgency rule. Consistent with this warehouse: 965 of 967 simulated appeals
+  # were filed within 120 days of the denial posting (median 15 days).
+  filing_window_days: 120
+  # Inside this many days of the deadline a claim is worked regardless of score.
+  deadline_critical_days: 14
+
+  # Categories a human reviews regardless of expected value. These are a stated
+  # PROJECT POLICY, not a claim about regulation: writing off a coverage or
+  # coordination-of-benefits denial without review can shift balance onto the
+  # beneficiary, and a medical-necessity denial is a clinical determination that
+  # a dollar threshold should not silently close. They are configured rather
+  # than hardcoded so the policy can be argued with.
+  mandatory_review_categories:
+    - MEDICAL_NECESSITY
+    - ELIGIBILITY_COVERAGE
+    - COORDINATION_BENEFITS
+
+  # Work-queue evaluation: the share of the denial queue a team can work.
+  queue_capacity_share: 0.10
+
 calibration: isotonic
 
 # Honesty tripwire (CLAUDE.md §1, docs/simulated_forbidden_columns.md §8). The

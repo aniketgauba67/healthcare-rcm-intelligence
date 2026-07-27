@@ -97,6 +97,7 @@ group by e.claim_sk
 DENIAL_QUERY = f"""
 select
     a.claim_sk,
+    a.sim_adjudication_date,
     a.sim_denial_review_date,
     a.sim_denial_type,
     a.sim_denial_category,

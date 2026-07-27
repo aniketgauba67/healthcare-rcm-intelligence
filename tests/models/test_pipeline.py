@@ -16,7 +16,7 @@ import pytest
 from src.features.build import MODEL_A_FEATURES
 from src.features.spec import FeatureSet, FeatureSpec
 from src.models.advanced import gradient_boosted_model
-from src.models.baselines import BaseRateBaseline, PayerRuleBaseline, logistic_baseline
+from src.models.baselines import BaseRateBaseline, GroupRateBaseline, logistic_baseline
 from src.models.calibrate import calibrate, method_from_config
 from src.models.explain import REASON_CODES, _owner_of, unmapped_features
 from src.models.preprocess import build_preprocessor, median_fingerprint, prepare_matrix
@@ -132,7 +132,7 @@ def test_every_estimator_exposes_the_same_scoring_interface() -> None:
     y = frame["sim_denial_flag"].to_numpy()
     for model in (
         BaseRateBaseline(),
-        PayerRuleBaseline(),
+        GroupRateBaseline(),
         logistic_baseline(TOY_FEATURES, CONFIG),
         gradient_boosted_model(TOY_FEATURES, CONFIG),
     ):
@@ -155,7 +155,7 @@ def test_an_unseen_payer_falls_back_to_the_base_rate() -> None:
     frame = toy_frame()
     matrix = prepare_matrix(frame, TOY_FEATURES)
     y = frame["sim_denial_flag"].to_numpy()
-    model = PayerRuleBaseline().fit(matrix, y)
+    model = GroupRateBaseline().fit(matrix, y)
     unseen = matrix.head(1).assign(sim_payer_id="PAYER_NEVER_SEEN")
     assert model.predict_proba(unseen)[0, 1] == pytest.approx(model.base_rate_)
 
@@ -245,7 +245,7 @@ def test_sklearn_recognises_every_estimator_as_a_classifier() -> None:
 
     for model in (
         BaseRateBaseline(),
-        PayerRuleBaseline(),
+        GroupRateBaseline(),
         logistic_baseline(TOY_FEATURES, CONFIG),
         gradient_boosted_model(TOY_FEATURES, CONFIG),
     ):
