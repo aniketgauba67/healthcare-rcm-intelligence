@@ -640,6 +640,38 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
+> TEAM RULE — STALE-BRANCH WRITE HAZARD (team-lead, 2026-07-27, after
+> qa-reviewer-p9 walked into it and independently diagnosed it). A feature branch
+> that has not merged `main` can DESTROY MERGED WORK on the shared Postgres, and
+> the agent doing it cannot notice, because its own tests pass against its own
+> tree. Two live instances the same afternoon:
+>   * qa's destructive run applied `apply_ddl` from a branch predating the §3.2
+>     crosswalk rename and SILENTLY REVERTED the live crosswalk to bare column
+>     names — all 8 — while row counts, FKs, views and reconciliation 21/21 all
+>     looked healthy afterwards. Healthy-looking is what made it dangerous.
+>   * qa's restore step then ran the pre-rename view SQL against the renamed
+>     crosswalk; the build raised, apply_views.py wraps all 9 views in ONE
+>     transaction, the whole rebuild rolled back, and the layer landed at ZERO
+>     views rather than partially built. From outside, "restore attempted and
+>     failed" and "restore never ran" look identical.
+> RULE: `git merge main` in your worktree BEFORE any write to the shared database
+> — DDL, loader, `make views`, or an integration run. Not after. The trigger is
+> branch STALENESS, not the existence of an unmerged branch, so this applies even
+> when nothing of yours is outstanding.
+> Team-lead merged main into feat/phase4-ml (3cc6577) and feat/phase4-qa (8bbb423)
+> on 2026-07-27 in a quiet window with no agents running, to clear the hazard
+> before work resumed. Both verified after: ml 211 passed / 12 skipped, qa 205
+> passed / 4 skipped / 1 failed (the intentional blocker below), ruff clean on both.
+> CRASH + RE-SPAWN #2 2026-07-27 18:37Z (team-lead): ml-engineer-2 and
+> qa-reviewer-p9 hit the cap TOGETHER again, ~4.5h after the previous pair. Reset
+> 6:50pm America/New_York. Re-spawned as ml-engineer-3 and qa-reviewer-p10.
+> PRESERVED before re-spawning: 34a5b1c on feat/phase4-ml = Model C + work-queue
+> WIP (appeal.py 315 / model_c.py 456 / work_queue.py 316 + a 47-line
+> appeal_economics block in config/model.yaml), verbatim, unreviewed and unrun,
+> with NO Model C training run or metrics. qa's worktree was CLEAN — everything
+> committed through 47df189, which is the discipline the crash notes ask for.
+> Warehouse verified healthy after both crashes: 9 views, 20,867 claims, 0
+> orphans, drg_desc 167/168, 0 unprefixed crosswalk columns, reconciliation 21/21.
 > CRASH + RE-SPAWN 2026-07-27 13:51Z (team-lead): ml-engineer and qa-reviewer-p8
 > hit the ~5h account cap TOGETHER, mid-task, exactly as in Phase 3. Reset 1:50pm
 > America/New_York. Re-spawned as ml-engineer-2 and qa-reviewer-p9 — the cap is
