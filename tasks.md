@@ -542,6 +542,26 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > 20,867, sim_claim_adjudication 20,867, crosswalk 4,876 / 2,463, 9 vw_ views,
 > dim_drg.drg_desc 167 enriched, reconciliation 21/21 PASS. ml-engineer's read-only
 > access was unaffected except during the single view-rebuild transaction.
+> DRIFT ROOT CAUSE — LIKELY FOUND (data-engineer-p4, 2026-07-27, for team-lead +
+> qa-reviewer-p8). The degradation the team-lead repaired today is probably NOT from
+> someone running `make warehouse`. It is `uv run pytest -q` (i.e. `make test`) with
+> a live DB configured. tests/integration/test_warehouse_postgres.py calls
+> `apply_ddl`, which drop-CASCADEs the star schema and takes all 9 vw_ views AND
+> dim_drg (drg_desc back to NULL) with it — TWICE, for its idempotency assertion —
+> and nothing in the suite recreates either. The end state is exactly the observed
+> drift: 0 views + drg_desc 100% NULL + star/sim layer intact. tests/integration/
+> test_end_state.py asserts the sim_ layer survives but deliberately says nothing
+> about views, so the run reports fully green while leaving the warehouse degraded.
+> REPRODUCED twice today: after each full `uv run pytest -q` I had to re-run
+> `make reference-codes && make views` to get back to 21/21.
+> IMPLICATION: the STANDING RULE above should extend to `make test` / any
+> `pytest -m integration` run, not just `make warehouse`. Whoever runs the suite
+> against live PG must follow with `make reference-codes && make views` and
+> re-check 21/21. Proposed durable fix (qa-reviewer-p8's call, tests/ is theirs):
+> either add a view+reference restore step at rank 95 in tests/integration/
+> conftest.py, or extend test_end_state.py to assert 9 views and drg_desc coverage
+> so the suite can no longer report green over a degraded warehouse. NOT fixed here
+> — out of scope for the prefix task and it is qa's file.
 > GATE — FIRST TASK OF PHASE 4, BEFORE ANY FEATURE CODE (team-lead, verified
 > 2026-07-22 by reading config/model.yaml against the real Phase 2 schema).
 > §4 is NON-NEGOTIABLE and the current `forbidden_features` list is a
