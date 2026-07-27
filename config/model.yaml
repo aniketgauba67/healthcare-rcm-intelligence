@@ -410,11 +410,15 @@ cost_matrix:
 # The reason is arithmetic and worth stating, because it is a finding about this
 # problem rather than about this model. A claim is worth reviewing when
 #   multiplier x P(denial) x dollars_at_stake  >  review_cost
-# At a 12% denial rate and a mean $3,800 at stake, the BREAK-EVEN multiplier is
-# 25 / (0.12 x 3800) = 0.055. Every honest reading of the published benchmarks
-# lands above that: the old 1.0 by a factor of eighteen, and the decomposed 0.125
-# by a factor of more than two. A pre-submission review would have to be barely
-# 5% effective at recovering value before the threshold started to bind.
+# MEASURED, not asserted — src/models/evaluate.py: break_even_multiplier(), and
+# the run records it in metrics.json. On the CALIBRATION fold (the fold the
+# threshold is chosen on) the denial rate is 0.1306 and the mean denied amount is
+# $3,029.75, so the BREAK-EVEN multiplier is 0.0632. The same figure is 0.0543 on
+# the test fold and 0.0785 across the whole book: near 0.05-0.08 however it is
+# measured. Every honest reading of the published benchmarks lands above that —
+# the old 1.0 by a factor of sixteen, the decomposed 0.125 by about two. A
+# pre-submission review would have to be under ~6% effective at recovering value
+# before the threshold started to bind.
 #
 # So the degeneracy was never the bad constant. At a $25 review cost against
 # thousands of dollars of exposure, reviewing everything really is worth it, and
