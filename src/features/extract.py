@@ -48,7 +48,6 @@ select
     dc.sim_duplicate_submission_flag,
     f.clm_tot_chrg_amt as billed_charge_amt,
     f.length_of_stay_days,
-    f.clm_utlztn_day_cnt,
     pv.prvdr_num,
     pv.provider_state_cd,
     drg.drg_cd,

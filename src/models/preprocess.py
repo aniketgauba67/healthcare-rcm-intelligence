@@ -106,6 +106,4 @@ def median_fingerprint(preprocessor: ColumnTransformer) -> np.ndarray:
     different statistics from fitting on the whole frame. If those two are
     identical, the split is not doing anything.
     """
-    return np.asarray(
-        preprocessor.named_transformers_["numeric"].named_steps["impute"].statistics_
-    )
+    return np.asarray(preprocessor.named_transformers_["numeric"].named_steps["impute"].statistics_)

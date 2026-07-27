@@ -178,6 +178,20 @@ forbidden_source_features:
   nch_ip_ncvrd_chrg_amt: same column, star-schema name
   bene_deductible_amt: deductible applied is an adjudication determination
   nch_bene_ip_ddctbl_amt: same column, star-schema name
+  # Measured 2026-07-27 before classifying, because a covered-day count that is
+  # only ever a fixed offset from the calendar stay would carry no information
+  # and the call would be moot. It is not a fixed offset. length_of_stay_days is
+  # (discharge - admission) + 1 on 100% of 20,867 claims — pure calendar
+  # arithmetic, knowable at submission. clm_utlztn_day_cnt equals
+  # (discharge - admission) on 92.5% and is one day SHORT of it on the other
+  # 7.53% (1,572 claims), and that deficit cohort carries 7.2x the mean
+  # non-covered charge ($2,784 vs $385) and a higher rate of any non-covered
+  # charge at all (47.2% vs 37.9%). The short day is therefore a benefit
+  # determination — a day the payer did not count as covered — which is the same
+  # adjudication event nch_ip_ncvrd_chrg_amt above records in dollars.
+  # length_of_stay_days stays PERMITTED; it is the calendar stay, not the
+  # covered stay.
+  clm_utlztn_day_cnt: covered/utilization days is a benefit determination
 
 # Names CLAUDE.md §4 or an older config called out that match no column in the
 # schema today. Kept so a future rename cannot reintroduce them silently.

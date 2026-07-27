@@ -64,8 +64,11 @@ _DIRECT_NUMERICS: tuple[tuple[str, tuple[str, ...], str], ...] = (
         "The payer's contractual filing limit.",
     ),
     ("billed_charge_amt", ("clm_tot_chrg_amt",), "Total charge billed on the CMS claim."),
+    # The CALENDAR stay: (discharge - admission) + 1 on every claim, so it is
+    # date arithmetic a biller can do at submission. Its sibling
+    # clm_utlztn_day_cnt — the COVERED-day count — is a benefit determination and
+    # is on forbidden_source_features; see the note there.
     ("length_of_stay_days", ("length_of_stay_days",), "Inpatient length of stay."),
-    ("clm_utlztn_day_cnt", ("clm_utlztn_day_cnt",), "Covered utilization days on the claim."),
     ("diagnosis_count", ("fact_claim_diagnosis",), "Diagnoses coded on the claim."),
 )
 

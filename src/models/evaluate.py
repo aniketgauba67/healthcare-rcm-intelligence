@@ -247,8 +247,11 @@ def slice_metrics(
     confident conclusion the data does not support.
     """
     work = pd.DataFrame(
-        {"slice": frame[by].astype("string"), "y": np.asarray(y_true).astype(int),
-         "p": np.asarray(y_score, dtype=float)}
+        {
+            "slice": frame[by].astype("string"),
+            "y": np.asarray(y_true).astype(int),
+            "p": np.asarray(y_score, dtype=float),
+        }
     )
     rows: list[dict[str, object]] = []
     for value, group in work.groupby("slice", observed=True):
@@ -321,7 +324,9 @@ def threshold_from_cost_matrix(
     )
 
     grid = np.unique(np.quantile(y_score, np.linspace(0.0, 1.0, candidates)))
-    best = max(grid, key=lambda t: float(value[y_score >= t].sum()) if (y_score >= t).any() else 0.0)
+    best = max(
+        grid, key=lambda t: float(value[y_score >= t].sum()) if (y_score >= t).any() else 0.0
+    )
 
     flagged = y_score >= best
     caught = int(y_true[flagged].sum())
