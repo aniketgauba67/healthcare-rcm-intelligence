@@ -46,7 +46,12 @@ def billed(claim_frame: pd.DataFrame) -> pd.Series:
 
 
 def test_clean_matrix_produces_no_findings(
-    clean_matrix, truth_frame, claim_frame, label, oracle_ceiling, forbidden_columns,
+    clean_matrix,
+    truth_frame,
+    claim_frame,
+    label,
+    oracle_ceiling,
+    forbidden_columns,
     permitted_columns,
 ):
     """Specificity. A matrix of permitted columns must pass every probe."""
@@ -78,9 +83,7 @@ def test_permitted_baseline_stays_below_the_thresholds(
 
     usable = [c for c in truth_frame.columns if not detectors._is_row_key(truth_frame[c])]
     worst = max(
-        (
-            detectors.uncertainty_coefficient(clean_matrix[c], truth_frame[f]), c, f
-        )
+        (detectors.uncertainty_coefficient(clean_matrix[c], truth_frame[f]), c, f)
         for c in clean_matrix.columns
         for f in usable
         if not (detectors._is_datelike(clean_matrix[c]) and detectors._is_datelike(truth_frame[f]))
@@ -149,7 +152,9 @@ def test_catches_a_ratio_against_a_permitted_column(
 def test_catches_a_rebinned_forbidden_column(claim_frame, truth_frame, label, oracle_ceiling):
     """Discretising a forbidden column destroys its name and its scale, not its content."""
     matrix = _poisoned(
-        claim_frame, "payment_speed_band", pd.cut(claim_frame["sim_days_to_payment"], 8, labels=False)
+        claim_frame,
+        "payment_speed_band",
+        pd.cut(claim_frame["sim_days_to_payment"], 8, labels=False),
     )
     findings = detectors.dependency_findings(matrix, truth_frame) + detectors.label_auc_findings(
         matrix, label, oracle_ceiling

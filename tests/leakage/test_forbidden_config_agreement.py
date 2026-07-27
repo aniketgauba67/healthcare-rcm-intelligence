@@ -80,7 +80,9 @@ def test_config_covers_every_forbidden_column(configured, generated_schema, forb
     )
 
 
-def test_config_blocks_nothing_the_document_permits(configured, generated_schema, forbidden_columns):
+def test_config_blocks_nothing_the_document_permits(
+    configured, generated_schema, forbidden_columns
+):
     """Over-coverage: a pattern blocking a column the document explicitly permits.
 
     Over-blocking is not a leak, but it is drift, and it is how a blacklist silently
@@ -125,8 +127,7 @@ def test_split_strategy_is_temporal(model_config):
     """CLAUDE.md §4.3: temporal splits, never random, wherever time features exist."""
     strategy = model_config.get("split", {}).get("strategy")
     assert strategy == "temporal", (
-        f"config/model.yaml split.strategy is {strategy!r}; CLAUDE.md §4.3 requires "
-        "'temporal'"
+        f"config/model.yaml split.strategy is {strategy!r}; CLAUDE.md §4.3 requires 'temporal'"
     )
 
 

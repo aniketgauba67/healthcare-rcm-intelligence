@@ -106,9 +106,7 @@ def name_findings(features: list[str], forbidden: frozenset[str]) -> list[Findin
     stems = {f: _normalise(f.removeprefix("sim_")) for f in forbidden}
     for feature in features:
         if feature in forbidden:
-            findings.append(
-                Finding(feature, "name", "forbidden column present verbatim", 1.0)
-            )
+            findings.append(Finding(feature, "name", "forbidden column present verbatim", 1.0))
             continue
         normalised = _normalise(feature)
         for forbidden_column, stem in stems.items():
@@ -350,9 +348,7 @@ def label_auc_findings(
     return findings
 
 
-def unrecognised_date_findings(
-    matrix: pd.DataFrame, permitted: frozenset[str]
-) -> list[Finding]:
+def unrecognised_date_findings(matrix: pd.DataFrame, permitted: frozenset[str]) -> list[Finding]:
     """Date-typed features the firewall document does not name as permitted.
 
     This is the counterpart to the date carve-out in `dependency_findings`, and it is
@@ -386,9 +382,7 @@ def auc_report(matrix: pd.DataFrame, y: np.ndarray, ceiling: float, top: int = 1
     an out-of-fold historical rate is legitimately strong — but it is where a subtle
     leak would sit, so it is printed for review rather than silently accepted.
     """
-    scored = sorted(
-        ((single_feature_auc(matrix[c], y), c) for c in matrix.columns), reverse=True
-    )
+    scored = sorted(((single_feature_auc(matrix[c], y), c) for c in matrix.columns), reverse=True)
     lines = [f"single-feature AUC (oracle ceiling {ceiling:.4f}), strongest first:"]
     for auc, column in scored[:top]:
         flag = "  <-- REVIEW" if auc >= 0.59 else ""

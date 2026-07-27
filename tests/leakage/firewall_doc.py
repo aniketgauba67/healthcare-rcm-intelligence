@@ -152,11 +152,7 @@ def parse(path: pathlib.Path) -> FirewallDoc:
 
     # §1 — latent generator internals. Markdown table; first cell is the column, the
     # second is the table it lives on, so only the first cell may be read as a column.
-    latent = {
-        ident
-        for row in _table_rows(sections["1"])
-        for ident in _identifiers(row[0])
-    }
+    latent = {ident for row in _table_rows(sections["1"]) for ident in _identifiers(row[0])}
     forbidden |= latent
 
     # §2 — post-submission columns, forbidden for Model A. The "### Whole tables"
