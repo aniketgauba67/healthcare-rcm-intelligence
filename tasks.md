@@ -950,9 +950,127 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   acceptance, not a nice-to-have. qa materialised the matrix by hand to run the
   probes (88 passed, 0 failed, store clean) — that is a reviewer's workaround, not
   a substitute for the wiring.
+  CLOSED cd3e30c (ml-engineer-3), VERIFIED by qa-reviewer-p10 rather than read:
+  test_training_matrix_guard.py is 5 passed, and the four §4.1 VALUE probes now
+  RUN instead of skipping. The committed 44-column parquet = the 39 declared
+  features + 4 passthrough (claim_sk, prvdr_num, sim_denial_flag, sim_submission_
+  date) + split; qa confirmed the 39 feature columns and their values are
+  IDENTICAL to a live `prepare_matrix` build off PG, same claim_sk row order, so
+  the guard checks the object the model actually saw. The label sitting in that
+  file is not a hole: p8's discovery contract names sim_denial_flag as the label
+  and split/claim_sk as key, documented before any of this was built, and the
+  value probes need y to compute anything at all.
+- [x] MODEL A REVIEWED — qa-reviewer-p10, PASS on the model, with two RULING
+  DEFECTS held open below. `make train` REPRODUCED end to end on the current
+  39-feature store: every figure in the 5097f08 report matches to the digit
+  (logistic ROC 0.6254 / PR 0.2210 / Brier 0.10280 champion; xgboost − logistic
+  +0.0003 [−0.0173, +0.0183]; folds 13,356 / 3,338 / 4,173; base rate 0.1205).
+  Calibration plot and payer / service_line / value_band / facility_provider
+  slices all written. metrics.json re-verified strict-JSON clean: 0 bare NaN
+  tokens, parses with parse_constant raising. The sklearn MRO fix is in place
+  (ClassifierMixin first on both baselines).
+> FIREWALL RE-MEASURED ON THE CURRENT 39-FEATURE STORE (qa-reviewer-p10), which
+> the model card was blocked on. Strongest single-feature AUC 0.5871 sim_payer_id,
+> then 0.5834 sim_payer_prior_denial_rate / 0.5530 sim_auth_required / 0.5453
+> sim_provider_prior_denial_rate. NOTHING at or above the 0.6778 oracle ceiling.
+> Confirms p9's finding on the current tree — no leak signature.
+>   PRECISION NOTE the model card must respect: the suite prints 0.5859 for
+>   sim_payer_id and qa measures 0.5871, and both are right. test_live_leakage
+>   scores on `shared`, the intersection of the matrix with the live truth frame;
+>   0.5871 is the full 20,867. Same feature, same labels, different population —
+>   qa proved the data identical (same values, same row order, same codes) before
+>   attributing the gap. Quote a number WITH its population, not as a constant.
+> RULING 1 — COST-MATRIX DECOMPOSITION: NOT SATISFIED, still deferred.
+> config/model.yaml:335 still reads `prevented_denial_value_multiplier: 1.0`. No
+> factors, no citations. The comment block describes the degeneracy honestly but
+> the ruling asked for the parameter to be REBUILT from named cited factors, and
+> the sensitivity sweep is not a substitute for it.
+>   AND A CONSTRAINT-1 CROSSING, verified on live PG rather than inferred: the
+>   appeal_economics comment anchors $45 against "the simulation's own realized
+>   denial rework + appeal cost is $29.88 per DENIED claim". qa measured it —
+>   avg(sim_denial_rework_cost + sim_appeal_cost) over the 2,663 denied claims is
+>   29.8818, exact. So a forbidden table (sim_operating_costs, blocked for BOTH
+>   models) was queried to validate a business parameter, which is precisely what
+>   constraint 1 forbids. No code reads it and no model is affected; the harm is
+>   that the operating point became a function of the layer the §4.5 firewall
+>   exists to hide, and the repo now records the crossing. Cite the benchmark and
+>   stop there.
+> RULING 2 — PAIRED CI ON THE DOLLARS-AT-RISK DIFFERENCE: NOT SATISFIED, and the
+> conclusion everyone has been carrying is WRONG. train.py:440 still reports three
+> SEPARATE unpaired intervals plus a note inviting the reader to compare their
+> widths — the invalid comparison the ruling was written to prevent.
+>   qa-reviewer-p10 MEASURED the paired difference the ruling asked for, on the
+>   current store, reusing the shipped pipeline:
+>     champion − base_rate    +0.1793   95% CI [+0.036, +0.532]   P(diff<=0) ~0.01
+>     champion − payer_rule   +0.2962   95% CI [+0.071, +0.534]
+>   STABLE across five bootstrap seeds (1337/7/42/20260727/99991); zero excluded
+>   every time. So the metric DOES support a business claim and the current
+>   framing UNDERSTATES the model. The team-lead ruling anticipated "if it spans
+>   zero, say so" — it does not span zero. What must NOT be said is "38.4% vs
+>   20.4%"; the honest claim is "captures ~18pp more denied dollars than arbitrary
+>   ranking, magnitude poorly determined", because the ten largest denied claims
+>   hold 50.9% of denied dollars and that is what makes the interval so wide.
+>   `paired_bootstrap_difference` already exists in evaluate.py and is used for
+>   ROC-AUC; it takes metric_fn(y, score), so dollar capture needs a closure
+>   binding the amounts and resampling them with the rows.
+> MODEL C — EARLY BOUNDARY PROBE (WIP 34a5b1c; NOT a review, Model C is unrun).
+> The §5 boundary is RIGHT where it matters most: sim_denial_driver_mechanism is
+> forbidden for BOTH models, appears nowhere in src/ except appeal.py's prose, and
+> is not in DENIAL_QUERY; the permitted remittance neighbours are permitted; the
+> guard is invoked in both appeal.py and model_c.py. Two findings:
+>   (a) APPEAL_TARGET_QUERY SELECTS sim_appeal_disputed_amount — forbidden for
+>       Model C — and appeal.py:265 drops it inline before the merge. Nothing in
+>       the code uses it. That is a read-then-drop of a forbidden column, the
+>       pattern the clm_utlztn_day_cnt ruling rejected ("never read rather than
+>       read and then dropped"). Stop selecting it.
+>   (b) the equality the ENR recoverable amount rests on — disputed == denied —
+>       was checked once by hand and by nothing else. qa VERIFIED it on live PG
+>       (967 level-1 appeals, 0 mismatched, so the substitution is SOUND) and
+>       pinned it in tests/leakage/test_model_c_boundary.py so a future load
+>       cannot silently invalidate it. Same defect class as covered days.
+>   OWNERSHIP NOTE, non-blocking: cd3e30c adds tests/leakage/test_persisted_matrix.py.
+>   §5 gives tests/ to qa. tests/models/ by ml is established precedent and fine;
+>   tests/leakage/ is the guard qa owns and is where a well-meant edit can widen a
+>   hole. Coordinate before the next one.
+> ANSWER TO p9'S TWO QUESTIONS (qa-reviewer-p10, asked by team-lead; both are
+> tests/ and therefore qa's call — implemented and PROVEN, not just decided):
+>   Q1 "should a failed restore be loud and distinguishable?" YES, and the real
+>   gap was sharper than stated. The snapshot fallback in test_warehouse_restore.py
+>   also silently covers a repository whose own `make views` is BROKEN: the runner
+>   raises, apply_views.py wraps all 9 views in ONE transaction so the rebuild
+>   rolls back to zero, the fallback restores the pre-run definitions, and the
+>   suite goes green. Warehouse fine, repository broken, nobody told. The shipped
+>   runner's exit code is now asserted separately, so "restore succeeded",
+>   "restore rescued a broken build" and "restore never ran" are three outcomes
+>   instead of one green tick. The fallback STAYS — it is what keeps the warehouse
+>   usable — it just can no longer report success on someone else's behalf.
+>   Q2 "should the merge-main precondition be enforced rather than remembered?"
+>   YES. tests/integration/conftest.py now has `branch_is_not_stale`, a session
+>   autouse fixture defined AHEAD of warehouse_baseline so it fires before the run
+>   writes anything. It fails the suite when `main` is not an ancestor of HEAD.
+>   PROVEN BOTH WAYS: replayed from a detached worktree at 47df189 (9 commits
+>   behind main) with the new conftest, it BLOCKS all 12 destructive integration
+>   tests before any of them reaches apply_ddl, naming the branch, the commit
+>   count and the fix; on this merged branch tests/integration/test_end_state.py
+>   runs 6 passed. Every unknown degrades to ALLOW — no git, no repo, detached
+>   HEAD, no local `main` — because a precondition that cannot form an opinion
+>   must not block the suite. It compares against LOCAL `main` and deliberately
+>   does not fetch: a suite that reaches the network to decide whether to run is a
+>   worse problem than the one it solves.
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
-- [ ] Slice metrics, bootstrap CIs, model card
-- [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
+- [ ] Slice metrics, bootstrap CIs, model card — model card is still a 1-line stub
+- [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported.
+  BLOCKED on the 5 intentional reds below, all of them rulings deferred rather
+  than satisfied. Current state on feat/phase4-qa: 312 passed / 1 skipped /
+  5 FAILED, ruff clean.
+    tests/models/test_cost_matrix_ruling.py       (2) — ruling 1 + constraint 1
+    tests/models/test_dollars_at_risk_ruling.py   (2) — ruling 2, static + artifact
+    tests/leakage/test_model_c_boundary.py        (1) — read-then-drop of
+                                                        sim_appeal_disputed_amount
+  Repro: `uv run pytest tests/models/test_cost_matrix_ruling.py
+  tests/models/test_dollars_at_risk_ruling.py tests/leakage/test_model_c_boundary.py -v`
+  Each failure message states the ruling and the fix. These stay red until the
+  rulings are met, on the same principle team-lead applied to the matrix guard.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata

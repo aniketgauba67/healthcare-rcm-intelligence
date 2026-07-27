@@ -110,6 +110,33 @@ def test_the_suite_rebuilds_the_views_it_cascade_dropped(pg_engine_session, ware
         f"apply_views.py exited {proc.returncode}: {proc.stderr.strip() or proc.stdout.strip()}"
     )
 
+    # Three states, and the snapshot fallback makes two of them look alike.
+    #
+    # The fallback exists for a view that is in the catalog with no file behind it.
+    # It also, silently, covers a repository whose own `make views` is BROKEN: the
+    # runner raises, apply_views.py wraps all 9 views in ONE transaction so the
+    # whole rebuild rolls back to zero, the snapshot then puts the pre-run
+    # definitions back, and the assertion above passes. The warehouse is fine and
+    # the repository is not, which is the worse of the two to leave unsaid.
+    #
+    # So the shipped runner's exit code is asserted on its own. This is the loud,
+    # DISTINGUISHABLE failure qa-reviewer-p9 asked for: "restore succeeded",
+    # "restore rescued a broken build" and "restore never ran" are now three
+    # different outcomes instead of one green tick. It is also the exact shape of
+    # the stale-branch hazard — pre-rename view SQL against a renamed crosswalk
+    # raises here — which `branch_is_not_stale` now blocks earlier.
+    assert proc.returncode == 0, (
+        "the views were restored from the pre-run snapshot, but the SHIPPED view "
+        f"runner FAILED (sql/views/apply_views.py exited {proc.returncode}). The live "
+        "warehouse is fine; `make views` in this repository is not, and without this "
+        "assertion the run would have reported green.\n"
+        f"  stderr: {proc.stderr.strip() or '(none)'}\n"
+        f"  stdout: {proc.stdout.strip()[-2000:] or '(none)'}\n"
+        "apply_views.py builds all views in one transaction, so a single bad view file "
+        "rolls the whole layer back to zero. Fix the view SQL; do not rely on the "
+        "snapshot fallback, which only ever holds what happened to be there before."
+    )
+
 
 def test_the_suite_restores_the_reference_enrichment_it_discarded(
     pg_engine_session, warehouse_baseline

@@ -109,6 +109,85 @@ def pg_engine_session():
 
 
 # ---------------------------------------------------------------------------
+# Precondition: the branch about to write to the shared database is not stale.
+# ---------------------------------------------------------------------------
+
+
+def _git(*args: str) -> tuple[int, str]:
+    """Run git in the repo root. Returns (returncode, stripped stdout)."""
+    import subprocess
+    from pathlib import Path
+
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 1, ""
+    return proc.returncode, proc.stdout.strip()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def branch_is_not_stale() -> None:
+    """Refuse to run the destructive suite from a branch that has not merged `main`.
+
+    TEAM RULE (tasks.md, 2026-07-27): `git merge main` BEFORE any write to the
+    shared Postgres — DDL, loader, `make views`, or an integration run. Not after.
+
+    This enforces the rule rather than trusting it to be remembered, because the
+    agent breaking it cannot notice: `apply_ddl` rewrites the warehouse from the
+    DDL of whichever branch the suite runs from, so a stale branch silently
+    reverts merged work while row counts, FKs, views and the reconciliation gate
+    all still look healthy afterwards. Healthy-looking is what makes it dangerous.
+    That is not hypothetical — it is how the live crosswalk lost all 8 of its
+    `sim_` column prefixes, and the run that did it reported green.
+
+    Defined ahead of `warehouse_baseline` so it fires first: the point is to stop
+    the run before it writes, not to diagnose it afterwards.
+
+    Every unknown degrades to "allow". No git, no repo, a detached HEAD, or no
+    local `main` ref means the check cannot form an opinion, and a precondition
+    that cannot form an opinion must not block the suite — the check exists to
+    catch a specific, reproducible mistake, not to police checkouts it cannot read.
+    Note it compares against the LOCAL `main`; it deliberately does not fetch,
+    because a test suite that reaches the network to decide whether to run is a
+    worse problem than the one it solves.
+    """
+    if _git("rev-parse", "--git-dir")[0] != 0:
+        return
+    code, head = _git("rev-parse", "HEAD")
+    if code != 0 or not head:
+        return
+    if _git("rev-parse", "--verify", "main")[0] != 0:
+        return
+
+    # `main` reachable from HEAD means everything merged into main is already here.
+    if _git("merge-base", "--is-ancestor", "main", "HEAD")[0] == 0:
+        return
+
+    branch = _git("rev-parse", "--abbrev-ref", "HEAD")[1] or head[:8]
+    _, behind = _git("rev-list", "--count", "HEAD..main")
+    pytest.fail(
+        f"STALE BRANCH — refusing to run the destructive integration suite.\n"
+        f"  branch: {branch}\n"
+        f"  {behind or 'some'} commit(s) on local `main` are not in this branch.\n"
+        "This suite calls apply_ddl, which rewrites the warehouse from THIS branch's DDL "
+        "and CASCADE-drops what it does not know about. Running it from a stale branch "
+        "silently reverts merged work on the shared database, and every health check — row "
+        "counts, FKs, views, reconciliation — still passes afterwards.\n"
+        "  fix: git merge main\n"
+        "If you are deliberately testing an older tree against a throwaway database, unset "
+        "POSTGRES_* or deselect tests/integration/.",
+        pytrace=False,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Pre-run snapshot of the materializations that `apply_ddl` destroys.
 # ---------------------------------------------------------------------------
 
