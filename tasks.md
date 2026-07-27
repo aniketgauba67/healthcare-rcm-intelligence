@@ -577,6 +577,59 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 - [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
   plus a training-matrix guard that fails on any forbidden or forbidden-derived
   column.
+> QA REVIEW — CROSSWALK sim_ PREFIX (qa-reviewer-p9, 2026-07-27, branch
+> feat/crosswalk-sim-prefix @ 554a35f): **PASS**, no blocking findings. Do not
+> self-merge; team-lead merges. Verified by commands I ran, not by reading:
+>   * unit suite on the branch 98 passed / 9 deselected; `ruff check` + `ruff
+>     format --check` clean (68 files).
+>   * `sql/quality/view_reconciliation.py` against live PG: **21/21 PASS**.
+>   * live integration `tests/integration/test_crosswalk_prefix_postgres.py`
+>     2 passed (NOT skipped — views present, so the live boundary check really ran).
+>   * REPRODUCIBILITY re-proven independently, not taken on report: rebuilt both
+>     crosswalks from crosswalk_seed=20260722 and compared frame-to-frame against
+>     the live tables — sim_facility_crosswalk 4,876 and sim_provider_crosswalk
+>     2,463 rows IDENTICAL on every column. §7 "same seed ⇒ identical output" holds
+>     through the rename.
+>   * (a) ZERO-CONSUMERS claim for display_facility_* CONFIRMED: `git grep
+>     display_facility_ main` returns only the defining view's own SQL (and
+>     tasks.md prose). The rename to sim_display_facility_* costs nothing today
+>     and I agree with the §4.2 reasoning for making it now.
+>   * (b) The drop-cascade in vw_claim_enriched.sql IS mechanical necessity, not
+>     cover: `create or replace view` cannot rename an output column, and
+>     apply_views.py (UNCHANGED by this branch) applies vw_claim_enriched first
+>     and every dependent view after inside one `engine.begin()` transaction, so
+>     all 9 rebuild atomically. Diff is rename-only — no change to any join,
+>     filter, grain, aggregate or metric definition in the three touched views.
+>   * (c) MANDATORY synthetic-id keying UNTOUCHED: `group by e.prvdr_num`
+>     unchanged; no `group by` on CCN/name anywhere in sql/views/; live
+>     vw_clean_claim_performance 4,877 rows == 4,877 distinct prvdr_num;
+>     vw_claim_enriched 20,867 rows == 20,867 distinct claim_sk. Multiplexing
+>     re-measured on live PG: 4,876 synthetic providers → 2,857 real CCNs, worst
+>     8:1 — unchanged, so the ruling's premise still holds.
+>   * Both renamed notebooks execute clean top-to-bottom against live PG
+>     (01 exit 0, 04 exit 0); nb01 prints 2,857 distinct display CCNs.
+>   * Live catalog: 0 unprefixed columns on either crosswalk table; 0 bare
+>     facility_*/display_facility_* columns on any rcm relation. Remaining bare
+>     names in src/ingestion/crosswalk.py are the REAL reference-file frames
+>     (load_facilities/load_providers) — REFERENCE, not crosswalk output; correct
+>     carve-out. §3.3 docs updated in the same commit, no stale bare names left.
+>   * SKIP-vs-FAIL ruling (tests/ is mine, so this is my call): the live
+>     view-boundary check may SKIP when the views are absent. Accepted, because
+>     the always-on enforcement moved to the DB-free
+>     tests/contracts/test_view_sim_prefix.py (11 static checks) and the skip's
+>     only precondition — a view layer missing after a suite run — is now itself a
+>     HARD FAILURE via the drift guard below. A skip is acceptable exactly when
+>     something else fails loudly on the same condition; it was not, and now it is.
+>   * NON-BLOCKING (qa follow-up, mine to fix after the merge): the skip is inside
+>     the per-view loop, so if 8 of 9 views existed and only vw_claim_enriched had
+>     been dropped, the whole test would skip instead of failing. Narrowing it to
+>     "skip only when the entire view layer is absent" is a tests/ change I will
+>     make on feat/phase4-qa once this merges, to avoid a conflict now.
+> DESTRUCTIVE-RUN ANNOUNCEMENT (qa-reviewer-p9, 2026-07-27): I am opening a
+> single-writer window to reproduce the integration-suite warehouse drift and
+> prove the new guard catches it. `uv run pytest -m integration` will run twice on
+> feat/phase4-qa. I restore with `make reference-codes && make views` and re-verify
+> 21/21 before closing the window. No `make warehouse-all`, no sim regeneration.
 - [x] Point-in-time feature store + forbidden-column leakage tests
   DONE 2026-07-27 on feat/phase4-ml. 40 declared features over 20,867 claims,
   built from the BASE TABLES with an explicit column allowlist rather than from
