@@ -47,7 +47,7 @@ actionable as (
         e.claim_sk,
         e.clm_id,
         e.prvdr_num,                                       -- SOURCE synthetic key
-        e.facility_name,                                   -- SIMULATED, display only
+        e.sim_facility_name,                               -- SIMULATED, display only
         e.sim_payer_id,                                    -- SIMULATED
         e.sim_denial_flag,
         e.sim_denial_category,                             -- SIMULATED
@@ -86,7 +86,7 @@ select
     claim_sk,
     clm_id,
     prvdr_num,
-    facility_name,                                         -- display only
+    sim_facility_name,                                     -- SIMULATED linkage, display only
     sim_payer_id,                                          -- SIMULATED
     action_type,
     sim_denial_flag,

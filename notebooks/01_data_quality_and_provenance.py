@@ -80,7 +80,7 @@ print(f"denied (SIMULATED)    : {denied:,}  ({denied / n:.4f})")
 print(f"open AR / unpaid (SIM): {unpaid:,}  ({unpaid / n:.4f})")
 print(f"distinct synthetic prvdr_num : {claims.prvdr_num.nunique():,}")
 print(
-    f"distinct real CCN (display)  : {claims.facility_ccn.nunique():,}  "
+    f"distinct real CCN (display)  : {claims.sim_facility_ccn.nunique():,}  "
     f"<- fewer than providers: the crosswalk multiplexes, so we NEVER group on CCN"
 )
 print(f"\nSOURCE billed charges total   : ${claims.billed_charge_amt.sum():,.0f}")

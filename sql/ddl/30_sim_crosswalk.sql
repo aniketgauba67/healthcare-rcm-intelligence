@@ -23,17 +23,17 @@ create table rcm.sim_facility_crosswalk (
         references rcm.dim_provider (prvdr_num),
     sim_provider_ssa_state    text,
     sim_provider_postal_state text,
-    facility_ccn              text not null,   -- REAL CMS CCN
-    facility_name             text,
-    facility_state            text,
-    facility_type             text,
-    match_rule                text not null,   -- state+acute | state_any_type | nationwide_fallback
-    same_state                boolean not null,
-    crosswalk_seed            integer not null,
-    provenance                text not null default 'SIMULATED'
+    sim_facility_ccn          text not null,   -- REAL CMS CCN (SIMULATED linkage)
+    sim_facility_name         text,
+    sim_facility_state        text,
+    sim_facility_type         text,
+    sim_match_rule            text not null,   -- state+acute | state_any_type | nationwide_fallback
+    sim_same_state            boolean not null,
+    sim_crosswalk_seed        integer not null,
+    sim_provenance            text not null default 'SIMULATED'
 );
-create index ix_sfx_ccn   on rcm.sim_facility_crosswalk (facility_ccn);
-create index ix_sfx_state on rcm.sim_facility_crosswalk (facility_state);
+create index ix_sfx_ccn   on rcm.sim_facility_crosswalk (sim_facility_ccn);
+create index ix_sfx_state on rcm.sim_facility_crosswalk (sim_facility_state);
 comment on table rcm.sim_facility_crosswalk is
   'SIMULATED: seeded assignment of synthetic billing providers to REAL facility '
   'CCNs (Hospital General Information). Not a real correspondence (CLAUDE.md §3.4).';
@@ -46,18 +46,18 @@ comment on table rcm.sim_facility_crosswalk is
 -- ---------------------------------------------------------------------------
 drop table if exists rcm.sim_provider_crosswalk cascade;
 create table rcm.sim_provider_crosswalk (
-    sim_at_physn_npi      text primary key,   -- synthetic attending physician id
-    assigned_postal_state text,
-    real_npi              text not null,       -- REAL Medicare NPI
-    real_provider_state   text,
-    real_specialty        text,
-    match_rule            text not null,       -- state+plausible_specialty | state_any_specialty | nationwide_fallback
-    same_state            boolean not null,
-    crosswalk_seed        integer not null,
-    provenance            text not null default 'SIMULATED'
+    sim_at_physn_npi          text primary key,   -- synthetic attending physician id
+    sim_assigned_postal_state text,
+    sim_real_npi              text not null,       -- REAL Medicare NPI (SIMULATED linkage)
+    sim_real_provider_state   text,
+    sim_real_specialty        text,
+    sim_match_rule            text not null,       -- state+plausible_specialty | state_any_specialty | nationwide_fallback
+    sim_same_state            boolean not null,
+    sim_crosswalk_seed        integer not null,
+    sim_provenance            text not null default 'SIMULATED'
 );
-create index ix_spx_npi     on rcm.sim_provider_crosswalk (real_npi);
-create index ix_spx_state   on rcm.sim_provider_crosswalk (real_provider_state);
+create index ix_spx_npi     on rcm.sim_provider_crosswalk (sim_real_npi);
+create index ix_spx_state   on rcm.sim_provider_crosswalk (sim_real_provider_state);
 comment on table rcm.sim_provider_crosswalk is
   'SIMULATED: seeded assignment of synthetic attending physicians to REAL '
   'Medicare NPIs. Not a real correspondence (CLAUDE.md §3.4).';

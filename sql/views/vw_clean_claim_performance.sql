@@ -5,16 +5,22 @@
 --               (includes the Unknown provider member for null-provider claims).
 --
 -- ***  MANDATORY KEYING (tasks.md crosswalk ruling)  ***
---      This view groups on the SYNTHETIC prvdr_num, NEVER on facility_ccn /
---      facility_name. The simulated crosswalk multiplexes 4,876 synthetic
+--      This view groups on the SYNTHETIC prvdr_num, NEVER on sim_facility_ccn /
+--      sim_facility_name. The simulated crosswalk multiplexes 4,876 synthetic
 --      providers onto only 2,857 real CCNs (worst 8:1), so grouping by CCN would
 --      silently merge up to 8 distinct synthetic hospitals and inflate volume.
---      facility_ccn / facility_name are carried DISPLAY-ONLY (max() of the 1:1
---      crosswalk value) and must not be used as a grouping key downstream.
+--      sim_facility_ccn / sim_facility_name are carried DISPLAY-ONLY (max() of
+--      the 1:1 crosswalk value) and must not be used as a grouping key
+--      downstream. They are re-exported as sim_display_facility_* — `sim_` first
+--      per §3.2 (these are SIMULATED-linkage values and §4.2 names the provider
+--      clean-claim rate as a Phase 4 feature, so the column-name provenance
+--      marker has to survive here too), `display_` retained to keep the
+--      display-only signal.
 --
 -- Sources:      rcm.vw_claim_enriched.
 -- Provenance:   provider identity (prvdr_num, provider_state_cd) = SOURCE;
---               facility_ccn/name/state = SIMULATED linkage, DISPLAY-ONLY;
+--               sim_display_facility_ccn/name/state = SIMULATED linkage,
+--               DISPLAY-ONLY;
 --               clean_claim_rate/first_pass_rate/denial_rate/rework_rate and all
 --               amounts = DERIVED from SIMULATED. "Clean claim" = adjudicated
 --               with no denial, no late filing, no eligibility failure, no
@@ -35,9 +41,9 @@ create or replace view rcm.vw_clean_claim_performance as
 select
     e.prvdr_num,                                        -- SOURCE synthetic key (grouping)
     max(e.provider_state_cd)             as provider_state_cd,   -- SOURCE
-    max(e.facility_ccn)                  as display_facility_ccn,    -- SIMULATED, display only
-    max(e.facility_name)                 as display_facility_name,   -- SIMULATED, display only
-    max(e.facility_state)                as display_facility_state,  -- SIMULATED, display only
+    max(e.sim_facility_ccn)          as sim_display_facility_ccn,    -- SIMULATED, display only
+    max(e.sim_facility_name)         as sim_display_facility_name,   -- SIMULATED, display only
+    max(e.sim_facility_state)        as sim_display_facility_state,  -- SIMULATED, display only
 
     count(*)                                            as provider_claims,
     count(*) filter (where e.clean_claim_flag)          as clean_claims,
@@ -64,6 +70,6 @@ group by e.prvdr_num;
 
 comment on view rcm.vw_clean_claim_performance is
   'Clean-claim / first-pass quality per SYNTHETIC provider (prvdr_num). Grouped '
-  'on the synthetic id per the crosswalk ruling; facility_ccn/name are '
-  'display-only. Rates are DERIVED from SIMULATED outcomes; low rates are review '
+  'on the synthetic id per the crosswalk ruling; sim_display_facility_ccn/name '
+  'are display-only. Rates are DERIVED from SIMULATED outcomes; low rates are review '
   'flags, not accusations. low_volume_flag marks thin denominators.';

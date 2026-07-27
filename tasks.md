@@ -247,44 +247,88 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   Test-ordering bug FIXED + guarded by me (69c2736, on main). PHASE 2 DONE.
 
 ## Carry-forward / tech debt (team-lead tracked, not phase-gated)
-- [ ] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE, verified by team-lead
-  2026-07-22 reading sql/ddl/30_sim_crosswalk.sql). §3.2 requires every simulated
-  table AND column name prefixed `sim_`. In sim_facility_crosswalk only 3 of 11
-  columns comply (facility_ccn/_name/_state/_type, match_rule, same_state,
-  crosswalk_seed, provenance do not); sim_provider_crosswalk likewise. Raised by
-  simulation-engineer at Phase 2 kickoff. Not merely cosmetic: the §4 leakage
-  blacklist is column-name based, so an unprefixed column escaping into a
-  flattened feature matrix loses its provenance marker. Owner: data-engineer
-  (re-spawn; owns src/ingestion/ + sql/ddl/). MUST land before Phase 4 opens
-  (leakage blacklist) and before the Phase 5 honesty pass. Deferred now only to
-  avoid shared-Postgres contention with Phase 2 acceptance runs.
+- [x] CROSSWALK STRICT COLUMN PREFIX (§3.2 NON-NEGOTIABLE) — DONE 2026-07-27 by
+  data-engineer-p4 on `feat/crosswalk-sim-prefix`. qa-reviewer-p9 PASS at 554a35f,
+  MERGED to main by team-lead (author offline on the usage cap; post-PASS merge
+  per the established pattern; not pushed to origin). qa verified independently
+  rather than from the author's report: 98 passed / 9 deselected, ruff clean,
+  reconciliation 21/21, the live view-boundary test EXECUTING (2 passed, not
+  skipped), both renamed notebooks exit 0, and both crosswalks rebuilt from
+  crosswalk_seed=20260722 frame-identical to live (4,876 / 2,463, every column)
+  so §7 "same seed ⇒ identical output" survives the rename. Zero-consumers claim
+  for the display_* rename confirmed by grep; drop-cascade confirmed mechanical
+  necessity (`create or replace view` cannot rename an output column) with
+  apply_views.py unchanged and all 9 views rebuilding atomically in one
+  transaction; synthetic-id keying ruling intact (4,877 rows == 4,877 distinct
+  prvdr_num; 20,867 == 20,867 distinct claim_sk; no group-by on facility_ccn/name
+  anywhere). qa accepted the skip-when-views-absent change CONDITIONALLY: it is
+  tolerable only because always-on enforcement genuinely moved to the DB-free
+  tests/contracts/test_view_sim_prefix.py, and because the drift guard below
+  turns the skip's precondition into a hard failure. qa owns a non-blocking
+  follow-up — the skip sits inside the per-view loop, so 8-of-9 views present
+  would skip rather than fail; they will narrow it to "entire view layer absent"
+  on feat/phase4-qa post-merge. Every column of BOTH crosswalk tables now
+  carries `sim_`, AND the prefix propagates through the view layer with no
+  alias-back, per the team-lead ruling below. Verified against LIVE PG, not source.
+  This closes the Phase 4 gate on the leakage blacklist.
+    - Renamed (sim_facility_crosswalk, 8): facility_ccn/_name/_state/_type,
+      match_rule, same_state, crosswalk_seed, provenance → sim_ prefixed.
+    - Renamed (sim_provider_crosswalk, 7): assigned_postal_state, real_npi,
+      real_provider_state, real_specialty, match_rule, same_state,
+      crosswalk_seed, provenance → sim_ prefixed.
+    - PREFIX PROPAGATED (supersedes the 2026-07-24 Option A alias-back):
+      `vw_claim_enriched` now emits sim_facility_ccn/_name/_state/_type under
+      their prefixed names; `vw_clean_claim_performance` re-exports them as
+      sim_display_facility_ccn/_name/_state; `vw_work_queue_priority` emits
+      sim_facility_name. `create or replace view` cannot rename an output column,
+      so vw_claim_enriched.sql now drop-cascades first — apply_views.py runs it
+      first and rebuilds every dependent view in the SAME transaction.
+    - Files: sql/ddl/30_sim_crosswalk.sql, src/ingestion/crosswalk.py,
+      src/ingestion/warehouse_sql_checks.py (provenance→sim_provenance),
+      sql/views/{vw_claim_enriched,vw_clean_claim_performance,vw_work_queue_priority}.sql,
+      notebooks/{01,04,README}, docs/{data_dictionary,provenance_register}.md.
+    - CARVE-OUTS KEPT (documented, not violations): `claim_sk`, `prvdr_num`,
+      `clm_id` and the other join keys mirror a SOURCE/DERIVED warehouse column
+      and stay unprefixed. Inside src/ingestion/crosswalk.py, load_facilities()/
+      load_providers() keep bare facility_ccn/real_npi/... — those are the REAL
+      reference-file frames (Hospital General Information / Medicare Physician),
+      classified REFERENCE, not crosswalk output columns.
+    - Regression guards ADDED: tests/contracts/test_crosswalk.py
+      (test_every_crosswalk_column_carries_sim_prefix, builder frames);
+      tests/contracts/test_view_sim_prefix.py (NEW — static, DB-free: no view SQL
+      may read or alias a bare simulated-linkage column, base view still emits all
+      four, drop-cascade present); tests/integration/test_crosswalk_prefix_postgres.py
+      (live catalog: both crosswalk tables AND the three views' output columns).
+    - LIVE VERIFICATION (data-engineer-p4, write window 2026-07-27): crosswalk
+      DDL re-applied + loader re-run (not ALTER RENAME) so the shipped code path is
+      what produced the live shape. Reproducibility RE-PROVEN before and after:
+      rebuilding from crosswalk_seed=20260722 reproduces the accepted Phase-1
+      assignment row-for-row (4,876 facility / 2,463 provider, all columns, both
+      tables). Counts unchanged. `make views` clean, reconciliation 21/21 PASS.
+    - Blast-radius note: team-lead's original `git grep -nE '\b...\b'` returns a
+      FALSE NEGATIVE here (\b under -E); use a plain grep.
+  Not merely cosmetic: the §4 leakage blacklist is column-name based, and
+  vw_claim_enriched is exactly the flattened matrix the Phase 4 feature store
+  consumes — an unprefixed simulated column arriving there loses its provenance
+  marker. That is why the alias-back was overruled.
   NOTE: simulation-engineer adopts STRICT prefixing for all new sim_ tables —
   team-lead RATIFIED; that is the standard going forward.
-  SCHEDULED 2026-07-27 as the Phase 4 gate task → data-engineer-p4,
-  branch feat/crosswalk-sim-prefix (branch exists, currently 0 commits ahead of
-  main — no prior work was done on it). Still open: verified today by reading
-  sql/ddl/30_sim_crosswalk.sql — sim_facility_crosswalk has 8 unprefixed columns
-  (facility_ccn/_name/_state/_type, match_rule, same_state, crosswalk_seed,
-  provenance) and sim_provider_crosswalk 7 (assigned_postal_state, real_npi,
-  real_provider_state, real_specialty, match_rule, same_state, crosswalk_seed,
-  provenance).
   DELEGATED AUTHORITY (team-lead ruling, §5 exception, one task only): the rename
-  has a downstream blast radius outside data-engineer's ownership — measured today
-  it is sql/views/vw_claim_enriched.sql, sql/views/vw_clean_claim_performance.sql,
-  notebooks/01_data_quality_and_provenance.py, notebooks/04_risk_adjusted_facility.py,
-  notebooks/README.md (analytics-engineer's files) plus docs/. analytics-engineer
-  is NOT being re-spawned for a mechanical rename, so data-engineer-p4 MAY edit
-  those downstream references, in the SAME commit, RENAME-ONLY — no logic, grain,
-  join, or metric change. qa-reviewer-p8 verifies by re-running the 21/21
-  reconciliation gate and executing the two touched notebooks.
+  has a downstream blast radius outside data-engineer's ownership — sql/views/ and
+  notebooks/ (analytics-engineer's files) plus docs/. analytics-engineer is NOT
+  being re-spawned for a mechanical rename, so data-engineer-p4 MAY edit those
+  downstream references, in the SAME commit, RENAME-ONLY — no logic, grain, join,
+  or metric change. qa-reviewer-p8 verifies by re-running the 21/21 reconciliation
+  gate and executing the two touched notebooks.
   CARRY-FORWARD ITEM 2 (samples-with-replacement) is NOT reopened by this: the
-  synthetic-id keying rule stands unchanged and the rename must not alter it.
+  synthetic-id keying rule stands unchanged and the rename did not alter it.
 - [ ] CROSSWALK SAMPLES WITH REPLACEMENT (analytic fidelity, not provenance).
   Distinct synthetic providers collide onto the same real CCN (within-state pools
   are small). Team-lead ruling: do NOT re-randomize the accepted Phase 1 crosswalk
   for this. Instead — the real facility/NPI is DISPLAY-ONLY enrichment; every
   facility- or provider-level analysis MUST key on the synthetic prvdr_num /
-  claim_sk, never on facility_ccn or facility_name, or it silently merges several
+  claim_sk, never on sim_facility_ccn or sim_facility_name (renamed 2026-07-27;
+  bare facility_* no longer exists anywhere), or it silently merges several
   distinct synthetic hospitals. Binding on analytics-engineer (Phase 3) and
   app-engineer (Phase 5). If a 1:1 mapping is ever wanted, fix = sample without
   replacement within stratum then fall back.
@@ -294,6 +338,27 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   worst carries 8. So a naive `group by facility_ccn` merges up to 8 distinct
   synthetic hospitals into one row and inflates its volume ~8x. The keying rule
   above is therefore MANDATORY for Phase 3/5, not advisory.
+- [x] VIEW OUTPUT COLUMNS — STRICT §3.2 TIGHTENING. CLOSED 2026-07-27 by
+  data-engineer-p4 in the same commit as the crosswalk prefix fix, NOT deferred to
+  Phase 5. Originally split off under the 2026-07-24 Option A ruling (view OUTPUT
+  names preserved, `fx.sim_facility_ccn as facility_ccn`); team-lead OVERRULED that
+  on 2026-07-27 because the alias-back defeats the purpose — vw_claim_enriched is
+  the flattened matrix the Phase 4 feature store consumes and the §4 blacklist is
+  column-name based, so it IS a leakage-blacklist concern, not display polish.
+  Resolution: `vw_claim_enriched` exposes sim_facility_ccn/_name/_state/_type;
+  `vw_work_queue_priority` exposes sim_facility_name; `vw_clean_claim_performance`
+  exposes sim_display_facility_ccn/_name/_state.
+  DECISION on the display_* aliases (data-engineer-p4, flagged for qa): RENAMED to
+  `sim_display_facility_*` rather than left alone. Reasons — (1) §3.2 is
+  column-name based and these hold SIMULATED-linkage values; (2) §4.2 names
+  "provider clean-claim rate" as a Phase 4 historical-rate feature, so this view is
+  a plausible feature source and the same argument that overruled the alias-back
+  applies one hop later; (3) they had ZERO consumers repo-wide at the time of the
+  rename (grep: only the view's own SQL and this file), so the cost was nil now and
+  only grows once Phase 4/5 read it; (4) leaving them would have made
+  display_facility_* the single remaining unprefixed simulated column name in the
+  whole view stack. `sim_` leads because §3.2 says "prefixed"; `display_` is kept
+  so the display-only signal survives.
 
 ## Phase 3 — Analytics + KPI Views (lead: analytics-engineer)
 > CARRY-FORWARD from Phase 1 (team-lead, 2026-07-22): Phase 1 task 1 was scoped
@@ -333,7 +398,9 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > TEAM RULE incl. the claim_sk warehouse-reload mechanism).
 > MANDATORY RULING (from Phase 2 crosswalk audit, team-lead): every facility- or
 > provider-level view MUST key on the SYNTHETIC ids (prvdr_num / claim_sk /
-> sim_at_physn_npi), NEVER on facility_ccn or facility_name. The crosswalk maps
+> sim_at_physn_npi), NEVER on sim_facility_ccn or sim_facility_name (those columns
+> were bare facility_ccn/facility_name until the §3.2 prefix fix on 2026-07-27; the
+> rule itself is unchanged). The crosswalk maps
 > 4,876 synthetic providers onto only 2,857 real CCNs (45.9% multiplexed, worst
 > 8-to-1), so grouping by facility_ccn silently merges up to 8 distinct synthetic
 > hospitals. Real CCN/name are DISPLAY-ONLY enrichment. qa-reviewer must reject
@@ -484,6 +551,42 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   `make warehouse-all && make reference-codes && make views`. Any agent that
 >   reloads the warehouse MUST run those last two afterwards and re-check 21/21,
 >   or the next agent inherits a silently degraded DB. Applies to Phase 4 and 5.
+> WAREHOUSE WRITE WINDOW (data-engineer-p4, 2026-07-27): OPENED then CLOSED for the
+> crosswalk-prefix rename. Scope was deliberately narrow — sql/ddl/30_sim_crosswalk.sql
+> re-applied (drop/create the two sim_*_crosswalk tables only) + crosswalk loader
+> re-run + `make views`. `make warehouse` / `make warehouse-all` were NOT run, so
+> fact_/dim_/sim_ adjudication and the reference code sets were never dropped and no
+> sim regeneration was triggered. Post-window state re-verified: fact_inpatient_claim
+> 20,867, sim_claim_adjudication 20,867, crosswalk 4,876 / 2,463, 9 vw_ views,
+> dim_drg.drg_desc 167 enriched, reconciliation 21/21 PASS. ml-engineer's read-only
+> access was unaffected except during the single view-rebuild transaction.
+>   ROOT CAUSE CORRECTED 2026-07-27 (data-engineer-p4 reproduced it twice; I
+>   confirmed the mechanism by reading the code and the live catalog). My original
+>   attribution above — "someone ran `make warehouse`" — was a plausible hypothesis
+>   and it was WRONG. The actual trigger is running the live-PG INTEGRATION SUITE:
+>   `make validate-warehouse` / `pytest -m integration`. tests/integration/
+>   test_warehouse_postgres.py calls `apply_ddl(engine)`, which drops and recreates
+>   every table (twice per run, for its idempotency assertion). That CASCADE-drops
+>   all 9 vw_ views and recreates dim_drg with a null drg_desc, and NOTHING in the
+>   suite restores either. tests/integration/conftest.py already documents this
+>   CASCADE hazard for the sim_ layer and test_end_state.py guards that layer —
+>   but no guard covers the views or the REFERENCE enrichment, so the suite reports
+>   fully GREEN over a warehouse it just degraded. That is why a degraded DB
+>   survived a phase acceptance unnoticed.
+>   The standing rule stands, with the trigger list widened: after `make
+>   validate-warehouse` OR any warehouse reload, re-run `make reference-codes &&
+>   make views` and re-verify 21/21.
+>   REPRODUCED twice by data-engineer-p4: after each full `uv run pytest -q`
+>   against live PG they had to re-run `make reference-codes && make views` to get
+>   back to 21/21. So the rule extends to `make test` as well, not just
+>   `make validate-warehouse`.
+>   OWNER OF THE FIX: qa-reviewer-p9 (inherited from p8, who died on the cap
+>   before starting it; tests/ is qa's file and data-engineer-p4 correctly
+>   declined to touch it as out of task scope). Two options they proposed, either
+>   acceptable: a view+reference restore step at rank 95 in tests/integration/
+>   conftest.py, or extend test_end_state.py to assert 9 views and drg_desc
+>   coverage. A green suite over a degraded warehouse is the defect, not the drop
+>   itself.
 > GATE — FIRST TASK OF PHASE 4, BEFORE ANY FEATURE CODE (team-lead, verified
 > 2026-07-22 by reading config/model.yaml against the real Phase 2 schema).
 > §4 is NON-NEGOTIABLE and the current `forbidden_features` list is a
@@ -537,85 +640,207 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
+> CRASH + RE-SPAWN 2026-07-27 13:51Z (team-lead): ml-engineer and qa-reviewer-p8
+> hit the ~5h account cap TOGETHER, mid-task, exactly as in Phase 3. Reset 1:50pm
+> America/New_York. Re-spawned as ml-engineer-2 and qa-reviewer-p9 — the cap is
+> per-SESSION, not account-wide, so a fresh session comes up immediately. That is
+> worth knowing for every future crash on this project: preserve, re-spawn, carry on.
+> PRESERVED by team-lead before re-spawning (both verbatim, unreviewed and unrun
+> by me): c82542f on feat/phase4-ml = Model A scaffolding (baselines/preprocess/
+> evaluate + a 16-line extract.py delta), no training run or metrics yet;
+> 9355e92 on feat/phase4-qa = qa's in-progress merge of ml's feature store for
+> review plus a 44-line WIP hardening of the agreement test.
+> DB verified coherent after both crashes: 20,867 claims, 9 views, drg_desc
+> 167/168, crosswalk 4,876, 0 orphans, reconciliation 21/21.
 - [x] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
-  docs/simulated_forbidden_columns.md. No feature code until green.
-  CLOSED 2026-07-27 on feat/phase4-ml. `forbidden_features` is now the exact set
-  of 27 columns the firewall document names as forbidden for Model A (§1 latent
-  internals, §2 outcome/money/dates, §4 workflow columns, §6 provenance stamps,
-  §7 warehouse keys). Correspondence is not hand-curated: src/features/leakage.py
-  PARSES the document section by section and asserts set equality both ways, so
-  omitting a documented column and inventing an undocumented one both fail the
-  build. All 5 stale patterns are gone and all 16 named-unprotected columns are
-  blocked (regression test names them individually).
-  Beyond the document, in separate keys so the doc-agreement surface stays exact:
-    - forbidden_tables + forbidden_table_columns: §2 whole-table forbids
-      (sim_appeals, sim_operating_costs) expanded to real column names, with an
-      integration test that re-checks the expansion against information_schema.
-    - forbidden_derived_features: 9 DERIVED columns of sql/views/ that are
-      functions of forbidden columns (clean_claim_flag, first_pass_paid_flag,
-      adjudicated, ar_open_flag, ar_balance_amt, and the vw_work_queue_priority
-      heuristic score/tier/dollars_at_stake/appeal_levels). Required by §4.1
-      ("or a column derived from one"); the document covers generated columns
-      only, so these were classified nowhere.
-    - forbidden_source_features: NEW CALL, flagged to team-lead. The CMS SOURCE
-      columns medicare_source_paid_amt / ncvrd_charge_amt / bene_deductible_amt
-      (clm_pmt_amt, nch_ip_ncvrd_chrg_amt, nch_bene_ip_ddctbl_amt) are real, not
-      simulated, so the firewall document does not cover them — but every one is
-      an adjudication OUTPUT that no biller knows before submission. Excluded
-      from Model A. billed_charge_amt (what is billed) stays permitted.
-    - forbidden_crosswalk_tables + display features: the crosswalk is display-
-      only linkage (§3.4), never a feature or grouping key. Both pre- and
-      post-rename spellings listed so data-engineer-p4's sim_ prefix change
-      cannot open a window. Synthetic prvdr_num deliberately NOT blocked.
-  Model C's separate boundary (§5) is configured under `model_c`, not merged
-  into the Model A list: denial outcome/money/adjudication dates become
-  available, while §1 latents, sim_denial_driver_mechanism, payment timing and
-  every sim_appeals column other than the two targets stay forbidden.
-  EVIDENCE: `make lint` clean; `make test` 120 passed / 16 skipped (main was
-  85/8, so +35 net new, 43 in tests/leakage/ of which 3 are live-Postgres
-  integration). Read-only on the database throughout.
-- [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
-  plus a training-matrix guard that fails on any forbidden or forbidden-derived
-  column.
-- [x] Point-in-time feature store + forbidden-column leakage tests
-  DONE 2026-07-27 on feat/phase4-ml. 40 declared features over 20,867 claims,
-  built from the BASE TABLES with an explicit column allowlist rather than from
-  vw_claim_enriched — that view carries the label, the money and the latent
-  probability, so `select *` would leave a drop-list as the only thing between
-  them and the model. A forbidden column is now never read in the first place.
-  (It also meant the build was unaffected by the window where the vw_ views were
-  dropped for the crosswalk rename.)
-  LINEAGE, NOT NAMES: every feature is declared in src/features/spec.py with its
-  source columns, and the build refuses a frame that does not match the
-  declaration. Name-based guards cannot tell payer_prior_denial_rate from
-  payer_denial_rate; declared sources can.
-  §4.2 HISTORICAL RATES: prior-period, with a 60-day EMBARGO. "Submitted before
-  t" is not "known before t" — a claim submitted last week has not come back
-  from the payer. The embargo is set from the payer adjudication/posting cycle
-  in config, deliberately NOT fitted to observed adjudication timing, which
-  would mean designing a feature from a forbidden column. Rates shrink (m=20)
-  toward the prior-period book rate, which itself moves. No history => null,
-  never a silent zero.
-  §4.3 SPLIT: quantile temporal, cut 2021-12-28, train 16,694 / test 4,173
-  (20.0%), test base rate 0.1205 vs train 0.1294 — matches doc §8 exactly.
-  Calibration fold carved temporally off the END of train (fit 13,356 /
-  calibrate 3,338, latest calibration 2021-12-28 < earliest test 2021-12-29),
-  so isotonic never sees either the fit rows or the test fold.
-  POINT-IN-TIME PROVEN BEHAVIOURALLY, not structurally. Three invariants, on
-  synthetic data as unit tests and on the real warehouse as integration tests:
-  truncate the dataset at t and past features are bit-identical; scramble every
-  label after t and past features do not move; flip a claim's own outcome and
-  its own features do not move. Plus a control asserting a naive whole-dataset
-  provider rate DOES break them, so the tests are not vacuous.
-  LEAK CANARIES: no single numeric feature exceeds ROC-AUC 0.75 alone, and no
-  categorical level with >=100 claims determines the label.
-  CORRECTION worth recording: I first assumed provider history would be sparse
-  ("median provider has 2 claims"). Wrong at the claim level — volume is
-  concentrated (top 10% of providers hold 53% of claims), so 72% of all claims
-  and 83% of post-2019 claims DO have provider history. Provider-weighted and
-  claim-weighted are different questions; the model card will say the latter.
-  EVIDENCE: `make lint` clean, `make test` 177 passed / 16 skipped.
-- [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
+  docs/simulated_forbidden_columns.md. CLOSED 6eeae82 — the exact 27 columns the
+  doc names for Model A, parsed STRUCTURALLY from the document (section →
+  subsection → table cell) with set equality asserted in BOTH directions, so a
+  doc column the config omits and a config column the doc never named both fail
+  the build. A deliberate-drift test proves the check can fire. All 5 stale
+  patterns gone; all 16 previously-unprotected columns blocked, each named in a
+  regression test. Reported: lint clean, 120 passed / 16 skipped.
+  THREE ADDITIONAL KEYS, all team-lead APPROVED 2026-07-27, kept SEPARATE from
+  `forbidden_features` so the doc-agreement surface stays exactly equal:
+  (a) forbidden_derived_features — 9 label-derived columns from sql/views/
+      (clean_claim_flag, first_pass_paid_flag, adjudicated, ar_open_flag,
+      ar_balance_amt + work_queue's 4). These fell in the gap between two owners:
+      the firewall doc covers generated columns, sql/views/ is analytics'. §4.1
+      requires blocking derived columns, so they belong in the guard.
+  (b) forbidden_source_features — medicare_source_paid_amt / ncvrd_charge_amt /
+      bene_deductible_amt. REAL CMS SOURCE columns, so the firewall doc is silent
+      on them by construction. RULING: §4's list is introduced "at minimum", so
+      the operative test is point-in-time knowability, not provenance class — and
+      all three are the payer's adjudication determinations. billed_charge_amt
+      stays permitted (it is what the provider bills).
+      MEASURED cost of the exclusion (team-lead, n=20,867): corr with the label
+      0.0477 / 0.0117 / 0.0008, and clm_pmt_amt's 0.0477 is IDENTICAL to
+      billed_charge_amt's — both just track claim size. So the exclusion is NOT
+      empirically load-bearing here: these are real Medicare outputs and the label
+      is simulated and independent of them. It is load-bearing on the pipeline
+      being correct AS IF the data were real, which is the §1 credibility
+      property. Model card must say that and must NOT imply a live leak was caught.
+  (c) forbidden_crosswalk_tables — both pre- and post-rename spellings, so
+      data-engineer-p4's change could not open a window in either direction.
+      Synthetic prvdr_num deliberately NOT blocked: it is the mandatory grouping key.
+  MODEL C boundary configured under its own `model_c` key (post-denial facts
+  legitimately available, §5 of the doc). Two calls team-lead UPHELD:
+  sim_denial_driver_mechanism stays forbidden even for Model C (it is the
+  generator's statement of WHY, not something on a remittance advice — admitting
+  it would invert the §4.5 firewall through a column name), and
+  sim_appeal_disputed_amount stays out with sim_denied_amount as the legitimate
+  substitute for the same economic quantity.
+  OPEN, carried to ml-engineer-2: classify clm_utlztn_day_cnt. It differs from
+  length_of_stay_days on 100% of claims so it is not a duplicate, and the RIF
+  covered-day count is a benefit determination. Constant offset ⇒ harmless;
+  varies ⇒ forbidden_source_features. Must not stay silently permitted.
+- [x] GATE 2 (qa-reviewer-p8): tests/leakage/ built — 63062dd + 4ca8e35.
+  firewall_doc.py parses the doc section-aware; detectors.py is four probes
+  CALIBRATED on the live 20,867-claim layer rather than by eye (name matching,
+  uncertainty coefficient U(x|f) for renames/logs/rescalings/re-binnings, a
+  single-feature AUC ceiling derived from the oracle for ratios and aggregates,
+  and an identifier probe for claim_sk under a new name). test_detectors.py
+  proves BOTH directions every run: silent on a permitted-only matrix, rejects
+  eleven separate disguises of a forbidden column — "a guard never shown to catch
+  anything is worse than no guard".
+  Two calibration findings fixed rather than tuned around: clm_id is row-unique
+  so U=1.0 against everything (keys excluded from the truth side), and every
+  post-submission date is submission + lag so the permitted anchor is legitimately
+  0.856-determined by sim_ack_date — loosening past that would also pass renamed
+  forbidden columns at 0.965, so date-vs-date pairs are carved out to a probe that
+  rejects any date-typed feature the doc does not name.
+  The agreement test was RED on the placeholder config, independently reproducing
+  5 dead patterns and 26 unblocked forbidden columns — which is the point.
+  qa-reviewer-p9 inherits an unrun 44-line WIP hardening of it (9355e92).
+- [x] Point-in-time feature store — ml-engineer, e6a1b44, PENDING qa-reviewer-p9.
+  40 features over 20,867 claims, built from BASE TABLES with an explicit column
+  allowlist rather than from vw_claim_enriched — that view carries the label, the
+  money and the latent probability, so selecting it wholesale would leave a
+  drop-list as the only thing between them and the model. Every feature declares
+  its source columns (src/features/spec.py) and the build refuses a frame that
+  does not match the declaration: a name-based guard cannot tell
+  payer_prior_denial_rate from payer_denial_rate, and only one is a feature.
+  §4.2 historical rates are prior-period with a 60-DAY EMBARGO — "submitted
+  before t" is not "known before t", since a claim submitted last week has not
+  come back from the payer yet. Embargo comes from the config's posting cycle and
+  is deliberately NOT fitted to observed adjudication timing (that would design a
+  feature out of a forbidden column). Rates shrink toward the prior-period book
+  rate; no history yields NULL, never a silent zero, because zero would tell the
+  model the first claims in the warehouse came from flawless providers.
+  §4.3 split is the prescribed 2021-12-28 quantile cut: 16,694 train / 4,173 test,
+  with the calibration fold carved temporally off the END of the training window
+  so isotonic sees neither the estimator's fit rows nor anything from the test
+  period. Point-in-time safety is tested BEHAVIOURALLY, not structurally:
+  truncate at t and past features must be bit-identical, scramble every post-t
+  label and the past must not move, flip one claim's own outcome and its own
+  features must not move — with a CONTROL test asserting a naive whole-dataset
+  provider rate DOES break all three, so the checks are known to be sensitive.
+  Feature names keep the sim_ prefix through engineering (§3.2) so provenance
+  survives into the matrix, the SHAP plots and the dashboard.
+  DETAIL preserved from ml-engineer's own board entry when team-lead reconciled
+  the merge conflict (main's block is authoritative; these facts existed only on
+  the branch):
+    - A fifth config key beyond the three team-lead ruled on: `forbidden_tables`
+      + `forbidden_table_columns` expand §2's WHOLE-TABLE forbids (sim_appeals,
+      sim_operating_costs) into real column names, with an integration test
+      re-checking the expansion against information_schema. NOTE: this is the key
+      qa-reviewer-p9's fixture later misread as an annotated dict and took the
+      KEYS of, folding two table names into the blacklist and dropping fourteen
+      real column names — the protection held; the test reading it did not.
+    - Split numbers: cut 2021-12-28, train 16,694 / test 4,173 (20.0%), test base
+      rate 0.1205 vs train 0.1294 — matches firewall doc §8 exactly. Calibration
+      fold carved off the END of train (fit 13,356 / calibrate 3,338; latest
+      calibration row 2021-12-28 < earliest test row 2021-12-29), so isotonic sees
+      neither the fit rows nor the test fold.
+    - Historical-rate shrinkage m=20 toward the prior-period book rate, which
+      itself moves. No history ⇒ null, never a silent zero.
+    - Leak canaries: no single numeric feature exceeds ROC-AUC 0.75 alone, and no
+      categorical level with ≥100 claims determines the label.
+    - CORRECTION ml-engineer recorded against itself: it first assumed provider
+      history would be sparse ("median provider has 2 claims"). Wrong at the CLAIM
+      level — volume is concentrated (top 10% of providers hold 53% of claims), so
+      72% of all claims and 83% of post-2019 claims DO have provider history.
+      Provider-weighted and claim-weighted are different questions; the model card
+      must say the latter.
+- [x] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
+  — ml-engineer-2, 5097f08, `make train` runs it end to end. PENDING qa-reviewer-p9.
+  Forward test fold 4,173 claims / 503 denials / base rate 0.1205:
+    base_rate           ROC 0.5000  PR 0.1205  Brier 0.10608
+    payer_rule          ROC 0.5921  PR 0.1514  Brier 0.10489
+    logistic            ROC 0.6254  PR 0.2210  Brier 0.10280   <- CHAMPION
+    xgboost             ROC 0.6257  PR 0.2078  Brier 0.10418
+    logistic + isotonic ROC 0.6185  PR 0.1972  Brier 0.10368
+    xgboost  + isotonic ROC 0.6256  PR 0.1982  Brier 0.10593
+  XGBoost − logistic ROC-AUC = +0.0003 [−0.0173, +0.0183] — interval spans zero by
+  an order of magnitude, REPORTED AS NO DIFFERENCE per the standing §7 ruling, with
+  the domain explanation. Nothing tuned; no hyperparameter search exists in the
+  repo and config records why. 0.625 sits below the 0.68 oracle and lands where the
+  Phase 2 self-audit predicted — corroboration, not coincidence. Logistic wins
+  PR-AUC outright. Champion selected on the calibration fold, never on test.
+  Everything the model card quotes is written by the run into models_artifacts/
+  model_a/, nothing typed by hand. 223 passed / 12 skipped (was 178/12), lint clean.
+- [x] clm_utlztn_day_cnt CLASSIFIED — FORBIDDEN (ml-engineer-2, cdc93e3). Closes
+  the item team-lead opened at GATE 1. Team-lead REPRODUCED every figure
+  independently on live PG before upholding it: clm_utlztn_day_cnt − (discharge −
+  admission) is BIMODAL, not a constant offset — 0 on 19,295 claims (92.47%) and
+  −1 on 1,572 (7.53%) — while length_of_stay_days == span+1 on 20,867 of 20,867.
+  The one-day-short cohort carries 7.2x the mean non-covered charge ($2,783.69 vs
+  $385.43) and a higher rate of any non-covered charge (47.2% vs 37.9%), so the
+  missing day is the payer declining to count a day as covered — the same
+  adjudication event nch_ip_ncvrd_chrg_amt already records in dollars. Discharge
+  status cannot explain it (single value across the warehouse). Removed from the
+  EXTRACT QUERY as well as the spec, so it is never read rather than read-then-
+  dropped. Feature store 40 → 39. length_of_stay_days stays permitted.
+  tests/leakage/test_covered_days_boundary.py re-measures both facts on live PG so
+  a future load cannot silently invalidate the call.
+> COST-MATRIX RULING (team-lead, 2026-07-27, raised by ml-engineer-2). The
+> configured matrix is DEGENERATE: $25 review against a mean $3,800 at stake at a
+> 12% denial rate makes reviewing an average claim worth ~$456, so the cost-optimal
+> threshold flags 99% of the queue. The fault is CONCEPTUAL, not a bad constant —
+> `prevented_denial_value_multiplier: 1.0` asserts both that a review prevents the
+> denial with certainty AND that a denial costs the FULL claim value. The second is
+> the worse error: denials are appealed and substantially overturned, so the real
+> loss is rework cost + unrecovered fraction + carrying cost of delay, not the claim.
+> RULING: decompose the multiplier into named factors — P(review prevents | flagged
+> and worked) × (share of claim value permanently lost when a denial occurs) — each
+> set from PUBLISHED benchmarks with citations, labelled DESIGN CHOICE, mirroring
+> docs/assumptions.md. config/model.yaml is ml-engineer's under §5.
+> TWO HARD CONSTRAINTS: (1) do NOT derive the factors from the generator's realized
+> overturn/rework rates — that reaches through the §4.5 firewall to set a business
+> parameter and makes the operating point a function of what the firewall exists to
+> hide; published benchmarks only. (2) Do NOT choose factors to produce a pleasing
+> flagged share. Pick each on its own merits and report whatever threshold falls
+> out, even if still degenerate — a cost matrix reverse-engineered from a desirable
+> operating point is the same failure as tuning a model to beat a baseline, and §1
+> forbids it in the same terms. If honest parameters still flag 99%, that is a
+> finding about this problem's economics and must be said plainly.
+> The CAPACITY-CONSTRAINED point is now the PRIMARY reported operating point (a work
+> queue is ranked against finite analyst hours, not thresholded): top 10% of queue
+> catches 20.9% of denials at 26.3% precision, 2.2x base rate. The sensitivity sweep
+> (flagged share 0.6% → 98% as the multiplier moves 0.005 → 1.0) stays a first-class
+> artifact regardless — a business parameter nobody measured is a guess, and the
+> sweep is the honest representation of a guess.
+> DOLLARS-AT-RISK RULING: as measured, champion captures 38.4% of denied dollars in
+> the top decile with CI [16.0%, 59.3%] against a constant scorer at 20.4% — and
+> 20.4% lies INSIDE that interval, so the champion is NOT distinguishable from
+> arbitrary ranking on this metric. Reporting "38.4% vs 20.4%" would imply a
+> superiority the numbers do not support. Required fix is to the INSTRUMENT: a
+> PAIRED bootstrap CI on the DIFFERENCE over the same resamples (the discipline
+> already applied to XGBoost − logistic). Report whatever it says; if it spans zero,
+> state that the metric cannot support a business claim at this fold size, and that
+> the ten largest denied claims holding 50.9% of denied dollars is why.
+> ml-engineer-2 also fixed the metric's tie-break: it broke ties by row order on a
+> date-sorted frame, so a "constant" scorer silently meant oldest-claims-first.
+> INHERITED BUG FOUND + FIXED (ml-engineer-2): the preserved WIP baselines declared
+> (BaseEstimator, ClassifierMixin) in that order; sklearn 1.9 resolves estimator
+> type along the MRO, so is_classifier() returned False and sklearn silently handed
+> the full two-column predict_proba to anything asking for a score — reproduced as a
+> calibrator fitted against the wrong class, output negatively correlated with its
+> own input. Nothing raises. Phase 4 numbers unaffected (train.py indexes [:,1]);
+> Phase 5 would have hit it.
+> FOR PHASE 5 / app-engineer: metrics.json was emitting bare NaN tokens — valid
+> Python, INVALID JSON — and app-engineer parses that file. Fixed with allow_nan=
+> False and sanitised to null. Do not reintroduce it with a convenience dump.
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
 - [ ] Slice metrics, bootstrap CIs, model card
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
