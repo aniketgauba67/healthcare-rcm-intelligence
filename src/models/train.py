@@ -43,6 +43,7 @@ from src.features.build import LABEL, MODEL_A_FEATURES, build_model_a_frame, lab
 from src.features.extract import fetch_outcome_economics
 from src.features.leakage import assert_no_forbidden_columns, load_model_config
 from src.features.splits import TemporalSplit, calibration_split, split_from_config
+from src.features.store import persist_training_matrix
 from src.models.advanced import gradient_boosted_model
 from src.models.baselines import BaseRateBaseline, GroupRateBaseline, logistic_baseline
 from src.models.calibrate import calibrate, method_from_config
@@ -248,6 +249,13 @@ def run_model_a(
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     frame = build_model_a_frame(engine, cfg)
+    if write:
+        # Persist the matrix the run is about to fit on, so the CLAUDE.md §4.1
+        # value probes have something to check. They discover it under
+        # artifacts/features/; before this existed they skipped, and a skipped
+        # leakage probe reads like a passing one. src/features/store.py explains
+        # why the file is committed rather than regenerated.
+        persist_training_matrix(frame, cfg)
     # `prepare_matrix` selects the declared features and nothing else, and coerces
     # them to modelling dtypes. Passthrough columns — claim_sk, the date, the
     # provider key, the label — stay on `frame` and never reach an estimator.
