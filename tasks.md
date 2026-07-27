@@ -827,6 +827,46 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > (flagged share 0.6% → 98% as the multiplier moves 0.005 → 1.0) stays a first-class
 > artifact regardless — a business parameter nobody measured is a guess, and the
 > sweep is the honest representation of a guess.
+> DOLLARS-AT-RISK — TEAM-LEAD RULING BELOW WAS WRONG, CORRECTED 2026-07-27 by
+> qa-reviewer-p10's measurement. I compared a POINT (constant scorer 20.4%) against
+> a MARGINAL interval ([16.0, 59.3]) and concluded the metric supported no claim —
+> which is the very error I was in the same breath telling ml-engineer to fix. The
+> question needs a PAIRED interval on the DIFFERENCE. qa measured it with the
+> shipped pipeline: champion − base_rate +0.1793 [+0.036, +0.532] (P(diff<=0) ~0.01)
+> and champion − payer_rule +0.2962 [+0.071, +0.534], stable across five seeds
+> (1337/7/42/20260727/99991) with zero exclusions. It does NOT span zero. The
+> unpaired comparison erred in the CONSERVATIVE direction: the metric DOES support
+> a claim and my framing understated the model.
+> ADOPTED MODEL-CARD LINE: "~18pp more denied dollars than arbitrary ranking,
+> magnitude poorly determined." The ban on "38.4% vs 20.4%" STANDS for the original
+> reason — ten claims hold 50.9% of denied dollars, so the direction is defensible
+> and the point estimate is not. The paired instrument is still required in
+> train.py:440, which still reports three unpaired intervals.
+> FIREWALL NEAR-MISS, recorded rather than scrubbed (qa-reviewer-p10, 2026-07-27;
+> team-lead verified the arithmetic). config/model.yaml:452 anchored
+> appeal_processing_cost_usd partly against "the simulation's own realized $29.88
+> per DENIED claim". That is exactly avg(sim_denial_rework_cost + sim_appeal_cost)
+> over the 2,663 denied claims = 29.8818, and sim_operating_costs is a FORBIDDEN
+> table for both models. RULING: the reference comes OUT of config/model.yaml —
+> anchoring to a generator-realized value, even as a consistency remark, makes the
+> operating point a function of the layer the §4.5 firewall exists to hide.
+> ATTRIBUTION CORRECTED by team-lead: qa first recorded this as "a forbidden table
+> was queried". Not established, and the likelier route is innocent — the figure is
+> PUBLISHED in tasks.md line 164 and docs/assumptions.md line 379, both of which
+> ml-engineer is expected to read; §4.5 forbids src/simulation/ and
+> config/simulation.yaml, not those docs. A recorded §4.5 breach is the most serious
+> accusation available on this project and must not rest on inference when a
+> published source explains it — the same failure mode as p9's fixture that reported
+> blocked columns as unblocked.
+> HOLE THIS EXPOSES (nobody's fault, for Phase 5): docs/assumptions.md and tasks.md
+> REPUBLISH generator-realized values to an agent firewalled from the generator. The
+> firewall is enforced on source files and leaks through documentation.
+> OWNERSHIP RULING (team-lead, following the Phase 1 precedent): tests/leakage/ is
+> qa-reviewer's — a guard authored by the party it constrains is not a guard.
+> tests/models/ and tests/features/ are ml-engineer's for its own modules, with qa
+> owning tests/ overall and free to amend. cd3e30c's tests/leakage/
+> test_persisted_matrix.py moves or is adopted by qa, qa's call.
+> SUPERSEDED RULING FOLLOWS — kept for the record:
 > DOLLARS-AT-RISK RULING: as measured, champion captures 38.4% of denied dollars in
 > the top decile with CI [16.0%, 59.3%] against a constant scorer at 20.4% — and
 > 20.4% lies INSIDE that interval, so the champion is NOT distinguishable from
