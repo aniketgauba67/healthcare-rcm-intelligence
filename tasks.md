@@ -537,8 +537,43 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
-- [ ] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
+- [x] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
   docs/simulated_forbidden_columns.md. No feature code until green.
+  CLOSED 2026-07-27 on feat/phase4-ml. `forbidden_features` is now the exact set
+  of 27 columns the firewall document names as forbidden for Model A (§1 latent
+  internals, §2 outcome/money/dates, §4 workflow columns, §6 provenance stamps,
+  §7 warehouse keys). Correspondence is not hand-curated: src/features/leakage.py
+  PARSES the document section by section and asserts set equality both ways, so
+  omitting a documented column and inventing an undocumented one both fail the
+  build. All 5 stale patterns are gone and all 16 named-unprotected columns are
+  blocked (regression test names them individually).
+  Beyond the document, in separate keys so the doc-agreement surface stays exact:
+    - forbidden_tables + forbidden_table_columns: §2 whole-table forbids
+      (sim_appeals, sim_operating_costs) expanded to real column names, with an
+      integration test that re-checks the expansion against information_schema.
+    - forbidden_derived_features: 9 DERIVED columns of sql/views/ that are
+      functions of forbidden columns (clean_claim_flag, first_pass_paid_flag,
+      adjudicated, ar_open_flag, ar_balance_amt, and the vw_work_queue_priority
+      heuristic score/tier/dollars_at_stake/appeal_levels). Required by §4.1
+      ("or a column derived from one"); the document covers generated columns
+      only, so these were classified nowhere.
+    - forbidden_source_features: NEW CALL, flagged to team-lead. The CMS SOURCE
+      columns medicare_source_paid_amt / ncvrd_charge_amt / bene_deductible_amt
+      (clm_pmt_amt, nch_ip_ncvrd_chrg_amt, nch_bene_ip_ddctbl_amt) are real, not
+      simulated, so the firewall document does not cover them — but every one is
+      an adjudication OUTPUT that no biller knows before submission. Excluded
+      from Model A. billed_charge_amt (what is billed) stays permitted.
+    - forbidden_crosswalk_tables + display features: the crosswalk is display-
+      only linkage (§3.4), never a feature or grouping key. Both pre- and
+      post-rename spellings listed so data-engineer-p4's sim_ prefix change
+      cannot open a window. Synthetic prvdr_num deliberately NOT blocked.
+  Model C's separate boundary (§5) is configured under `model_c`, not merged
+  into the Model A list: denial outcome/money/adjudication dates become
+  available, while §1 latents, sim_denial_driver_mechanism, payment timing and
+  every sim_appeals column other than the two targets stay forbidden.
+  EVIDENCE: `make lint` clean; `make test` 120 passed / 16 skipped (main was
+  85/8, so +35 net new, 43 in tests/leakage/ of which 3 are live-Postgres
+  integration). Read-only on the database throughout.
 - [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
   plus a training-matrix guard that fails on any forbidden or forbidden-derived
   column.
