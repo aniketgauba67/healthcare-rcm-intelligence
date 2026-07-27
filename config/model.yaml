@@ -32,6 +32,26 @@
 
 seed: 1337
 
+feature_store:
+  prior_period:
+    # Historical rates look at claims submitted strictly before the row's
+    # cutoff. The cutoff is the submission date minus an embargo, because
+    # "submitted before t" is not "known before t" — a claim submitted last week
+    # has not come back from the payer yet. 60 days is a payer adjudication and
+    # posting cycle; it is set from that business rule and deliberately NOT
+    # fitted to observed adjudication timing, which would mean designing a
+    # feature from a forbidden column.
+    embargo_days: 60
+    # m-estimate weight. An entity with this many prior claims is weighted half
+    # its own rate, half the book rate. The median provider here has two claims,
+    # so most provider rates are almost entirely shrunk — which is the honest
+    # treatment of two observations.
+    smoothing: 20.0
+    entities:
+      sim_payer: sim_payer_id
+      sim_provider: prvdr_num
+      sim_service_line: sim_service_line_id
+
 split:
   strategy: temporal
   # docs/simulated_forbidden_columns.md §8: submission dates span 2015-2024 but

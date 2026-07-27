@@ -577,7 +577,44 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 - [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
   plus a training-matrix guard that fails on any forbidden or forbidden-derived
   column.
-- [ ] Point-in-time feature store + forbidden-column leakage tests
+- [x] Point-in-time feature store + forbidden-column leakage tests
+  DONE 2026-07-27 on feat/phase4-ml. 40 declared features over 20,867 claims,
+  built from the BASE TABLES with an explicit column allowlist rather than from
+  vw_claim_enriched — that view carries the label, the money and the latent
+  probability, so `select *` would leave a drop-list as the only thing between
+  them and the model. A forbidden column is now never read in the first place.
+  (It also meant the build was unaffected by the window where the vw_ views were
+  dropped for the crosswalk rename.)
+  LINEAGE, NOT NAMES: every feature is declared in src/features/spec.py with its
+  source columns, and the build refuses a frame that does not match the
+  declaration. Name-based guards cannot tell payer_prior_denial_rate from
+  payer_denial_rate; declared sources can.
+  §4.2 HISTORICAL RATES: prior-period, with a 60-day EMBARGO. "Submitted before
+  t" is not "known before t" — a claim submitted last week has not come back
+  from the payer. The embargo is set from the payer adjudication/posting cycle
+  in config, deliberately NOT fitted to observed adjudication timing, which
+  would mean designing a feature from a forbidden column. Rates shrink (m=20)
+  toward the prior-period book rate, which itself moves. No history => null,
+  never a silent zero.
+  §4.3 SPLIT: quantile temporal, cut 2021-12-28, train 16,694 / test 4,173
+  (20.0%), test base rate 0.1205 vs train 0.1294 — matches doc §8 exactly.
+  Calibration fold carved temporally off the END of train (fit 13,356 /
+  calibrate 3,338, latest calibration 2021-12-28 < earliest test 2021-12-29),
+  so isotonic never sees either the fit rows or the test fold.
+  POINT-IN-TIME PROVEN BEHAVIOURALLY, not structurally. Three invariants, on
+  synthetic data as unit tests and on the real warehouse as integration tests:
+  truncate the dataset at t and past features are bit-identical; scramble every
+  label after t and past features do not move; flip a claim's own outcome and
+  its own features do not move. Plus a control asserting a naive whole-dataset
+  provider rate DOES break them, so the tests are not vacuous.
+  LEAK CANARIES: no single numeric feature exceeds ROC-AUC 0.75 alone, and no
+  categorical level with >=100 claims determines the label.
+  CORRECTION worth recording: I first assumed provider history would be sparse
+  ("median provider has 2 claims"). Wrong at the claim level — volume is
+  concentrated (top 10% of providers hold 53% of claims), so 72% of all claims
+  and 83% of post-2019 claims DO have provider history. Provider-weighted and
+  claim-weighted are different questions; the model card will say the latter.
+  EVIDENCE: `make lint` clean, `make test` 177 passed / 16 skipped.
 - [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
 - [ ] Slice metrics, bootstrap CIs, model card
