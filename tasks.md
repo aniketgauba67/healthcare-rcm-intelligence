@@ -866,6 +866,42 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > tests/models/ and tests/features/ are ml-engineer's for its own modules, with qa
 > owning tests/ overall and free to amend. cd3e30c's tests/leakage/
 > test_persisted_matrix.py moves or is adopted by qa, qa's call.
+>   RESOLVED: qa ADOPTED it rather than moving it, with a better reason than my
+>   ruling gave — its subject is the discovery contract tests/leakage/ PUBLISHES,
+>   not src/features/ behaviour, so moving it would put a guard on qa's own
+>   contract inside the constrained party's directory: the same inversion the
+>   ruling rejects. qa's gate tests in tests/models/ now carry a header stating
+>   they are qa-authored, expected red, and not to be edited green.
+>   ADOPTING IT FOUND A DEFECT, and it is the restore failure mode in miniature:
+>   the staleness check called build_training_matrix(refresh=True), which
+>   PERSISTS — so the guard rewrote the committed artifact as a side effect of
+>   checking it, and thereby repaired the very condition it existed to detect. A
+>   stale file would fail once and pass forever after. "Was never stale" and "was
+>   stale and quietly rewritten" were indistinguishable. Fixed: builds through the
+>   same path without persisting and asserts sha256 unchanged across itself
+>   (digest 479ea5b57d605acc before and after, 11 passed).
+> SECOND WRITER — ml's, NON-BLOCKING (flagged by qa, team-lead ruling): src/models/
+> train.py:258 persists the matrix on every training run, and test_train_postgres
+> trains against live PG, so a full suite run dirties the COMMITTED manifest.
+> Reproduced at will; qa hit and reverted it twice, catching the second only by
+> inspecting a `git add -A`. Content is byte-stable — same parquet sha256, 20,867
+> rows, every rebuild today, which is an independent re-proof that the feature
+> store is reproducible — and the only moving field is the embedded wall clock.
+> RULING: drop `written_at_utc` from the COMMITTED manifest (or write it only
+> under `make features`). A committed artifact that changes on every test run
+> trains reviewers to ignore its diff, which is precisely how a real content
+> change would slip through unnoticed. Reproducibility wart, not a leak — fix it,
+> do not gate on it.
+> TEAM-LEAD PROCESS CHANGE (2026-07-27, prompted by qa's staleness guard firing on
+> MY commit): I have been committing board updates to main frequently through the
+> day, and every such commit makes both agent branches stale, which now correctly
+> BLOCKS their destructive integration tests. The guard is right; my cadence was
+> wrong. From here I BATCH board commits to main and announce them to both agents
+> in one message so they merge once, rather than discovering staleness mid-run.
+> NOTE FOR THE RECORD: that guard, written this afternoon, caught a genuine
+> staleness event in production conditions hours later — d5927c2 landing on main
+> mid-session — and blocked all 14 destructive tests before any reached apply_ddl.
+> Third incident today it would have prevented.
 > SUPERSEDED RULING FOLLOWS — kept for the record:
 > DOLLARS-AT-RISK RULING: as measured, champion captures 38.4% of denied dollars in
 > the top decile with CI [16.0%, 59.3%] against a constant scorer at 20.4% — and
