@@ -39,7 +39,7 @@ Prereqs: the docker Postgres warehouse is up and loaded (`make warehouse-all`),
 - The **payer dimension is 100 percent simulated** (§3.5); every payer-grouped
   finding says so.
 - Provider/facility aggregates key on the **synthetic `prvdr_num`**, never on
-  `facility_ccn`/`facility_name` (crosswalk multiplexes up to 8:1). Real facility
+  `sim_facility_ccn`/`sim_facility_name` (crosswalk multiplexes up to 8:1). Real facility
   names are display-only and are **withheld from flagged-outlier tables** so no
   simulated outlier is ever attached to a real hospital's name.
 - Outliers and anomalies are **review flags**, never "fraud".

@@ -185,14 +185,19 @@ routed to the Unknown member (reported as data-quality metrics, not errors).
 SIMULATED crosswalk tables (CLAUDE.md §3.4 — seeded random assignment, NOT a
 real linkage; seed in `config/simulation.yaml:linkage.crosswalk_seed`):
 
+Per CLAUDE.md §3.2, both tables are SIMULATED so **every** column carries the
+`sim_` prefix (enforced by `tests/contracts/test_crosswalk.py` and
+`tests/integration/test_crosswalk_prefix_postgres.py`).
+
 | Table | Grain | Maps | Stratified by |
 |---|---|---|---|
-| `sim_facility_crosswalk` | one synthetic billing provider (`sim_prvdr_num`, FK to `dim_provider`) | → real facility CCN (Hospital General Information) | state (SSA→postal) + acute-care type |
-| `sim_provider_crosswalk` | one synthetic attending physician (`sim_at_physn_npi`) | → real Medicare NPI (Medicare Physician by Provider) | coherent state + inpatient-plausible specialty |
+| `sim_facility_crosswalk` | one synthetic billing provider (`sim_prvdr_num`, FK to `dim_provider`) | → real facility CCN (`sim_facility_ccn`, Hospital General Information; plus `sim_facility_name`/`sim_facility_state`/`sim_facility_type`) | state (SSA→postal, `sim_provider_ssa_state`/`sim_provider_postal_state`) + acute-care type |
+| `sim_provider_crosswalk` | one synthetic attending physician (`sim_at_physn_npi`) | → real Medicare NPI (`sim_real_npi`, Medicare Physician by Provider; plus `sim_real_provider_state`/`sim_real_specialty`) | coherent state (`sim_assigned_postal_state`) + inpatient-plausible specialty |
 
-Each row carries `match_rule`, `same_state`, `crosswalk_seed`, and
-`provenance='SIMULATED'`. On this subset: 4,876 facility rows and 2,463 provider
-rows, 100% same-state matches. Same seed reproduces an identical crosswalk.
+Each row carries `sim_match_rule`, `sim_same_state`, `sim_crosswalk_seed`, and
+`sim_provenance='SIMULATED'`. On this subset: 4,876 facility rows and 2,463
+provider rows, 100% same-state matches. Same seed reproduces an identical
+crosswalk.
 
 REFERENCE code-set tables (`sql/ddl/60_reference_codes.sql`, loaded by
 `src/ingestion/reference_codes.py`). Vintage matches the 2023-04 claims period
@@ -287,22 +292,32 @@ tables and the SIMULATED `sim_*` layer, so a view's honesty is inherited from
 its inputs — anything sourced from `sim_*` stays SIMULATED downstream, and the
 payer dimension stays 100% simulated (§3.5). **Per-column provenance is stated
 authoritatively in each view's SQL header block; that header is the source of
-truth this table summarizes.** No view keys on `facility_ccn`/`facility_name`
+truth this table summarizes.** No view keys on `sim_facility_ccn`/`sim_facility_name`
 (display-only, §3.2 crosswalk ruling); facility/provider grain keys on the
 synthetic `prvdr_num`.
+
+**View OUTPUT columns keep the `sim_` prefix (§3.2, team-lead ruling 2026-07-27).**
+The simulated-linkage facility columns are exposed by `vw_claim_enriched` as
+`sim_facility_ccn` / `sim_facility_name` / `sim_facility_state` /
+`sim_facility_type` — no alias back to a bare name — and re-exported by
+`vw_clean_claim_performance` as `sim_display_facility_ccn` / `_name` / `_state`
+and by `vw_work_queue_priority` as `sim_facility_name`. `vw_claim_enriched` is
+the flattened matrix the Phase 4 feature store reads and the §4 leakage blacklist
+is column-name based, so an unprefixed simulated column arriving there would lose
+its provenance marker at exactly the point that marker is load-bearing.
 
 `vw_claim_enriched` is the shared base (all others read from it), so the join
 logic and provenance live in one place.
 
 | View | Grain | Provenance summary |
 |---|---|---|
-| `vw_claim_enriched` | one inpatient claim (`claim_sk`), 20,867 rows | MIXED, labeled per column in-header: SOURCE (CMS RIF fields, incl. real billed charge + the one real Medicare paid amount), DERIVED (length-of-stay, flags), REFERENCE (`drg_desc` and code descriptions, display-only), SIMULATED (all `sim_*` adjudication/timeline/money). |
+| `vw_claim_enriched` | one inpatient claim (`claim_sk`), 20,867 rows | MIXED, labeled per column in-header: SOURCE (CMS RIF fields, incl. real billed charge + the one real Medicare paid amount), DERIVED (length-of-stay, flags), REFERENCE (`drg_desc` and code descriptions, display-only), SIMULATED (all `sim_*` adjudication/timeline/money **and the `sim_facility_*` linkage columns, display-only, prefix preserved on output**). |
 | `vw_executive_rcm_summary` | one submission month (`YYYY-MM`) | MIXED: billed + Medicare-paid = SOURCE; allowed/paid/denied amounts + denial/clean/first-pass rates = DERIVED from SIMULATED. |
 | `vw_denial_root_cause` | (denial_category, CARC group, driver_mechanism), denied only | SIMULATED throughout. CARC group used as a LABEL only (§3.7), not from any AMA/CMS description file. |
 | `vw_ar_aging` | one AR aging bucket (0-30…120+) | DERIVED from SIMULATED timeline + money; "open" = no simulated payment posted. |
 | `vw_payer_performance` | one simulated payer (`sim_payer_id`), 5 rows | **100% SIMULATED (§3.5)** — payer dimension is invented; every dashboard/export on this view MUST carry the simulated-data banner. |
-| `vw_clean_claim_performance` | one SYNTHETIC billing provider (`prvdr_num`), ~4,877 rows | DERIVED from SIMULATED; keyed on synthetic `prvdr_num` (mandatory), `facility_ccn`/`facility_name` display-only. |
-| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `heuristic_*` score, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. |
+| `vw_clean_claim_performance` | one SYNTHETIC billing provider (`prvdr_num`), ~4,877 rows | DERIVED from SIMULATED; keyed on synthetic `prvdr_num` (mandatory), `sim_display_facility_ccn`/`_name`/`_state` display-only. |
+| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `heuristic_*` score, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only. |
 | `vw_data_quality_scorecard` | one named DQ check (`check_id`) | DERIVED data-quality metadata; each row also carries the provenance class of the data under test. |
 | `vw_model_monitoring` | (submission_month, feature_name) | DRIFT SCAFFOLD, no model exists — `is_drift_scaffold` always true; observed input distributions only, no score/prediction/probability. |
 

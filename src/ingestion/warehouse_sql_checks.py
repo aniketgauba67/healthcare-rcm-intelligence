@@ -151,11 +151,11 @@ CROSSWALK_VIOLATION_CHECKS: list[tuple[str, str]] = [
     ),
     (
         "xwalk_provenance:sim_facility_crosswalk",
-        "select count(*) from {s}sim_facility_crosswalk where provenance <> 'SIMULATED'",
+        "select count(*) from {s}sim_facility_crosswalk where sim_provenance <> 'SIMULATED'",
     ),
     (
         "xwalk_provenance:sim_provider_crosswalk",
-        "select count(*) from {s}sim_provider_crosswalk where provenance <> 'SIMULATED'",
+        "select count(*) from {s}sim_provider_crosswalk where sim_provenance <> 'SIMULATED'",
     ),
 ]
 
