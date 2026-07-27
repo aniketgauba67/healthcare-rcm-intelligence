@@ -558,13 +558,106 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
-- [ ] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
-  docs/simulated_forbidden_columns.md. No feature code until green.
-- [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
-  plus a training-matrix guard that fails on any forbidden or forbidden-derived
-  column.
-- [ ] Point-in-time feature store + forbidden-column leakage tests
+> CRASH + RE-SPAWN 2026-07-27 13:51Z (team-lead): ml-engineer and qa-reviewer-p8
+> hit the ~5h account cap TOGETHER, mid-task, exactly as in Phase 3. Reset 1:50pm
+> America/New_York. Re-spawned as ml-engineer-2 and qa-reviewer-p9 — the cap is
+> per-SESSION, not account-wide, so a fresh session comes up immediately. That is
+> worth knowing for every future crash on this project: preserve, re-spawn, carry on.
+> PRESERVED by team-lead before re-spawning (both verbatim, unreviewed and unrun
+> by me): c82542f on feat/phase4-ml = Model A scaffolding (baselines/preprocess/
+> evaluate + a 16-line extract.py delta), no training run or metrics yet;
+> 9355e92 on feat/phase4-qa = qa's in-progress merge of ml's feature store for
+> review plus a 44-line WIP hardening of the agreement test.
+> DB verified coherent after both crashes: 20,867 claims, 9 views, drg_desc
+> 167/168, crosswalk 4,876, 0 orphans, reconciliation 21/21.
+- [x] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
+  docs/simulated_forbidden_columns.md. CLOSED 6eeae82 — the exact 27 columns the
+  doc names for Model A, parsed STRUCTURALLY from the document (section →
+  subsection → table cell) with set equality asserted in BOTH directions, so a
+  doc column the config omits and a config column the doc never named both fail
+  the build. A deliberate-drift test proves the check can fire. All 5 stale
+  patterns gone; all 16 previously-unprotected columns blocked, each named in a
+  regression test. Reported: lint clean, 120 passed / 16 skipped.
+  THREE ADDITIONAL KEYS, all team-lead APPROVED 2026-07-27, kept SEPARATE from
+  `forbidden_features` so the doc-agreement surface stays exactly equal:
+  (a) forbidden_derived_features — 9 label-derived columns from sql/views/
+      (clean_claim_flag, first_pass_paid_flag, adjudicated, ar_open_flag,
+      ar_balance_amt + work_queue's 4). These fell in the gap between two owners:
+      the firewall doc covers generated columns, sql/views/ is analytics'. §4.1
+      requires blocking derived columns, so they belong in the guard.
+  (b) forbidden_source_features — medicare_source_paid_amt / ncvrd_charge_amt /
+      bene_deductible_amt. REAL CMS SOURCE columns, so the firewall doc is silent
+      on them by construction. RULING: §4's list is introduced "at minimum", so
+      the operative test is point-in-time knowability, not provenance class — and
+      all three are the payer's adjudication determinations. billed_charge_amt
+      stays permitted (it is what the provider bills).
+      MEASURED cost of the exclusion (team-lead, n=20,867): corr with the label
+      0.0477 / 0.0117 / 0.0008, and clm_pmt_amt's 0.0477 is IDENTICAL to
+      billed_charge_amt's — both just track claim size. So the exclusion is NOT
+      empirically load-bearing here: these are real Medicare outputs and the label
+      is simulated and independent of them. It is load-bearing on the pipeline
+      being correct AS IF the data were real, which is the §1 credibility
+      property. Model card must say that and must NOT imply a live leak was caught.
+  (c) forbidden_crosswalk_tables — both pre- and post-rename spellings, so
+      data-engineer-p4's change could not open a window in either direction.
+      Synthetic prvdr_num deliberately NOT blocked: it is the mandatory grouping key.
+  MODEL C boundary configured under its own `model_c` key (post-denial facts
+  legitimately available, §5 of the doc). Two calls team-lead UPHELD:
+  sim_denial_driver_mechanism stays forbidden even for Model C (it is the
+  generator's statement of WHY, not something on a remittance advice — admitting
+  it would invert the §4.5 firewall through a column name), and
+  sim_appeal_disputed_amount stays out with sim_denied_amount as the legitimate
+  substitute for the same economic quantity.
+  OPEN, carried to ml-engineer-2: classify clm_utlztn_day_cnt. It differs from
+  length_of_stay_days on 100% of claims so it is not a duplicate, and the RIF
+  covered-day count is a benefit determination. Constant offset ⇒ harmless;
+  varies ⇒ forbidden_source_features. Must not stay silently permitted.
+- [x] GATE 2 (qa-reviewer-p8): tests/leakage/ built — 63062dd + 4ca8e35.
+  firewall_doc.py parses the doc section-aware; detectors.py is four probes
+  CALIBRATED on the live 20,867-claim layer rather than by eye (name matching,
+  uncertainty coefficient U(x|f) for renames/logs/rescalings/re-binnings, a
+  single-feature AUC ceiling derived from the oracle for ratios and aggregates,
+  and an identifier probe for claim_sk under a new name). test_detectors.py
+  proves BOTH directions every run: silent on a permitted-only matrix, rejects
+  eleven separate disguises of a forbidden column — "a guard never shown to catch
+  anything is worse than no guard".
+  Two calibration findings fixed rather than tuned around: clm_id is row-unique
+  so U=1.0 against everything (keys excluded from the truth side), and every
+  post-submission date is submission + lag so the permitted anchor is legitimately
+  0.856-determined by sim_ack_date — loosening past that would also pass renamed
+  forbidden columns at 0.965, so date-vs-date pairs are carved out to a probe that
+  rejects any date-typed feature the doc does not name.
+  The agreement test was RED on the placeholder config, independently reproducing
+  5 dead patterns and 26 unblocked forbidden columns — which is the point.
+  qa-reviewer-p9 inherits an unrun 44-line WIP hardening of it (9355e92).
+- [x] Point-in-time feature store — ml-engineer, e6a1b44, PENDING qa-reviewer-p9.
+  40 features over 20,867 claims, built from BASE TABLES with an explicit column
+  allowlist rather than from vw_claim_enriched — that view carries the label, the
+  money and the latent probability, so selecting it wholesale would leave a
+  drop-list as the only thing between them and the model. Every feature declares
+  its source columns (src/features/spec.py) and the build refuses a frame that
+  does not match the declaration: a name-based guard cannot tell
+  payer_prior_denial_rate from payer_denial_rate, and only one is a feature.
+  §4.2 historical rates are prior-period with a 60-DAY EMBARGO — "submitted
+  before t" is not "known before t", since a claim submitted last week has not
+  come back from the payer yet. Embargo comes from the config's posting cycle and
+  is deliberately NOT fitted to observed adjudication timing (that would design a
+  feature out of a forbidden column). Rates shrink toward the prior-period book
+  rate; no history yields NULL, never a silent zero, because zero would tell the
+  model the first claims in the warehouse came from flawless providers.
+  §4.3 split is the prescribed 2021-12-28 quantile cut: 16,694 train / 4,173 test,
+  with the calibration fold carved temporally off the END of the training window
+  so isotonic sees neither the estimator's fit rows nor anything from the test
+  period. Point-in-time safety is tested BEHAVIOURALLY, not structurally:
+  truncate at t and past features must be bit-identical, scramble every post-t
+  label and the past must not move, flip one claim's own outcome and its own
+  features must not move — with a CONTROL test asserting a naive whole-dataset
+  provider rate DOES break all three, so the checks are known to be sensitive.
+  Feature names keep the sim_ prefix through engineering (§3.2) so provenance
+  survives into the matrix, the SHAP plots and the dashboard.
 - [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
+  — scaffolding preserved at c82542f (baselines/preprocess/evaluate), NO training
+  run and NO metrics yet. ml-engineer-2 owns finishing it.
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
 - [ ] Slice metrics, bootstrap CIs, model card
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
