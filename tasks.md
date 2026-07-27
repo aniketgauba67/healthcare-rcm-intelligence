@@ -737,9 +737,85 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   provider rate DOES break all three, so the checks are known to be sensitive.
   Feature names keep the sim_ prefix through engineering (§3.2) so provenance
   survives into the matrix, the SHAP plots and the dashboard.
-- [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
-  — scaffolding preserved at c82542f (baselines/preprocess/evaluate), NO training
-  run and NO metrics yet. ml-engineer-2 owns finishing it.
+- [x] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
+  — ml-engineer-2, 5097f08, `make train` runs it end to end. PENDING qa-reviewer-p9.
+  Forward test fold 4,173 claims / 503 denials / base rate 0.1205:
+    base_rate           ROC 0.5000  PR 0.1205  Brier 0.10608
+    payer_rule          ROC 0.5921  PR 0.1514  Brier 0.10489
+    logistic            ROC 0.6254  PR 0.2210  Brier 0.10280   <- CHAMPION
+    xgboost             ROC 0.6257  PR 0.2078  Brier 0.10418
+    logistic + isotonic ROC 0.6185  PR 0.1972  Brier 0.10368
+    xgboost  + isotonic ROC 0.6256  PR 0.1982  Brier 0.10593
+  XGBoost − logistic ROC-AUC = +0.0003 [−0.0173, +0.0183] — interval spans zero by
+  an order of magnitude, REPORTED AS NO DIFFERENCE per the standing §7 ruling, with
+  the domain explanation. Nothing tuned; no hyperparameter search exists in the
+  repo and config records why. 0.625 sits below the 0.68 oracle and lands where the
+  Phase 2 self-audit predicted — corroboration, not coincidence. Logistic wins
+  PR-AUC outright. Champion selected on the calibration fold, never on test.
+  Everything the model card quotes is written by the run into models_artifacts/
+  model_a/, nothing typed by hand. 223 passed / 12 skipped (was 178/12), lint clean.
+- [x] clm_utlztn_day_cnt CLASSIFIED — FORBIDDEN (ml-engineer-2, cdc93e3). Closes
+  the item team-lead opened at GATE 1. Team-lead REPRODUCED every figure
+  independently on live PG before upholding it: clm_utlztn_day_cnt − (discharge −
+  admission) is BIMODAL, not a constant offset — 0 on 19,295 claims (92.47%) and
+  −1 on 1,572 (7.53%) — while length_of_stay_days == span+1 on 20,867 of 20,867.
+  The one-day-short cohort carries 7.2x the mean non-covered charge ($2,783.69 vs
+  $385.43) and a higher rate of any non-covered charge (47.2% vs 37.9%), so the
+  missing day is the payer declining to count a day as covered — the same
+  adjudication event nch_ip_ncvrd_chrg_amt already records in dollars. Discharge
+  status cannot explain it (single value across the warehouse). Removed from the
+  EXTRACT QUERY as well as the spec, so it is never read rather than read-then-
+  dropped. Feature store 40 → 39. length_of_stay_days stays permitted.
+  tests/leakage/test_covered_days_boundary.py re-measures both facts on live PG so
+  a future load cannot silently invalidate the call.
+> COST-MATRIX RULING (team-lead, 2026-07-27, raised by ml-engineer-2). The
+> configured matrix is DEGENERATE: $25 review against a mean $3,800 at stake at a
+> 12% denial rate makes reviewing an average claim worth ~$456, so the cost-optimal
+> threshold flags 99% of the queue. The fault is CONCEPTUAL, not a bad constant —
+> `prevented_denial_value_multiplier: 1.0` asserts both that a review prevents the
+> denial with certainty AND that a denial costs the FULL claim value. The second is
+> the worse error: denials are appealed and substantially overturned, so the real
+> loss is rework cost + unrecovered fraction + carrying cost of delay, not the claim.
+> RULING: decompose the multiplier into named factors — P(review prevents | flagged
+> and worked) × (share of claim value permanently lost when a denial occurs) — each
+> set from PUBLISHED benchmarks with citations, labelled DESIGN CHOICE, mirroring
+> docs/assumptions.md. config/model.yaml is ml-engineer's under §5.
+> TWO HARD CONSTRAINTS: (1) do NOT derive the factors from the generator's realized
+> overturn/rework rates — that reaches through the §4.5 firewall to set a business
+> parameter and makes the operating point a function of what the firewall exists to
+> hide; published benchmarks only. (2) Do NOT choose factors to produce a pleasing
+> flagged share. Pick each on its own merits and report whatever threshold falls
+> out, even if still degenerate — a cost matrix reverse-engineered from a desirable
+> operating point is the same failure as tuning a model to beat a baseline, and §1
+> forbids it in the same terms. If honest parameters still flag 99%, that is a
+> finding about this problem's economics and must be said plainly.
+> The CAPACITY-CONSTRAINED point is now the PRIMARY reported operating point (a work
+> queue is ranked against finite analyst hours, not thresholded): top 10% of queue
+> catches 20.9% of denials at 26.3% precision, 2.2x base rate. The sensitivity sweep
+> (flagged share 0.6% → 98% as the multiplier moves 0.005 → 1.0) stays a first-class
+> artifact regardless — a business parameter nobody measured is a guess, and the
+> sweep is the honest representation of a guess.
+> DOLLARS-AT-RISK RULING: as measured, champion captures 38.4% of denied dollars in
+> the top decile with CI [16.0%, 59.3%] against a constant scorer at 20.4% — and
+> 20.4% lies INSIDE that interval, so the champion is NOT distinguishable from
+> arbitrary ranking on this metric. Reporting "38.4% vs 20.4%" would imply a
+> superiority the numbers do not support. Required fix is to the INSTRUMENT: a
+> PAIRED bootstrap CI on the DIFFERENCE over the same resamples (the discipline
+> already applied to XGBoost − logistic). Report whatever it says; if it spans zero,
+> state that the metric cannot support a business claim at this fold size, and that
+> the ten largest denied claims holding 50.9% of denied dollars is why.
+> ml-engineer-2 also fixed the metric's tie-break: it broke ties by row order on a
+> date-sorted frame, so a "constant" scorer silently meant oldest-claims-first.
+> INHERITED BUG FOUND + FIXED (ml-engineer-2): the preserved WIP baselines declared
+> (BaseEstimator, ClassifierMixin) in that order; sklearn 1.9 resolves estimator
+> type along the MRO, so is_classifier() returned False and sklearn silently handed
+> the full two-column predict_proba to anything asking for a score — reproduced as a
+> calibrator fitted against the wrong class, output negatively correlated with its
+> own input. Nothing raises. Phase 4 numbers unaffected (train.py indexes [:,1]);
+> Phase 5 would have hit it.
+> FOR PHASE 5 / app-engineer: metrics.json was emitting bare NaN tokens — valid
+> Python, INVALID JSON — and app-engineer parses that file. Fixed with allow_nan=
+> False and sanitised to null. Do not reintroduce it with a convenience dump.
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
 - [ ] Slice metrics, bootstrap CIs, model card
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
