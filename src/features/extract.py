@@ -119,6 +119,17 @@ where sim_appeal_level = 1
 """
 
 
+# EVALUATION ONLY. Denied dollars are an adjudication result and are forbidden
+# as a Model A feature; they are read here to answer "how much of the money at
+# risk does the top decile capture?", which is an outcome-side question. Kept in
+# its own frame, joined only inside the evaluation functions, so it can never
+# arrive in a feature matrix by being sat next to one.
+OUTCOME_ECONOMICS_QUERY = f"""
+select claim_sk, sim_denied_amount, sim_allowed_amount
+from {SCHEMA}.sim_claim_adjudication
+"""
+
+
 def _read(engine: Engine, query: str) -> pd.DataFrame:
     with engine.connect() as conn:
         return pd.read_sql(text(query), conn)
@@ -147,3 +158,8 @@ def fetch_denials(engine: Engine) -> pd.DataFrame:
 def fetch_appeal_targets(engine: Engine) -> pd.DataFrame:
     """First-level appeal outcomes. Targets only — never features."""
     return _read(engine, APPEAL_TARGET_QUERY)
+
+
+def fetch_outcome_economics(engine: Engine) -> pd.DataFrame:
+    """Denied and allowed dollars. EVALUATION ONLY — never join this to features."""
+    return _read(engine, OUTCOME_ECONOMICS_QUERY)
