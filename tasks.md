@@ -537,12 +537,84 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
-- [ ] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
+- [x] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
   docs/simulated_forbidden_columns.md. No feature code until green.
+  CLOSED 2026-07-27 on feat/phase4-ml. `forbidden_features` is now the exact set
+  of 27 columns the firewall document names as forbidden for Model A (§1 latent
+  internals, §2 outcome/money/dates, §4 workflow columns, §6 provenance stamps,
+  §7 warehouse keys). Correspondence is not hand-curated: src/features/leakage.py
+  PARSES the document section by section and asserts set equality both ways, so
+  omitting a documented column and inventing an undocumented one both fail the
+  build. All 5 stale patterns are gone and all 16 named-unprotected columns are
+  blocked (regression test names them individually).
+  Beyond the document, in separate keys so the doc-agreement surface stays exact:
+    - forbidden_tables + forbidden_table_columns: §2 whole-table forbids
+      (sim_appeals, sim_operating_costs) expanded to real column names, with an
+      integration test that re-checks the expansion against information_schema.
+    - forbidden_derived_features: 9 DERIVED columns of sql/views/ that are
+      functions of forbidden columns (clean_claim_flag, first_pass_paid_flag,
+      adjudicated, ar_open_flag, ar_balance_amt, and the vw_work_queue_priority
+      heuristic score/tier/dollars_at_stake/appeal_levels). Required by §4.1
+      ("or a column derived from one"); the document covers generated columns
+      only, so these were classified nowhere.
+    - forbidden_source_features: NEW CALL, flagged to team-lead. The CMS SOURCE
+      columns medicare_source_paid_amt / ncvrd_charge_amt / bene_deductible_amt
+      (clm_pmt_amt, nch_ip_ncvrd_chrg_amt, nch_bene_ip_ddctbl_amt) are real, not
+      simulated, so the firewall document does not cover them — but every one is
+      an adjudication OUTPUT that no biller knows before submission. Excluded
+      from Model A. billed_charge_amt (what is billed) stays permitted.
+    - forbidden_crosswalk_tables + display features: the crosswalk is display-
+      only linkage (§3.4), never a feature or grouping key. Both pre- and
+      post-rename spellings listed so data-engineer-p4's sim_ prefix change
+      cannot open a window. Synthetic prvdr_num deliberately NOT blocked.
+  Model C's separate boundary (§5) is configured under `model_c`, not merged
+  into the Model A list: denial outcome/money/adjudication dates become
+  available, while §1 latents, sim_denial_driver_mechanism, payment timing and
+  every sim_appeals column other than the two targets stay forbidden.
+  EVIDENCE: `make lint` clean; `make test` 120 passed / 16 skipped (main was
+  85/8, so +35 net new, 43 in tests/leakage/ of which 3 are live-Postgres
+  integration). Read-only on the database throughout.
 - [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
   plus a training-matrix guard that fails on any forbidden or forbidden-derived
   column.
-- [ ] Point-in-time feature store + forbidden-column leakage tests
+- [x] Point-in-time feature store + forbidden-column leakage tests
+  DONE 2026-07-27 on feat/phase4-ml. 40 declared features over 20,867 claims,
+  built from the BASE TABLES with an explicit column allowlist rather than from
+  vw_claim_enriched — that view carries the label, the money and the latent
+  probability, so `select *` would leave a drop-list as the only thing between
+  them and the model. A forbidden column is now never read in the first place.
+  (It also meant the build was unaffected by the window where the vw_ views were
+  dropped for the crosswalk rename.)
+  LINEAGE, NOT NAMES: every feature is declared in src/features/spec.py with its
+  source columns, and the build refuses a frame that does not match the
+  declaration. Name-based guards cannot tell payer_prior_denial_rate from
+  payer_denial_rate; declared sources can.
+  §4.2 HISTORICAL RATES: prior-period, with a 60-day EMBARGO. "Submitted before
+  t" is not "known before t" — a claim submitted last week has not come back
+  from the payer. The embargo is set from the payer adjudication/posting cycle
+  in config, deliberately NOT fitted to observed adjudication timing, which
+  would mean designing a feature from a forbidden column. Rates shrink (m=20)
+  toward the prior-period book rate, which itself moves. No history => null,
+  never a silent zero.
+  §4.3 SPLIT: quantile temporal, cut 2021-12-28, train 16,694 / test 4,173
+  (20.0%), test base rate 0.1205 vs train 0.1294 — matches doc §8 exactly.
+  Calibration fold carved temporally off the END of train (fit 13,356 /
+  calibrate 3,338, latest calibration 2021-12-28 < earliest test 2021-12-29),
+  so isotonic never sees either the fit rows or the test fold.
+  POINT-IN-TIME PROVEN BEHAVIOURALLY, not structurally. Three invariants, on
+  synthetic data as unit tests and on the real warehouse as integration tests:
+  truncate the dataset at t and past features are bit-identical; scramble every
+  label after t and past features do not move; flip a claim's own outcome and
+  its own features do not move. Plus a control asserting a naive whole-dataset
+  provider rate DOES break them, so the tests are not vacuous.
+  LEAK CANARIES: no single numeric feature exceeds ROC-AUC 0.75 alone, and no
+  categorical level with >=100 claims determines the label.
+  CORRECTION worth recording: I first assumed provider history would be sparse
+  ("median provider has 2 claims"). Wrong at the claim level — volume is
+  concentrated (top 10% of providers hold 53% of claims), so 72% of all claims
+  and 83% of post-2019 claims DO have provider history. Provider-weighted and
+  claim-weighted are different questions; the model card will say the latter.
+  EVIDENCE: `make lint` clean, `make test` 177 passed / 16 skipped.
 - [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
 - [ ] Slice metrics, bootstrap CIs, model card

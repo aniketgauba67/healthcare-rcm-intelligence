@@ -27,6 +27,11 @@ import pytest
 
 FORBIDDEN_KEY = "forbidden_features"
 
+# `forbidden_*` blocks that hold TABLE names rather than column names. Everything
+# else under that prefix is treated as column-bearing and folded into the blacklist,
+# so a new block cannot be added and then quietly left out of the union.
+TABLE_NAME_KEYS = frozenset({"forbidden_tables", "forbidden_crosswalk_tables"})
+
 
 def _all_columns(schema: dict[str, list[str]]) -> set[str]:
     return {column for columns in schema.values() for column in columns}
@@ -39,15 +44,51 @@ def _resolve(patterns: list[str], universe: set[str]) -> dict[str, set[str]]:
     }
 
 
+def _names(block) -> set[str]:
+    """Column names out of a config block, whether it is a list or an annotated dict.
+
+    The config uses both shapes: plain lists where the name is all there is, and
+    dicts whose keys are the column and whose values say what it was derived from.
+    """
+    if isinstance(block, dict):
+        return {str(k) for k in block}
+    if isinstance(block, list):
+        return {str(v) for v in block}
+    return set()
+
+
+def _column_bearing_blocks(config: dict) -> dict[str, set[str]]:
+    """Every `forbidden_*` block that names columns, top level and under `model_c`."""
+    blocks = {
+        key: _names(value)
+        for key, value in config.items()
+        if key.startswith("forbidden") and key not in TABLE_NAME_KEYS
+    }
+    nested = (config.get("model_c") or {}).get("forbidden_features")
+    if nested:
+        blocks["model_c.forbidden_features"] = _names(nested)
+    return blocks
+
+
 @pytest.fixture(scope="module")
 def configured(model_config) -> list[str]:
+    """The blacklist as a flat list of names, unioned across every column block.
+
+    CLAUDE.md §4 names `forbidden_features` as the blacklist's home, and the config
+    keeps that key as the surface that must equal the firewall document exactly. It
+    then carries further blocks for things the document does not cover — whole-table
+    expansions, DERIVED view columns, SOURCE adjudication outputs, the crosswalk
+    linkage. All of them bar columns from a matrix, so the guard is their union, and
+    that union is what these tests check.
+    """
     assert FORBIDDEN_KEY in model_config, (
         f"config/model.yaml has no `{FORBIDDEN_KEY}` key — CLAUDE.md §4 requires the "
         "forbidden-column blacklist to live there"
     )
-    patterns = model_config[FORBIDDEN_KEY]
-    assert isinstance(patterns, list) and patterns, f"`{FORBIDDEN_KEY}` must be a non-empty list"
-    return list(patterns)
+    blocks = _column_bearing_blocks(model_config)
+    union = set().union(*blocks.values())
+    assert union, "no forbidden columns configured"
+    return sorted(union)
 
 
 def test_no_configured_pattern_matches_zero_columns(configured, generated_schema):

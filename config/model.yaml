@@ -1,20 +1,300 @@
+# Model configuration — Healthcare RCM Intelligence Platform
+#
+# LEAKAGE BLACKLIST (CLAUDE.md §4, NON-NEGOTIABLE).
+#
+# Source of truth for every entry under `forbidden_*` below is
+# docs/simulated_forbidden_columns.md — the §4.5 firewall interface, written by
+# simulation-engineer so that ml-engineer never has to open src/simulation/.
+# The lists are not hand-curated: each is tagged with the document section it is
+# copied from, and src/features/leakage.py parses that document and asserts the
+# two agree (tests/leakage/test_forbidden_config_agrees_with_doc.py). Editing
+# one without the other fails the build, which is the point.
+#
+# Structure, and why it is split rather than one flat list:
+#   forbidden_features          columns the DOCUMENT names as forbidden for
+#                               Model A. This is the doc-agreement surface and
+#                               must equal the parsed document exactly.
+#   forbidden_tables            §2 whole-table forbids, expressed the way the
+#                               document expresses them.
+#   forbidden_table_columns     those tables expanded to real column names, so
+#                               the training-matrix guard can work on names
+#                               alone without a database connection.
+#   forbidden_derived_features  DERIVED columns in the analytics views that are
+#                               functions of the above. Not in the document —
+#                               the document covers the generated schema, these
+#                               are sql/views/ columns. CLAUDE.md §4.1 requires
+#                               blocking "a column derived from one" too.
+#   forbidden_source_features   SOURCE (CMS) columns that are adjudication
+#                               outputs and so are not knowable pre-submission.
+#   forbidden_features_defensive  names with no matching column today, kept as
+#                               tripwires.
+# The guard in src/features/leakage.py unions all of them.
+
 seed: 1337
+
+feature_store:
+  prior_period:
+    # Historical rates look at claims submitted strictly before the row's
+    # cutoff. The cutoff is the submission date minus an embargo, because
+    # "submitted before t" is not "known before t" — a claim submitted last week
+    # has not come back from the payer yet. 60 days is a payer adjudication and
+    # posting cycle; it is set from that business rule and deliberately NOT
+    # fitted to observed adjudication timing, which would mean designing a
+    # feature from a forbidden column.
+    embargo_days: 60
+    # m-estimate weight. An entity with this many prior claims is weighted half
+    # its own rate, half the book rate. The median provider here has two claims,
+    # so most provider rates are almost entirely shrunk — which is the honest
+    # treatment of two observations.
+    smoothing: 20.0
+    entities:
+      sim_payer: sim_payer_id
+      sim_provider: prvdr_num
+      sim_service_line: sim_service_line_id
+
 split:
   strategy: temporal
+  # docs/simulated_forbidden_columns.md §8: submission dates span 2015-2024 but
+  # the tail years are sparse (2023 ~3.4% of claims), so holding out the final
+  # calendar year gives a tiny skewed fold. Quantile cut instead.
+  time_column: sim_submission_date
+  train_quantile: 0.80
+  # Validation fold for calibration is carved out of the TRAIN side, again
+  # temporally, so calibration never sees the forward test fold.
+  calibration_quantile_of_train: 0.80
+
+# ---------------------------------------------------------------------------
+# Model A — pre-submission denial risk. Boundary: the moment before submission.
+# ---------------------------------------------------------------------------
+
+# docs/simulated_forbidden_columns.md §1 (latent internals — forbidden in EVERY
+# model), §2 (post-submission outcome / money / dates), §4 (workflow-event
+# columns named forbidden), §6 (provenance stamps), §7 (warehouse keys).
 forbidden_features:
+  # §1 — latent generator internals. Answer keys; never a feature, any model.
+  - sim_latent_p
+  - sim_provider_quality_latent
+  - sim_label_noise_applied
+  - sim_appeal_latent_p
+  # §2 Outcome
   - sim_denial_flag
-  - sim_denial_reason
+  - sim_denial_type
   - sim_denial_category
+  - sim_denial_carc_group
+  - sim_denial_driver_mechanism
+  # §2 Money
   - sim_allowed_amount
   - sim_paid_amount
-  - sim_latent_p
-  - sim_appeal_*
-  - sim_recovered_*
-  - adjudication_date
-  - payment_date
-  - post_submission_workflow_*
+  - sim_patient_responsibility_amount
+  - sim_contractual_adjustment_amount
+  - sim_denied_amount
+  # §2 Dates and durations after submission
+  - sim_ack_date
+  - sim_adjudication_date
+  - sim_denial_review_date
+  - sim_payment_date
+  - sim_days_to_adjudication
+  - sim_days_to_payment
+  # §4 — workflow-event columns forbidden as features even after row filtering
+  - sim_event_sk
+  - sim_appeal_level
+  # §6 — provenance stamps present on every generated table
+  - sim_provenance
+  - sim_config_version
+  - sim_seed
+  # §7 — warehouse keys (claim_sk is assigned in source-file order and acts as
+  # a smuggled date feature)
+  - claim_sk
+  - clm_id
+
+# §2 "Whole tables" — every column is post-submission for Model A.
+forbidden_tables:
+  - sim_appeals
+  - sim_operating_costs
+
+# The above expanded against the live schema (rcm.*), so the name-based guard
+# needs no database. tests/leakage/ re-checks this expansion against
+# information_schema when Postgres is available (integration marker).
+forbidden_table_columns:
+  sim_appeals:
+    - sim_appeal_sk
+    - sim_appeal_level
+    - sim_appeal_filed_date
+    - sim_appeal_decision_date
+    - sim_appeal_outcome
+    - sim_appeal_disputed_amount
+    - sim_appeal_recovered_amount
+    - sim_appeal_latent_p
+  sim_operating_costs:
+    - sim_touch_minutes_total
+    - sim_coding_cost
+    - sim_submission_cost
+    - sim_payment_posting_cost
+    - sim_denial_rework_cost
+    - sim_appeal_cost
+    - sim_total_cost_to_collect
+
+# sim_workflow_events is the third whole-table entry in §2, but it is filtered
+# by row rather than dropped: events at or before the claim's CLAIM_SUBMITTED
+# timestamp are pre-submission facts and are permitted. §4.
+workflow_events:
+  boundary_event: CLAIM_SUBMITTED
+  # Timestamp-based, not event-type-based, so a new event type cannot leak in.
+  filter: sim_event_ts <= claim's CLAIM_SUBMITTED sim_event_ts
+  forbidden_columns:
+    - sim_event_sk
+    - sim_appeal_level
+  # §4: "The recurring hazard here is aggregation, not selection." Any sum, max
+  # or count must be taken over the filtered rows only — sim_event_seq and
+  # sim_touch_minutes encode rework effort, and therefore the label, when
+  # aggregated over a claim's full history.
+  aggregate_after_filter_only:
+    - sim_event_seq
+    - sim_touch_minutes
+
+# DERIVED columns of sql/views/ (not generated columns, so outside the scope of
+# the firewall document) that are functions of forbidden columns. CLAUDE.md §4.1
+# requires blocking derived columns too. Value = what it is derived from.
+forbidden_derived_features:
+  adjudicated: derived from sim_adjudication_date
+  clean_claim_flag: derived from sim_denial_flag and first-pass payment
+  first_pass_paid_flag: derived from sim_denial_flag and sim_paid_amount
+  ar_open_flag: derived from sim_payment_date
+  ar_balance_amt: derived from sim_allowed_amount and sim_paid_amount
+  heuristic_priority_score: vw_work_queue_priority, built on sim_denial_flag
+  priority_tier: vw_work_queue_priority, built on sim_denial_flag
+  dollars_at_stake: vw_work_queue_priority, built on sim_denied_amount
+  appeal_levels: count over sim_appeals; non-zero implies a denial
+
+# SOURCE columns from the CMS claim that are adjudication OUTPUTS. They are real
+# rather than simulated, so the firewall document does not cover them, but a
+# biller does not know any of them at the moment before submission — the same
+# test CLAUDE.md §4 applies to the simulated layer. billed_charge_amt (what is
+# billed) is permitted; what Medicare decided to pay is not.
+forbidden_source_features:
+  medicare_source_paid_amt: CMS clm_pmt_amt — the payer's payment decision
+  clm_pmt_amt: same column, star-schema name
+  ncvrd_charge_amt: non-covered charge is an adjudication determination
+  nch_ip_ncvrd_chrg_amt: same column, star-schema name
+  bene_deductible_amt: deductible applied is an adjudication determination
+  nch_bene_ip_ddctbl_amt: same column, star-schema name
+
+# Names CLAUDE.md §4 or an older config called out that match no column in the
+# schema today. Kept so a future rename cannot reintroduce them silently.
+forbidden_features_defensive:
+  - sim_denial_reason
+
+# Simulated display-only linkage (CLAUDE.md §3.4). These tables map synthetic
+# provider identifiers onto real facilities and NPIs by seeded random
+# assignment, purely so the dashboard has recognisable names. The assignment
+# carries no information about the claim, and it multiplexes 4,876 synthetic
+# providers onto 2,857 real CCNs (worst case 8:1), so a real CCN is not even a
+# stable entity key. Whole tables are excluded from the feature store; facility
+# and provider analysis keys on the synthetic prvdr_num. The document does not
+# cover these tables — they are data-engineer's, classified in
+# docs/provenance_register.md — so they are classified here.
+forbidden_crosswalk_tables:
+  - sim_facility_crosswalk
+  - sim_provider_crosswalk
+
+# Those tables' columns by name, plus the same linkage as it surfaces in
+# sql/views/. Both the pre- and post-rename spellings of the view columns are
+# listed, so the in-flight sim_ prefix change cannot open a window in either
+# direction. Note the synthetic `prvdr_num` is deliberately NOT here: it is the
+# legitimate provider key and the correct grouping key for facility analysis.
+forbidden_crosswalk_display_features:
+  # as they appear in the crosswalk tables
+  - sim_prvdr_num
+  - sim_provider_ssa_state
+  - sim_provider_postal_state
+  - sim_at_physn_npi
+  - assigned_postal_state
+  - real_npi
+  - real_provider_state
+  - real_specialty
+  - match_rule
+  - same_state
+  - crosswalk_seed
+  # as they appear in the views, post-rename and pre-rename
+  - sim_facility_ccn
+  - sim_facility_name
+  - sim_facility_state
+  - sim_facility_type
+  - facility_ccn
+  - facility_name
+  - facility_state
+  - facility_type
+  - display_facility_ccn
+  - display_facility_name
+  - display_facility_state
+
+# ---------------------------------------------------------------------------
+# Model C — appeal success. Boundary: the denial has been posted and is being
+# triaged, so post-denial facts are legitimately available.
+# docs/simulated_forbidden_columns.md §5.
+# ---------------------------------------------------------------------------
+model_c:
+  boundary: denial_posted
+  targets:
+    classification: sim_appeal_outcome
+    regression: sim_appeal_recovered_amount
+  # Relative to Model A: these become available, because a denials analyst is
+  # looking at them at triage time.
+  permitted_beyond_model_a:
+    - sim_denial_flag
+    - sim_denial_type
+    - sim_denial_category
+    - sim_denial_carc_group
+    - sim_allowed_amount
+    - sim_paid_amount
+    - sim_patient_responsibility_amount
+    - sim_contractual_adjustment_amount
+    - sim_denied_amount
+    - sim_ack_date
+    - sim_adjudication_date
+    - sim_denial_review_date
+    - sim_days_to_adjudication
+  # Still forbidden: §1 in full, plus every sim_appeals column other than the
+  # targets — filed/decision dates, the disputed amount and the level-2 rows all
+  # postdate the decision being predicted.
+  forbidden_features:
+    - sim_latent_p
+    - sim_provider_quality_latent
+    - sim_label_noise_applied
+    - sim_appeal_latent_p
+    # sim_denial_driver_mechanism stays out: it is the generator's statement of
+    # WHY the denial happened, not something on the remittance advice.
+    - sim_denial_driver_mechanism
+    - sim_appeal_sk
+    - sim_appeal_level
+    - sim_appeal_filed_date
+    - sim_appeal_decision_date
+    - sim_appeal_disputed_amount
+    - sim_appeal_recovered_amount
+    - sim_appeal_outcome
+    - sim_payment_date
+    - sim_days_to_payment
+    - sim_provenance
+    - sim_config_version
+    - sim_seed
+    - claim_sk
+    - clm_id
+
+# ---------------------------------------------------------------------------
+# Decision thresholds and economics
+# ---------------------------------------------------------------------------
 cost_matrix:
   review_cost_usd: 25
   prevented_denial_value_multiplier: 1.0
   false_negative_penalty: full_expected_reimbursement_loss
+
 calibration: isotonic
+
+# Honesty tripwire (CLAUDE.md §1, docs/simulated_forbidden_columns.md §8). The
+# label carries deliberate noise; scoring with the true latent probability tops
+# out near AUC 0.68 and roughly a third of denials carry no mechanism signal.
+# A model above this bound is a leak to hunt, not a result to report.
+sanity_bounds:
+  oracle_roc_auc: 0.68
+  suspicious_roc_auc: 0.75
+  suspicious_pr_auc: 0.95
