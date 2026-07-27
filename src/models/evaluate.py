@@ -23,6 +23,7 @@ them out of the matrix.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -83,7 +84,11 @@ class ClassificationMetrics:
 
 
 def dollars_at_risk_captured(
-    y_true: np.ndarray, y_score: np.ndarray, amounts: np.ndarray, top_fraction: float = 0.10
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    amounts: np.ndarray,
+    top_fraction: float = 0.10,
+    seed: int = 1337,
 ) -> float:
     """Share of denied dollars falling in the top `top_fraction` by predicted risk.
 
@@ -91,6 +96,12 @@ def dollars_at_risk_captured(
     the team can only work 10% of the queue, how much of the money at risk do
     they see?". A perfect ranker does not reach 1.0 unless the denied dollars fit
     inside the decile, which is the honest ceiling.
+
+    Ties are broken by a seeded shuffle, not by row order. The frame arrives
+    sorted by submission date, so a stable sort would hand every tied claim to
+    the earliest ones — which silently turns "the constant-score baseline"
+    into "the oldest claims first" and reported 4.1% where the honest floor is
+    the decile's share of the dollars, about 10%.
     """
     if not 0 < top_fraction <= 1:
         raise ValueError("top_fraction must be in (0, 1]")
@@ -98,9 +109,44 @@ def dollars_at_risk_captured(
     if total_at_risk <= 0:
         return float("nan")
     k = max(1, int(round(len(y_score) * top_fraction)))
-    top = np.argsort(-y_score, kind="stable")[:k]
+    shuffled = np.random.default_rng(seed).permutation(len(y_score))
+    top = shuffled[np.argsort(-np.asarray(y_score)[shuffled], kind="stable")[:k]]
     captured = float(np.sum(amounts[top] * (y_true[top] == 1)))
     return captured / total_at_risk
+
+
+def bootstrap_dollar_capture(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    amounts: np.ndarray,
+    top_fraction: float = 0.10,
+    n_resamples: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 1337,
+) -> Interval:
+    """Interval for `dollars_at_risk_captured`, which needs one of its own.
+
+    This metric is far noisier than the ranking metrics and has to be read with
+    its interval. Denied dollars are heavy-tailed — a handful of large claims
+    hold much of the money at risk — so which decile a single big denial lands in
+    moves the number by several points on its own. A point estimate quoted
+    without this interval invites a business claim the fold cannot support.
+    """
+    rng = np.random.default_rng(seed)
+    n = len(y_true)
+    point = dollars_at_risk_captured(y_true, y_score, amounts, top_fraction, seed=seed)
+    draws: list[float] = []
+    for _ in range(n_resamples):
+        idx = rng.integers(0, n, size=n)
+        value = dollars_at_risk_captured(
+            y_true[idx], y_score[idx], amounts[idx], top_fraction, seed=seed
+        )
+        if not np.isnan(value):
+            draws.append(value)
+    if not draws:  # pragma: no cover - only with a fold holding no denied dollars
+        return Interval(point, float("nan"), float("nan"))
+    low, high = np.percentile(draws, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    return Interval(point, float(low), float(high))
 
 
 def bootstrap_interval(
@@ -165,7 +211,7 @@ def evaluate_classifier(
         brier=float(brier_score_loss(y_true, y_score)),
         pr_auc_lift_over_base_rate=pr_auc / base_rate if base_rate > 0 else float("nan"),
         dollars_at_risk_captured_top_decile=(
-            dollars_at_risk_captured(y_true, y_score, np.asarray(amounts, dtype=float))
+            dollars_at_risk_captured(y_true, y_score, np.asarray(amounts, dtype=float), seed=seed)
             if amounts is not None
             else None
         ),
@@ -340,6 +386,82 @@ def threshold_from_cost_matrix(
         precision=float(caught / max(1, int(flagged.sum()))),
         review_cost_usd=float(review_cost_usd),
     )
+
+
+def threshold_at_capacity(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    amounts: np.ndarray,
+    capacity_share: float,
+    review_cost_usd: float,
+    prevented_value_multiplier: float = 1.0,
+) -> ThresholdChoice:
+    """The operating point a team with finite reviewers can actually run.
+
+    `threshold_from_cost_matrix` above answers "what maximises net benefit?", and
+    on this data the answer is degenerate: a $25 review against a mean $3,800 at
+    stake and a 12% denial rate makes reviewing *everything* profitable, so the
+    optimiser flags ~99% of claims and the threshold stops carrying information.
+    That is a true statement about the cost matrix, not a defect — but it is not
+    an operating point, because nobody has reviewers for 99% of the queue.
+
+    So the second operating point is capacity-constrained: work the top
+    `capacity_share` of the queue by score. The threshold is the corresponding
+    score quantile on the fold it is chosen on, and it is then applied unchanged
+    to the test fold like any other.
+    """
+    if not 0 < capacity_share <= 1:
+        raise ValueError("capacity_share must be in (0, 1]")
+    y_score = np.asarray(y_score, dtype=float)
+    cut = float(np.quantile(y_score, 1.0 - capacity_share))
+    return apply_threshold(
+        y_true,
+        y_score,
+        amounts,
+        ThresholdChoice(
+            threshold=cut,
+            expected_net_benefit=float("nan"),
+            flagged=0,
+            flagged_share=0.0,
+            denials_caught=0,
+            recall=0.0,
+            precision=0.0,
+            review_cost_usd=review_cost_usd,
+        ),
+        prevented_value_multiplier=prevented_value_multiplier,
+    )
+
+
+def flagged_share_by_multiplier(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    amounts: np.ndarray,
+    review_cost_usd: float,
+    multipliers: Sequence[float],
+) -> pd.DataFrame:
+    """How much of the cost-optimal threshold is the multiplier assumption.
+
+    `prevented_denial_value_multiplier` is the share of a prevented denial's
+    dollars a pre-submission review actually saves, and it is an assumption
+    nobody has measured. This sweep shows what the "optimal" threshold does as
+    that assumption moves, so the reader can see the operating point is an
+    argument about economics rather than an output of the model.
+    """
+    rows = []
+    for multiplier in multipliers:
+        choice = threshold_from_cost_matrix(
+            y_true, y_score, amounts, review_cost_usd, prevented_value_multiplier=multiplier
+        )
+        rows.append(
+            {
+                "prevented_value_multiplier": multiplier,
+                "threshold": round(choice.threshold, 4),
+                "flagged_share": round(choice.flagged_share, 4),
+                "recall": round(choice.recall, 4),
+                "precision": round(choice.precision, 4),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def apply_threshold(

@@ -14,6 +14,17 @@ Three of them, in increasing order of effort:
 All three are fitted on the training fold only and expose the same
 `predict_proba` interface as anything from sklearn, so the evaluation code cannot
 accidentally treat them differently.
+
+Note the base-class order `(ClassifierMixin, BaseEstimator)`. It is not
+cosmetic: sklearn resolves an estimator's type through `__sklearn_tags__` along
+the MRO, and with `BaseEstimator` first the mixin never gets to set the type, so
+`sklearn.base.is_classifier` returns False for what is plainly a classifier.
+Nothing raises. What happens instead is that sklearn's response-value machinery
+stops treating `predict_proba` output as (negative, positive) and hands the
+whole two-column array to whatever asked for a score — which is how a calibrator
+wrapped around one of these ends up fitted on the probability of the wrong
+class. `tests/models/test_pipeline.py` asserts the type for every estimator the
+project exposes.
 """
 
 from __future__ import annotations
@@ -21,10 +32,15 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 from sklearn.utils.validation import check_is_fitted
 
+from src.features.spec import FeatureSet
+from src.models.preprocess import build_preprocessor
 
-class BaseRateBaseline(BaseEstimator, ClassifierMixin):
+
+class BaseRateBaseline(ClassifierMixin, BaseEstimator):
     """Predicts the training base rate for every claim."""
 
     def fit(self, X: pd.DataFrame, y: np.ndarray) -> BaseRateBaseline:  # noqa: N803
@@ -41,7 +57,7 @@ class BaseRateBaseline(BaseEstimator, ClassifierMixin):
         return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
 
 
-class PayerRuleBaseline(BaseEstimator, ClassifierMixin):
+class PayerRuleBaseline(ClassifierMixin, BaseEstimator):
     """Scores each claim with its payer's denial rate, learned on the training fold.
 
     Deliberately reads the payer's *observed training-fold* rate rather than the
@@ -70,3 +86,28 @@ class PayerRuleBaseline(BaseEstimator, ClassifierMixin):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:  # noqa: N803
         return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
+
+
+def logistic_baseline(feature_set: FeatureSet, config: dict) -> Pipeline:
+    """Regularized logistic regression on the full declared feature set.
+
+    Wrapped with the preprocessor in one `Pipeline` so that `fit` cannot be
+    called on the training fold with statistics learned anywhere else
+    (CLAUDE.md §4.4). The estimator hyperparameters come from
+    `config/model.yaml: estimators.logistic`; nothing here is tuned.
+    """
+    params = dict(config["estimators"]["logistic"])
+    return Pipeline(
+        [
+            ("preprocess", build_preprocessor(feature_set)),
+            (
+                "estimator",
+                LogisticRegression(
+                    C=float(params["C"]),
+                    max_iter=int(params["max_iter"]),
+                    solver=str(params["solver"]),
+                    random_state=int(config["seed"]),
+                ),
+            ),
+        ]
+    )

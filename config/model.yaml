@@ -295,12 +295,59 @@ model_c:
     - clm_id
 
 # ---------------------------------------------------------------------------
+# Estimators. Fixed, declared, and deliberately NOT searched.
+#
+# No hyperparameter search is run anywhere in this project, and that is a
+# decision rather than an omission. The label carries deliberate noise with an
+# oracle ceiling near ROC-AUC 0.68 (sanity_bounds below), the forward test fold
+# is ~4,200 claims holding ~500 denials, and a search over that surface would be
+# selecting on differences smaller than the bootstrap interval — it would buy a
+# better number and a worse model. The values below are ordinary regularized
+# defaults: shallow trees, strong minimum child weight, subsampling, and an L2
+# penalty on the linear model.
+# ---------------------------------------------------------------------------
+estimators:
+  logistic:
+    # Regularized, unweighted. class_weight="balanced" would improve nothing that
+    # matters here — ranking is unchanged by a constant reweighting and the
+    # probabilities go through isotonic afterwards anyway — while making the
+    # uncalibrated Brier score meaningless.
+    C: 1.0
+    max_iter: 2000
+    solver: lbfgs
+  xgboost:
+    n_estimators: 300
+    max_depth: 4
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    # ~1.5% of the fit fold. Leaves that thin cannot form on 500-ish positives
+    # without memorising individual claims.
+    min_child_weight: 20.0
+    reg_lambda: 2.0
+    n_jobs: 4
+
+# ---------------------------------------------------------------------------
 # Decision thresholds and economics
 # ---------------------------------------------------------------------------
 cost_matrix:
   review_cost_usd: 25
   prevented_denial_value_multiplier: 1.0
   false_negative_penalty: full_expected_reimbursement_loss
+
+# MEASURED 2026-07-27, and it changes how the threshold must be read: with a $25
+# review, a mean $3,800 at stake on a denied claim and a 12% denial rate, the
+# expected value of reviewing an AVERAGE claim is about $456. Reviewing
+# everything is therefore optimal and the cost-maximising threshold flags ~99% of
+# the queue — a correct answer to the question the cost matrix asks, and a
+# useless operating point, because no billing office has reviewers for 99% of its
+# claims. The binding constraint here is capacity, not economics, so a second
+# operating point is reported: work the top share of the queue by score. Both are
+# in the model card, and the multiplier sensitivity sweep shows how much of the
+# cost-optimal answer is the multiplier assumption rather than the model.
+operating_point:
+  review_capacity_share: 0.10
+  multiplier_sensitivity: [0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
 
 calibration: isotonic
 
