@@ -260,6 +260,25 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   avoid shared-Postgres contention with Phase 2 acceptance runs.
   NOTE: simulation-engineer adopts STRICT prefixing for all new sim_ tables —
   team-lead RATIFIED; that is the standard going forward.
+  SCHEDULED 2026-07-27 as the Phase 4 gate task → data-engineer-p4,
+  branch feat/crosswalk-sim-prefix (branch exists, currently 0 commits ahead of
+  main — no prior work was done on it). Still open: verified today by reading
+  sql/ddl/30_sim_crosswalk.sql — sim_facility_crosswalk has 8 unprefixed columns
+  (facility_ccn/_name/_state/_type, match_rule, same_state, crosswalk_seed,
+  provenance) and sim_provider_crosswalk 7 (assigned_postal_state, real_npi,
+  real_provider_state, real_specialty, match_rule, same_state, crosswalk_seed,
+  provenance).
+  DELEGATED AUTHORITY (team-lead ruling, §5 exception, one task only): the rename
+  has a downstream blast radius outside data-engineer's ownership — measured today
+  it is sql/views/vw_claim_enriched.sql, sql/views/vw_clean_claim_performance.sql,
+  notebooks/01_data_quality_and_provenance.py, notebooks/04_risk_adjusted_facility.py,
+  notebooks/README.md (analytics-engineer's files) plus docs/. analytics-engineer
+  is NOT being re-spawned for a mechanical rename, so data-engineer-p4 MAY edit
+  those downstream references, in the SAME commit, RENAME-ONLY — no logic, grain,
+  join, or metric change. qa-reviewer-p8 verifies by re-running the 21/21
+  reconciliation gate and executing the two touched notebooks.
+  CARRY-FORWARD ITEM 2 (samples-with-replacement) is NOT reopened by this: the
+  synthetic-id keying rule stands unchanged and the rename must not alter it.
 - [ ] CROSSWALK SAMPLES WITH REPLACEMENT (analytic fidelity, not provenance).
   Distinct synthetic providers collide onto the same real CCN (within-state pools
   are small). Team-lead ruling: do NOT re-randomize the accepted Phase 1 crosswalk
@@ -438,6 +457,33 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   * Docs: 9 views registered (data_dictionary 11 vw_ hits, provenance_register 4).
 
 ## Phase 4 — ML (lead: ml-engineer)
+> OPENED 2026-07-27 by team-lead on human instruction ("re-spawn only the
+> teammates needed for the current phase and continue"), after reconstructing
+> state from tasks.md + git log + file tree. Phases 1-3 are all qa-ACCEPTED;
+> Phase 4 is the current phase. Team (all Opus per the model pin):
+> ml-engineer (lead) + data-engineer-p4 (crosswalk-prefix tech debt ONLY) +
+> qa-reviewer-p8 (sole reviewer for the phase — one reviewer per phase rule).
+> analytics-engineer and simulation-engineer are NOT re-spawned; their scope is
+> closed. app-engineer waits for Phase 5.
+> WAREHOUSE DRIFT FOUND + REPAIRED 2026-07-27 (team-lead, quiet window, no agents
+> running). The live DB had lost BOTH Phase 3 materializations that qa-reviewer-p7
+> signed off on 2026-07-24: 0 vw_ views existed and dim_drg.drg_desc was 100% NULL.
+> Diagnosis: a `make warehouse` / `make warehouse-all` reload ran after acceptance
+> — that drops+recreates dim_drg (null drg_desc) and drops the dependent views by
+> CASCADE, exactly as the Makefile comment on `reference-codes` warns. The star
+> schema and sim layer were NOT damaged: fact_inpatient_claim 20,867,
+> sim_claim_adjudication 20,867, 20 FKs intact incl. all 6 sim_→fact_ FKs, 0
+> claim_sk orphans, crosswalk 4,876. REPAIR (both additive, non-destructive):
+> `make reference-codes` → drg_desc 167/168 enriched, 0 unmatched, ref_* reloaded
+> (73,674 / 78,530 / 7,404 / 767 / 10); `make views` → 9 vw_ views re-applied and
+> the reconciliation gate 21/21 PASS. `uv run pytest -q` on main: 85 passed /
+> 8 skipped. Baseline for Phase 4 is therefore green and matches the Phase 3
+> acceptance evidence.
+>   STANDING RULE ADDED: `make warehouse` and `make warehouse-all` LEAVE THE
+>   WAREHOUSE INCOMPLETE. The correct full-rebuild sequence is
+>   `make warehouse-all && make reference-codes && make views`. Any agent that
+>   reloads the warehouse MUST run those last two afterwards and re-check 21/21,
+>   or the next agent inherits a silently degraded DB. Applies to Phase 4 and 5.
 > GATE — FIRST TASK OF PHASE 4, BEFORE ANY FEATURE CODE (team-lead, verified
 > 2026-07-22 by reading config/model.yaml against the real Phase 2 schema).
 > §4 is NON-NEGOTIABLE and the current `forbidden_features` list is a
@@ -491,6 +537,11 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
+- [ ] GATE 1 (ml-engineer): populate `config/model.yaml` forbidden_features from
+  docs/simulated_forbidden_columns.md. No feature code until green.
+- [ ] GATE 2 (qa-reviewer-p8): tests/leakage/ — model.yaml vs the doc must AGREE;
+  plus a training-matrix guard that fails on any forbidden or forbidden-derived
+  column.
 - [ ] Point-in-time feature store + forbidden-column leakage tests
 - [ ] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
