@@ -53,7 +53,9 @@ def _calls_named(node: ast.AST, attribute: str) -> bool:
 
 def _string_constants(node: ast.AST) -> list[str]:
     return [
-        child.value for child in ast.walk(node) if isinstance(child, ast.Constant) and isinstance(child.value, str)
+        child.value
+        for child in ast.walk(node)
+        if isinstance(child, ast.Constant) and isinstance(child.value, str)
     ]
 
 

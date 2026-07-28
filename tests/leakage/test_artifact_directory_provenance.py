@@ -44,7 +44,9 @@ _NOTE_NAMES = ("README.md", "PROVENANCE.md", "README.txt", "PROVENANCE.txt")
 @pytest.mark.parametrize("directory", _ARTIFACT_DIRS, ids=lambda path: path.name)
 def test_the_artifact_directory_states_its_provenance(directory: pathlib.Path) -> None:
     if not directory.exists():
-        pytest.skip(f"{directory.name} has not been generated; run `make train` / `make train-appeal`")
+        pytest.skip(
+            f"{directory.name} has not been generated; run `make train` / `make train-appeal`"
+        )
 
     csvs = sorted(path.name for path in directory.glob("*.csv"))
     if not csvs:

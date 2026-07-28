@@ -1,7 +1,22 @@
 """§3.2 must survive feature engineering, not just the warehouse.
 
 QA-AUTHORED REVIEW GATE (tests/leakage/ is qa's under the 2026-07-27 ownership
-ruling). Expected RED until the names are fixed. Do not delete it to go green.
+ruling). Do not delete it to go green.
+
+STATUS: GREEN as of ml-engineer-4's 0a7960a. This gate was RED when written
+against c565ea3 and is kept as a regression guard, not deleted — the violation it
+caught had shipped silently in the committed matrix since cd3e30c precisely
+because nothing was checking.
+
+HISTORY, because the disagreement is worth preserving. qa-reviewer-p11 reported
+four offending names against c565ea3; team-lead could not reproduce it and
+challenged it, having measured a tree where `sim_overall_prior_denial_rate`
+already existed. Both measurements were correct and of DIFFERENT COMMITS —
+ml-engineer-4's fix (0a7960a) landed between the report and the challenge, and
+team-lead's cited line numbers (historical.py:210, appeal.py:155) are 0a7960a's,
+where c565ea3 has historical.py:202 unprefixed. Three of the four names were real
+and are now fixed; the fourth (`log_sim_denied_amount`) was ruled a naming
+preference and this gate no longer fires on it — see below.
 
 CLAUDE.md §3.2: "Every simulated table and column name is prefixed `sim_`." The
 warehouse satisfies that and Phase 3 proved it — data-engineer-p4 renamed the
@@ -50,12 +65,28 @@ from src.features.build import MODEL_A_FEATURES
 from src.features.spec import FeatureSet
 
 
-def _sim_derived_without_prefix(feature_set: FeatureSet) -> list[tuple[str, tuple[str, ...]]]:
-    """Features built from a `sim_` column whose own name does not start with `sim_`."""
+def _sim_derived_without_any_marker(feature_set: FeatureSet) -> list[tuple[str, tuple[str, ...]]]:
+    """Features built from a `sim_` column whose own name carries NO `sim_` marker at all.
+
+    TEAM-LEAD RULING 2026-07-28, and this test implements it rather than arguing
+    with it. The blocking property is that a reader can see the provenance in the
+    name. A name with `sim_` INFIXED — `log_sim_denied_amount` — carries the
+    marker, keeps the base column legible, and nobody would read it as a real
+    Medicare quantity; team-lead called that a naming preference at most, and qa
+    agrees on the merits. A name with no marker at all —
+    `overall_prior_denial_rate`, which shipped in the committed matrix from
+    cd3e30c until ml-engineer-4 fixed it in 0a7960a — is the real failure, because
+    it is indistinguishable from the genuine CMS SOURCE columns beside it.
+
+    So the guard fires on ABSENCE of the marker, not on its position. That keeps
+    it aimed at the property §3.2 exists to protect instead of at a spelling.
+    """
     offenders: list[tuple[str, tuple[str, ...]]] = []
     for spec in feature_set.specs:
-        sources = tuple(spec.sources or ()) + tuple(getattr(spec, "prior_period_sources", None) or ())
-        if any(source.startswith("sim_") for source in sources) and not spec.name.startswith("sim_"):
+        sources = tuple(spec.sources or ()) + tuple(
+            getattr(spec, "prior_period_sources", None) or ()
+        )
+        if any(source.startswith("sim_") for source in sources) and "sim_" not in spec.name:
             offenders.append((spec.name, sources))
     return offenders
 
@@ -67,11 +98,12 @@ def _sim_derived_without_prefix(feature_set: FeatureSet) -> list[tuple[str, tupl
 def test_a_feature_derived_from_a_simulated_column_keeps_the_prefix(
     label: str, feature_set: FeatureSet
 ) -> None:
-    offenders = _sim_derived_without_prefix(feature_set)
+    offenders = _sim_derived_without_any_marker(feature_set)
     assert not offenders, (
-        f"{label}: {len(offenders)} feature(s) are derived from SIMULATED columns but do not "
-        "carry the `sim_` prefix CLAUDE.md §3.2 requires. Their sibling rates in the same "
-        "builder do carry it, so these are inconsistent with the code's own intent:\n  "
+        f"{label}: {len(offenders)} feature(s) are derived from SIMULATED columns and carry no "
+        "`sim_` marker anywhere in the name, so §3.2's provenance is lost at the feature "
+        "layer. Their sibling rates in the same builder do carry it, so these are "
+        "inconsistent with the code's own intent:\n  "
         + "\n  ".join(f"{name}  <-  {', '.join(sources)}" for name, sources in offenders)
         + "\nRename them (e.g. `sim_overall_prior_denial_rate`) and update the feature spec, "
         "the reason-code map in src/models/explain.py, and the model card. These names reach "

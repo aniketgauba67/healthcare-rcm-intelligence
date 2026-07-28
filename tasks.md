@@ -1450,8 +1450,44 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > / 998 / 9 views / drg_desc 167 / 0 claim_sk orphans / 0 unprefixed crosswalk
 > columns / reconciliation 21/21 PASS. `make train` and `make train-appeal` were
 > READ-ONLY against PG.
-- [ ] ACCEPTANCE (qa-reviewer-p11): **BLOCKED — 6 findings, 9 red tests.**
-  Reviewed feat/phase4-ml @ c565ea3 merged into feat/phase4-qa (fa8ff87).
+> FINDING 4 RECONCILED — BOTH SIDES WERE MEASURING, AND OF DIFFERENT COMMITS
+> (qa-reviewer-p11, 2026-07-28, after team-lead challenged it and asked for
+> re-verification or withdrawal). NOT withdrawn, and not upheld as written either.
+> qa reported 4 unprefixed sim-derived features against **c565ea3**, the tree under
+> review. team-lead could not reproduce it and measured `sim_overall_prior_denial_
+> rate` already present. Both are correct. **ml-engineer-4's fix landed in 0a7960a
+> BETWEEN the report and the challenge.** The proof is in the line numbers
+> team-lead cited: historical.py:210 and appeal.py:155 WITH the prefix are
+> 0a7960a's lines; at c565ea3 the same file reads `historical.py:202
+> out["overall_prior_denial_rate"] = global_rate`, unprefixed. Verified with
+> `git show c565ea3:src/features/historical.py | grep -n overall_prior` against the
+> same command on 0a7960a. ml-engineer-4's own board entry — "§3.2 VIOLATION FOUND
+> WHILE REGISTERING, AND FIXED ... shipped in the committed matrix UNPREFIXED since
+> cd3e30c ... Nothing failed, because nothing was checking" — is a third
+> independent confirmation that the finding was real on the reviewed tree.
+> DISPOSITION: 3 of the 4 names were real and are FIXED. The 4th,
+> `log_sim_denied_amount`, is sim_ INFIXED rather than prefixed; team-lead ruled it
+> a naming preference at most and **qa agrees on the merits** — the marker is
+> visible, the base column is legible, and no reader takes it for a real Medicare
+> quantity. The gate now fires on ABSENCE of the marker rather than its position,
+> which aims it at the property §3.2 protects instead of at a spelling. GREEN.
+> ON THE FALSE-POSITIVE PATTERN team-lead named (p9's fixture, p10's §4.5 route,
+> qa-p11's dollars-at-risk gate): the lesson is accepted and it is the right one.
+> This instance is NOT a fourth member of that class — it was a true positive on
+> the reviewed commit that a concurrent fix overtook. But the reviewing failure it
+> DOES expose is real and worth the same weight: **qa reported against a moving
+> branch tip without pinning the commit in the report**, which cost team-lead a
+> verification cycle and nearly cost a genuine finding its credibility. Every
+> future qa finding names the exact SHA it was measured on.
+- [ ] ACCEPTANCE (qa-reviewer-p11): **BLOCKED — 4 findings open, 5 red tests.**
+  Reviewed feat/phase4-ml @ c565ea3 (fa8ff87), re-verified @ 0a7960a.
+  **Findings 3 and 4 CLEARED by ml-engineer-4 (0a7960a) and re-run by qa, green.**
+  Registration gates pass including the content checks (SIMULATED classification
+  present, `make features` named). Committed artifact verified sane after ml's
+  degraded-persist warning: parquet d11bd0df5a918d0d, manifest d5c1ca88aa0786f7,
+  20,867 x 44, zero all-null columns, diagnosis_count 0 nulls, `written_at_utc`
+  gone, exactly 7 unprefixed features and every one genuine SOURCE/DERIVED.
+  STILL OPEN: findings 1, 2, 5, 6.
   Full suite on the merged tree: **355 passed / 9 failed / 3 skipped, ruff clean.**
   Every failure is a qa review gate; nothing unexpected is red.
   THE ML WORK IS STRONG. `make train` and `make train-appeal` both REPRODUCED end
