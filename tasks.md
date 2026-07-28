@@ -926,6 +926,50 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > False and sanitised to null. Do not reintroduce it with a convenience dump.
 - [ ] Model C: appeal success + Expected Net Recovery work-queue score
 - [ ] Slice metrics, bootstrap CIs, model card
+> CRASH + RE-SPAWN #3 2026-07-27 ~23:40Z (team-lead): qa-reviewer-p10 and
+> ml-engineer-3 hit the cap together, ~4.5h after the previous pair — the third
+> simultaneous double-crash in one day. BOTH WORKTREES WERE CLEAN, everything
+> committed (ml through c565ea3, qa through 69adf49). Nothing to preserve, which
+> is the first time that has been true and is exactly the discipline the crash
+> notes ask for. Re-spawned 2026-07-28 as ml-engineer-4 and qa-reviewer-p11.
+> Warehouse verified healthy at re-spawn: 9 views, 20,867 claims, drg_desc 167,
+> 0 orphans, 0 unprefixed crosswalk columns, reconciliation 21/21.
+> ml-engineer-3 declared PHASE 4 ML WORK COMPLETE before crashing (290 passed / 17
+> skipped, ruff clean, DB read-only throughout). Not merged; awaiting acceptance.
+> TEAM-LEAD RULINGS ON ml-engineer-3's TWO OPEN QUESTIONS:
+> 1. NO SHAP FOR MODEL C — UPHELD, with a condition. Their argument is right: a
+>    model whose paired interval cannot separate it from a category rule
+>    (xgboost − category_rule −0.0356 [−0.1325, +0.0597]) has nothing stable to
+>    attribute, and a waterfall over it would read as an explanation of a decision
+>    the data does not support. §7's ML bar is baseline-vs-advanced REPORTED,
+>    calibration, leakage, slices — SHAP is a §2 stack decision and it IS delivered
+>    for Model A. CONDITION: the model card must state explicitly WHY Model C has
+>    no SHAP, in terms of the measured non-separation, so a reader cannot mistake a
+>    deliberate omission for an oversight. That converts an absence into a finding.
+> 2. COMMITTED TRAINING MATRIX — APPROVED, reaffirmed. Keep it in git; do not
+>    switch to RCM_FEATURE_MATRIX + a CI build step. A guard that only runs where a
+>    warehouse is loaded has the shape of the defect this repo already shipped.
+> STILL OPEN AND NOT SATISFIED — §3.3, verified by team-lead on the ml branch
+> 2026-07-28: docs/provenance_register.md and docs/data_dictionary.md still have
+> ZERO mentions of artifacts/features/model_a_training_matrix.parquet. It has been
+> committed since cd3e30c. This is the ONLY data file a reader can open from a
+> clean clone with no database, so it is the most likely artifact an outside reader
+> inspects and the worst one to leave unclassified. Register it — what it is,
+> `make features` as the regeneration path, grain (one row per claim, 20,867),
+> per-column provenance, and an explicit statement that sim_-prefixed columns are
+> SIMULATED. BLOCKS Phase 4 acceptance.
+> DETERMINISM (ml-engineer-3 flagged, unexplained): one Model A run in six diverged
+> (ROC diff +0.0026 vs +0.0003, ECE 0.02056 vs 0.01964), not reproducible; two
+> consecutive full runs are byte-identical and estimator scores hash identically
+> across processes. tests/models/test_determinism.py added. TEAM-LEAD NOTE: their
+> own first suspect is the right one — `estimators.xgboost.n_jobs: 4`. Multi-thread
+> XGBoost sums gradient histograms in a thread-scheduling-dependent ORDER, and
+> floating-point addition is not associative, so bitwise-identical inputs can give
+> slightly different splits run to run. That is a known property, not a bug, and it
+> would produce exactly this signature: rare, tiny, unreproducible on demand.
+> Test at n_jobs=1 to confirm; if it holds, document it in the model card rather
+> than chasing it, and note that the CHAMPION is logistic so no headline figure
+> depends on it.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
