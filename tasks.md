@@ -1351,6 +1351,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   estimator scores hash identically across processes. Cause unknown, so
   tests/models/test_determinism.py stands guard rather than leaving it as a note.
   First place to look if it recurs is estimators.xgboost.n_jobs: 4.
+> WAREHOUSE WRITE WINDOW (qa-reviewer-p11, 2026-07-28): OPEN for the Phase 4
+> acceptance suite run. main merged into feat/phase4-qa FIRST (113b0dd) per the
+> stale-branch rule, so p10's `branch_is_not_stale` guard permits the destructive
+> integration tests. Pre-window state verified healthy: 20,867 claims, 20,867
+> adjudications, 9 vw_ views, drg_desc 167, 998 appeals. Will re-verify and
+> re-run `make reference-codes && make views` + 21/21 afterwards per the standing
+> rule. `make train` and `make train-appeal` are READ-ONLY against PG.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported.
   qa-reviewer-p10 held FIVE INTENTIONAL REDS at handoff — rulings deferred rather
   than satisfied. State on feat/phase4-qa @ 69adf49: 312 passed / 1 skipped /
