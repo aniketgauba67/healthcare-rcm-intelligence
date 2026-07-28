@@ -1488,6 +1488,42 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   20,867 x 44, zero all-null columns, diagnosis_count 0 nulls, `written_at_utc`
   gone, exactly 7 unprefixed features and every one genuine SOURCE/DERIVED.
   STILL OPEN: findings 1, 2, 5, 6.
+> QA RULINGS 2026-07-28, all measured at feat/phase4-ml @ **0a7960a** (SHA pinned
+> per the discipline qa-reviewer-p11 committed to after the finding-4 confusion):
+> A. `log_sim_denied_amount` — **NON-BLOCKING, and do NOT rename it.** qa's call
+>    under §3.2 and it goes further than team-lead's lean. Measured exposure is
+>    ZERO: `git ls-files artifacts/` shows only the MODEL A matrix is committed,
+>    there is no Model C matrix in git, and Model C has no SHAP plot by ruling, so
+>    the name reaches no artifact a reader can open (`grep -rl` over
+>    models_artifacts/ finds nothing). It also mirrors `log_billed_charge_amt`, the
+>    SOURCE analogue, so `log_<base>` is a consistent internal construction with the
+>    marker intact in the base. Renaming would churn code during an acceptance cycle
+>    for a property no reader can observe. REVISIT IN PHASE 5 if a Model C matrix is
+>    ever committed or a dashboard surfaces the name — that is when exposure starts.
+>    The gate already guards the blocking property (absence of a marker), not this.
+> B. DEGRADED-PERSIST GUARD — **PHASE 5, not a blocker.** Agreed with team-lead.
+>    The committed artifact is verified sane NOW (parquet d11bd0df5a918d0d, zero
+>    all-null columns), the failure needs a concurrent warehouse reload, and that
+>    hazard is already documented with a standing rule. Adding a new guard at the
+>    gate is scope creep. SHAPE, since it is qa's to specify: refuse the write when
+>    row count, column set, or per-column null rates deviate from the COMMITTED
+>    manifest — compare against git, NOT against the previous run. Comparing to the
+>    previous run reproduces the exact defect qa fixed in the staleness guard, where
+>    the check repaired the condition it existed to detect and "was never stale" and
+>    "was stale and got quietly rewritten" became indistinguishable. It must fail
+>    loudly; a skip is what let this through.
+> C. `split` COLUMN — **outcome UPHELD, reasoning REJECTED.** ml-engineer-4 justify
+>    leaving it unprefixed because qa's guard discovers it by name from
+>    {is_train, split, fold} and prefixing would blind the temporal check. That is
+>    backwards: a guard must never be the reason a correctness-improving rename
+>    cannot happen. The CORRECT reason is that `split` is not an attribute of the
+>    claim at all — it is a fold assignment, metadata about OUR experiment, not a
+>    statement about the simulated world. §3.2 governs simulated values; a partition
+>    label is not one. It stays unprefixed on its own merits.
+>    THE UNDERLYING ISSUE IS QA'S AND IS REAL: p8's discovery contract is
+>    name-based, and name-based discovery is what made a correct rename look
+>    dangerous. Declaration-based discovery is the better shape. PHASE 5 —
+>    tests/leakage/ is qa's and this is qa's debt, not ml's.
   Full suite on the merged tree: **355 passed / 9 failed / 3 skipped, ruff clean.**
   Every failure is a qa review gate; nothing unexpected is red.
   THE ML WORK IS STRONG. `make train` and `make train-appeal` both REPRODUCED end
