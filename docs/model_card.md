@@ -476,8 +476,11 @@ two headline queues.
   check cannot catch — **skipped**, and a skip reads like a pass. The matrix is now
   exported to `artifacts/features/model_a_training_matrix.parquet` and **committed**,
   so the probes run on a clean clone with no warehouse and no environment
-  variables. Strongest single-feature AUC **0.5859** (`sim_payer_id`) against the
-  **0.6778** oracle ceiling.
+  variables. Strongest single-feature AUC **0.5859** (`sim_payer_id`) **measured on
+  the matrix-truth intersection (`shared`)**; the same column scores **0.5871** on
+  the full 20,867-claim matrix. Both are correct and they measure different
+  populations, so neither number is quoted here without the population it came
+  from. Either way it sits below the **0.6778** oracle ceiling.
 
 ### Two SOURCE columns worth naming
 
