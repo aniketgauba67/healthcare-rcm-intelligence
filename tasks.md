@@ -640,6 +640,38 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >     with this domain explanation; a competitive logistic baseline is a realistic
 >     and credible result for denial prediction. Documented in docs/assumptions.md
 >     by simulation-engineer.
+> TEAM RULE — STALE-BRANCH WRITE HAZARD (team-lead, 2026-07-27, after
+> qa-reviewer-p9 walked into it and independently diagnosed it). A feature branch
+> that has not merged `main` can DESTROY MERGED WORK on the shared Postgres, and
+> the agent doing it cannot notice, because its own tests pass against its own
+> tree. Two live instances the same afternoon:
+>   * qa's destructive run applied `apply_ddl` from a branch predating the §3.2
+>     crosswalk rename and SILENTLY REVERTED the live crosswalk to bare column
+>     names — all 8 — while row counts, FKs, views and reconciliation 21/21 all
+>     looked healthy afterwards. Healthy-looking is what made it dangerous.
+>   * qa's restore step then ran the pre-rename view SQL against the renamed
+>     crosswalk; the build raised, apply_views.py wraps all 9 views in ONE
+>     transaction, the whole rebuild rolled back, and the layer landed at ZERO
+>     views rather than partially built. From outside, "restore attempted and
+>     failed" and "restore never ran" look identical.
+> RULE: `git merge main` in your worktree BEFORE any write to the shared database
+> — DDL, loader, `make views`, or an integration run. Not after. The trigger is
+> branch STALENESS, not the existence of an unmerged branch, so this applies even
+> when nothing of yours is outstanding.
+> Team-lead merged main into feat/phase4-ml (3cc6577) and feat/phase4-qa (8bbb423)
+> on 2026-07-27 in a quiet window with no agents running, to clear the hazard
+> before work resumed. Both verified after: ml 211 passed / 12 skipped, qa 205
+> passed / 4 skipped / 1 failed (the intentional blocker below), ruff clean on both.
+> CRASH + RE-SPAWN #2 2026-07-27 18:37Z (team-lead): ml-engineer-2 and
+> qa-reviewer-p9 hit the cap TOGETHER again, ~4.5h after the previous pair. Reset
+> 6:50pm America/New_York. Re-spawned as ml-engineer-3 and qa-reviewer-p10.
+> PRESERVED before re-spawning: 34a5b1c on feat/phase4-ml = Model C + work-queue
+> WIP (appeal.py 315 / model_c.py 456 / work_queue.py 316 + a 47-line
+> appeal_economics block in config/model.yaml), verbatim, unreviewed and unrun,
+> with NO Model C training run or metrics. qa's worktree was CLEAN — everything
+> committed through 47df189, which is the discipline the crash notes ask for.
+> Warehouse verified healthy after both crashes: 9 views, 20,867 claims, 0
+> orphans, drg_desc 167/168, 0 unprefixed crosswalk columns, reconciliation 21/21.
 > CRASH + RE-SPAWN 2026-07-27 13:51Z (team-lead): ml-engineer and qa-reviewer-p8
 > hit the ~5h account cap TOGETHER, mid-task, exactly as in Phase 3. Reset 1:50pm
 > America/New_York. Re-spawned as ml-engineer-2 and qa-reviewer-p9 — the cap is
@@ -820,6 +852,82 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > (flagged share 0.6% → 98% as the multiplier moves 0.005 → 1.0) stays a first-class
 > artifact regardless — a business parameter nobody measured is a guess, and the
 > sweep is the honest representation of a guess.
+> DOLLARS-AT-RISK — TEAM-LEAD RULING BELOW WAS WRONG, CORRECTED 2026-07-27 by
+> qa-reviewer-p10's measurement. I compared a POINT (constant scorer 20.4%) against
+> a MARGINAL interval ([16.0, 59.3]) and concluded the metric supported no claim —
+> which is the very error I was in the same breath telling ml-engineer to fix. The
+> question needs a PAIRED interval on the DIFFERENCE. qa measured it with the
+> shipped pipeline: champion − base_rate +0.1793 [+0.036, +0.532] (P(diff<=0) ~0.01)
+> and champion − payer_rule +0.2962 [+0.071, +0.534], stable across five seeds
+> (1337/7/42/20260727/99991) with zero exclusions. It does NOT span zero. The
+> unpaired comparison erred in the CONSERVATIVE direction: the metric DOES support
+> a claim and my framing understated the model.
+> ADOPTED MODEL-CARD LINE: "~18pp more denied dollars than arbitrary ranking,
+> magnitude poorly determined." The ban on "38.4% vs 20.4%" STANDS for the original
+> reason — ten claims hold 50.9% of denied dollars, so the direction is defensible
+> and the point estimate is not. The paired instrument is still required in
+> train.py:440, which still reports three unpaired intervals.
+> FIREWALL NEAR-MISS, recorded rather than scrubbed (qa-reviewer-p10, 2026-07-27;
+> team-lead verified the arithmetic). config/model.yaml:452 anchored
+> appeal_processing_cost_usd partly against "the simulation's own realized $29.88
+> per DENIED claim". That is exactly avg(sim_denial_rework_cost + sim_appeal_cost)
+> over the 2,663 denied claims = 29.8818, and sim_operating_costs is a FORBIDDEN
+> table for both models. RULING: the reference comes OUT of config/model.yaml —
+> anchoring to a generator-realized value, even as a consistency remark, makes the
+> operating point a function of the layer the §4.5 firewall exists to hide.
+> ATTRIBUTION CORRECTED by team-lead: qa first recorded this as "a forbidden table
+> was queried". Not established, and the likelier route is innocent — the figure is
+> PUBLISHED in tasks.md line 164 and docs/assumptions.md line 379, both of which
+> ml-engineer is expected to read; §4.5 forbids src/simulation/ and
+> config/simulation.yaml, not those docs. A recorded §4.5 breach is the most serious
+> accusation available on this project and must not rest on inference when a
+> published source explains it — the same failure mode as p9's fixture that reported
+> blocked columns as unblocked.
+> HOLE THIS EXPOSES (nobody's fault, for Phase 5): docs/assumptions.md and tasks.md
+> REPUBLISH generator-realized values to an agent firewalled from the generator. The
+> firewall is enforced on source files and leaks through documentation.
+> OWNERSHIP RULING (team-lead, following the Phase 1 precedent): tests/leakage/ is
+> qa-reviewer's — a guard authored by the party it constrains is not a guard.
+> tests/models/ and tests/features/ are ml-engineer's for its own modules, with qa
+> owning tests/ overall and free to amend. cd3e30c's tests/leakage/
+> test_persisted_matrix.py moves or is adopted by qa, qa's call.
+>   RESOLVED: qa ADOPTED it rather than moving it, with a better reason than my
+>   ruling gave — its subject is the discovery contract tests/leakage/ PUBLISHES,
+>   not src/features/ behaviour, so moving it would put a guard on qa's own
+>   contract inside the constrained party's directory: the same inversion the
+>   ruling rejects. qa's gate tests in tests/models/ now carry a header stating
+>   they are qa-authored, expected red, and not to be edited green.
+>   ADOPTING IT FOUND A DEFECT, and it is the restore failure mode in miniature:
+>   the staleness check called build_training_matrix(refresh=True), which
+>   PERSISTS — so the guard rewrote the committed artifact as a side effect of
+>   checking it, and thereby repaired the very condition it existed to detect. A
+>   stale file would fail once and pass forever after. "Was never stale" and "was
+>   stale and quietly rewritten" were indistinguishable. Fixed: builds through the
+>   same path without persisting and asserts sha256 unchanged across itself
+>   (digest 479ea5b57d605acc before and after, 11 passed).
+> SECOND WRITER — ml's, NON-BLOCKING (flagged by qa, team-lead ruling): src/models/
+> train.py:258 persists the matrix on every training run, and test_train_postgres
+> trains against live PG, so a full suite run dirties the COMMITTED manifest.
+> Reproduced at will; qa hit and reverted it twice, catching the second only by
+> inspecting a `git add -A`. Content is byte-stable — same parquet sha256, 20,867
+> rows, every rebuild today, which is an independent re-proof that the feature
+> store is reproducible — and the only moving field is the embedded wall clock.
+> RULING: drop `written_at_utc` from the COMMITTED manifest (or write it only
+> under `make features`). A committed artifact that changes on every test run
+> trains reviewers to ignore its diff, which is precisely how a real content
+> change would slip through unnoticed. Reproducibility wart, not a leak — fix it,
+> do not gate on it.
+> TEAM-LEAD PROCESS CHANGE (2026-07-27, prompted by qa's staleness guard firing on
+> MY commit): I have been committing board updates to main frequently through the
+> day, and every such commit makes both agent branches stale, which now correctly
+> BLOCKS their destructive integration tests. The guard is right; my cadence was
+> wrong. From here I BATCH board commits to main and announce them to both agents
+> in one message so they merge once, rather than discovering staleness mid-run.
+> NOTE FOR THE RECORD: that guard, written this afternoon, caught a genuine
+> staleness event in production conditions hours later — d5927c2 landing on main
+> mid-session — and blocked all 14 destructive tests before any reached apply_ddl.
+> Third incident today it would have prevented.
+> SUPERSEDED RULING FOLLOWS — kept for the record:
 > DOLLARS-AT-RISK RULING: as measured, champion captures 38.4% of denied dollars in
 > the top decile with CI [16.0%, 59.3%] against a constant scorer at 20.4% — and
 > 20.4% lies INSIDE that interval, so the champion is NOT distinguishable from
@@ -951,6 +1059,50 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   estimator scores hash identically across processes. Cause unknown, so
   tests/models/test_determinism.py stands guard rather than leaving it as a note.
   First place to look if it recurs is estimators.xgboost.n_jobs: 4.
+> CRASH + RE-SPAWN #3 2026-07-27 ~23:40Z (team-lead): qa-reviewer-p10 and
+> ml-engineer-3 hit the cap together, ~4.5h after the previous pair — the third
+> simultaneous double-crash in one day. BOTH WORKTREES WERE CLEAN, everything
+> committed (ml through c565ea3, qa through 69adf49). Nothing to preserve, which
+> is the first time that has been true and is exactly the discipline the crash
+> notes ask for. Re-spawned 2026-07-28 as ml-engineer-4 and qa-reviewer-p11.
+> Warehouse verified healthy at re-spawn: 9 views, 20,867 claims, drg_desc 167,
+> 0 orphans, 0 unprefixed crosswalk columns, reconciliation 21/21.
+> ml-engineer-3 declared PHASE 4 ML WORK COMPLETE before crashing (290 passed / 17
+> skipped, ruff clean, DB read-only throughout). Not merged; awaiting acceptance.
+> TEAM-LEAD RULINGS ON ml-engineer-3's TWO OPEN QUESTIONS:
+> 1. NO SHAP FOR MODEL C — UPHELD, with a condition. Their argument is right: a
+>    model whose paired interval cannot separate it from a category rule
+>    (xgboost − category_rule −0.0356 [−0.1325, +0.0597]) has nothing stable to
+>    attribute, and a waterfall over it would read as an explanation of a decision
+>    the data does not support. §7's ML bar is baseline-vs-advanced REPORTED,
+>    calibration, leakage, slices — SHAP is a §2 stack decision and it IS delivered
+>    for Model A. CONDITION: the model card must state explicitly WHY Model C has
+>    no SHAP, in terms of the measured non-separation, so a reader cannot mistake a
+>    deliberate omission for an oversight. That converts an absence into a finding.
+> 2. COMMITTED TRAINING MATRIX — APPROVED, reaffirmed. Keep it in git; do not
+>    switch to RCM_FEATURE_MATRIX + a CI build step. A guard that only runs where a
+>    warehouse is loaded has the shape of the defect this repo already shipped.
+> STILL OPEN AND NOT SATISFIED — §3.3, verified by team-lead on the ml branch
+> 2026-07-28: docs/provenance_register.md and docs/data_dictionary.md still have
+> ZERO mentions of artifacts/features/model_a_training_matrix.parquet. It has been
+> committed since cd3e30c. This is the ONLY data file a reader can open from a
+> clean clone with no database, so it is the most likely artifact an outside reader
+> inspects and the worst one to leave unclassified. Register it — what it is,
+> `make features` as the regeneration path, grain (one row per claim, 20,867),
+> per-column provenance, and an explicit statement that sim_-prefixed columns are
+> SIMULATED. BLOCKS Phase 4 acceptance.
+> DETERMINISM (ml-engineer-3 flagged, unexplained): one Model A run in six diverged
+> (ROC diff +0.0026 vs +0.0003, ECE 0.02056 vs 0.01964), not reproducible; two
+> consecutive full runs are byte-identical and estimator scores hash identically
+> across processes. tests/models/test_determinism.py added. TEAM-LEAD NOTE: their
+> own first suspect is the right one — `estimators.xgboost.n_jobs: 4`. Multi-thread
+> XGBoost sums gradient histograms in a thread-scheduling-dependent ORDER, and
+> floating-point addition is not associative, so bitwise-identical inputs can give
+> slightly different splits run to run. That is a known property, not a bug, and it
+> would produce exactly this signature: rare, tiny, unreproducible on demand.
+> Test at n_jobs=1 to confirm; if it holds, document it in the model card rather
+> than chasing it, and note that the CHAMPION is logistic so no headline figure
+> depends on it.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
