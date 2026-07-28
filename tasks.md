@@ -1719,6 +1719,92 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >      have licensed the general form "we cannot rename X because a guard looks for
 >      it by name", which must always lose. The name-based discovery contract is
 >      qa's debt and Phase 5 work.
+- [x] ACCEPTANCE (qa-reviewer-p12): **PHASE 4 PASSES §7**, measured on
+  feat/phase4-ml @ **4ecc4c5** merged into feat/phase4-qa as **aab1c3a**.
+  Two NON-BLOCKING findings below; nothing gates the merge.
+  ALL FIVE INHERITED REDS CLEARED, re-verified in one pass:
+    [READ-THEN-DROP]   BY MEASUREMENT, not by reading the comment ml-engineer-4
+                       wrote. Only mentions surviving in the ML path are comments;
+                       APPEAL_TARGET_QUERY selects 3 columns; a live
+                       build_model_c_frame is 2,663 x 60 with ZERO columns matching
+                       "disputed". The simulation-side mentions are the generator's
+                       own and are not ml's to remove.
+    [GENERATOR-ANCHOR] $29.88 and "965 of 967" both gone from config/model.yaml.
+    [SHAP-BANNER]      Verified IN THE PNG, not merely in the AST gate. Banner
+                       renders; the clipped x-label now reads in full.
+    [CSV-PROVENANCE]   README.md written into both artifact dirs BY THE RUN; gates
+                       green for model_a and model_c.
+  A DEFECT IN MY OWN GATE, found by running it rather than trusting it (20a1ca3),
+  and it is the same class my three predecessors each hit once. The constraint-1
+  check fired on ml-engineer-4's REMOVAL NOTE — "A previous version of this comment
+  reconciled $45 against the simulation's own realized cost per denied claim."
+  That sentence DELETES the anchor and discloses no generator value; $29.88 is gone
+  from the file, and $45 is the config's own appeal_processing_cost_usd. THIRD time
+  this check has confused an anchor with a statement ABOUT an anchor (v1 line-based
+  caught a disclaimer fragment; v2 sentence-based + any-digit caught this). Every
+  version's misfire pushes the reader to delete the honest sentence, against the
+  standing "recorded rather than scrubbed" ruling. Now states the property the
+  ruling protects — no generator-realized VALUE may be READABLE from this file — via
+  a foreign-number discriminator: a number the config itself SETS is not such a
+  value, any other number in generator voice is. THREE CONTROLS, because a check
+  relaxed to clear a false positive is the one most likely to have gone silent on
+  the true ones: both historical anchors replayed VERBATIM must still fire, and the
+  removal note must stay quiet. 5 passed.
+  §7 ML BAR WALKED ITEM BY ITEM, every figure REPRODUCED from a fresh run:
+    - baseline vs advanced REPORTED (not won): logistic ROC 0.6254 / PR 0.2210 /
+      Brier 0.10280 champion; xgboost - logistic +0.0003 [-0.0173, +0.0183];
+      folds 13,356 / 3,338 / 4,173; base rate 0.1205; ECE 0.01964 -> 0.01753.
+    - calibration plot PRODUCED and inspected; carries the banner.
+    - leakage tests PASS: 325 passed / 0 failed non-integration, plus 178 passed /
+      1 skipped on the read-only live-PG probes. Empirical firewall reproduces —
+      strongest single-feature AUC 0.5859 (sim_payer_id) against the 0.6778 oracle
+      ceiling, NOTHING at or above it.
+    - slice metrics by payer / facility / service line REPORTED for BOTH models
+      (A also value_band; C also denial_category), each with CI + beats_chance.
+    - model card CURRENT at 658 lines; every headline figure checked against
+      metrics.json, not eyeballed.
+    - Model C reproduces: xgboost 0.5611/0.4914, category_rule 0.5571/0.4793,
+      queue 65.7/61.0/59.8/0.7, 22 monthly queues, 237 deadline-critical claims.
+      The [READ-THEN-DROP] fix moved NO figure, confirming the column was inert —
+      which is exactly why nothing caught it for so long.
+  REPRODUCIBILITY, and the written_at_utc churn is CLOSED: committed artifacts are
+  BYTE-IDENTICAL before and after `make train` + `make train-appeal` (parquet
+  d11bd0df5a918d0d, manifest d5c1ca88aa0786f7) and `git status` stayed CLEAN.
+  Those digests also match p11's and p10's across TWO session boundaries.
+  p11's board line calling the churn "still open" contradicted their own line above
+  it; measured now, it is fixed.
+  §3.2/§3.3 RE-MEASURED ON THE FILE: 20,867 x 44, zero all-null columns,
+  diagnosis_count 0 nulls, 34 sim_-prefixed / 10 unprefixed = claim_sk + prvdr_num +
+  split + 7 features. All 7 confirmed genuine SOURCE/DERIVED — I traced
+  `provider_state_cd` specifically because a crosswalked state WOULD be SIMULATED
+  under §3.4, and it is not: it comes from dim_provider via provider_key, is the
+  SYNTHETIC provider's own state, and the register already says "never the
+  crosswalked real facility's". Registered arithmetic 34+4+6=44 checks out.
+  HONESTY PASS CLEAN. §4.5 firewall intact (no ml module imports src/simulation).
+  Every "fraud" occurrence in the repo is an explicit negation. Card's opening
+  honesty block is prominent and unambiguous. metrics.json carries a `provenance`
+  key on both models. models_artifacts/ is GITIGNORED, so artifact exposure begins
+  only after a run — and that same run writes the README beside the CSVs.
+  Warehouse left HEALTHY: 9 views, 20,867 claims, 20,867 adjudications, 131,077
+  workflow events, 998 appeals, drg_desc 167, 0 orphans, reconciliation 21/21 PASS.
+  NO DESTRUCTIVE WINDOW WAS OPENED — I confirmed by inspection that every apply_ddl
+  caller lives under tests/integration/, so the live-PG leakage probes and the
+  reconciliation gate ran read-only. Nothing needed dropping to prove Phase 4.
+> TWO NON-BLOCKING FINDINGS (qa-reviewer-p12 @ 4ecc4c5), neither gating:
+> [README-STALE] §7 names README in the Docs bar, and README.md has not been
+>   touched since the 2026-07-22 scaffold (2b5f90d). It is 11 lines and mentions
+>   Model A, Model C, `make train`, and docs/model_card.md exactly zero times — a
+>   658-line model card that nothing in the repo's front door points to. NOT
+>   blocking, on two grounds: the honesty statement it does carry is correct and
+>   prominent, so §1 is not at risk; and Phase 5 already OWNS "README final,
+>   screenshots, demo script". Minimal fix if it is wanted before then is two
+>   lines — link the model card, name the two make targets.
+> [FIREWALL-POPULATION] model_card.md:479 quotes "strongest single-feature AUC
+>   0.5859" without naming its population, which is the one thing p10's precision
+>   note asked for: the suite's 0.5859 is scored on `shared` (matrix ∩ live truth
+>   frame) and p10's 0.5871 on the full 20,867, and BOTH are right. Conclusion is
+>   untouched — both sit far below the 0.6778 ceiling — so this is a precision nit,
+>   not a correctness one. Add "on the probe population" and it is closed.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata
