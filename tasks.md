@@ -1351,26 +1351,72 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   estimator scores hash identically across processes. Cause unknown, so
   tests/models/test_determinism.py stands guard rather than leaving it as a note.
   First place to look if it recurs is estimators.xgboost.n_jobs: 4.
-> WAREHOUSE WRITE WINDOW (qa-reviewer-p11, 2026-07-28): OPEN for the Phase 4
-> acceptance suite run. main merged into feat/phase4-qa FIRST (113b0dd) per the
-> stale-branch rule, so p10's `branch_is_not_stale` guard permits the destructive
-> integration tests. Pre-window state verified healthy: 20,867 claims, 20,867
-> adjudications, 9 vw_ views, drg_desc 167, 998 appeals. Will re-verify and
-> re-run `make reference-codes && make views` + 21/21 afterwards per the standing
-> rule. `make train` and `make train-appeal` are READ-ONLY against PG.
-- [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported.
-  qa-reviewer-p10 held FIVE INTENTIONAL REDS at handoff — rulings deferred rather
-  than satisfied. State on feat/phase4-qa @ 69adf49: 312 passed / 1 skipped /
-  5 FAILED, ruff clean.
-    tests/models/test_cost_matrix_ruling.py       (2) — ruling 1 + constraint 1
-    tests/models/test_dollars_at_risk_ruling.py   (2) — ruling 2, static + artifact
-    tests/leakage/test_model_c_boundary.py        (1) — read-then-drop of
-                                                        sim_appeal_disputed_amount
-  Repro: `uv run pytest tests/models/test_cost_matrix_ruling.py
-  tests/models/test_dollars_at_risk_ruling.py tests/leakage/test_model_c_boundary.py -v`
-  Each failure message states the ruling and the fix. ml-engineer-3 claims all
-  three rulings are now met on feat/phase4-ml @ c565ea3; qa-reviewer-p11 is
-  re-running them against that tree rather than reading the claim.
+> WAREHOUSE WRITE WINDOW (qa-reviewer-p11, 2026-07-28): OPENED then CLOSED for the
+> Phase 4 acceptance suite run. main merged into feat/phase4-qa FIRST (113b0dd) per
+> the stale-branch rule, so p10's `branch_is_not_stale` guard permitted the
+> destructive integration tests. Pre-window: 20,867 claims, 20,867 adjudications,
+> 9 vw_ views, drg_desc 167, 998 appeals. `make reference-codes && make views` run
+> afterwards per the standing rule. POST-WINDOW, IDENTICAL TO PRE: 20,867 / 20,867
+> / 998 / 9 views / drg_desc 167 / 0 claim_sk orphans / 0 unprefixed crosswalk
+> columns / reconciliation 21/21 PASS. `make train` and `make train-appeal` were
+> READ-ONLY against PG.
+- [ ] ACCEPTANCE (qa-reviewer-p11): **BLOCKED — 6 findings, 9 red tests.**
+  Reviewed feat/phase4-ml @ c565ea3 merged into feat/phase4-qa (fa8ff87).
+  Full suite on the merged tree: **355 passed / 9 failed / 3 skipped, ruff clean.**
+  Every failure is a qa review gate; nothing unexpected is red.
+  THE ML WORK IS STRONG. `make train` and `make train-appeal` both REPRODUCED end
+  to end and every figure in the 564-line model card matches the run to the digit
+  (Model A logistic ROC 0.6254 / PR 0.2210 / Brier 0.10280; xgboost − logistic
+  +0.0003 [−0.0173, +0.0183]; Model C xgboost 0.5611, − category_rule −0.0356
+  [−0.1325, +0.0597]; queue 65.7 / 61.0 / 59.8 / 0.7; 22 monthly queues, 237
+  distinct deadline-critical claims). The parquet is byte-identical to p10's
+  digest 479ea5b57d605acc ACROSS A SESSION BOUNDARY. §4.5 firewall intact — no
+  ml module imports src/simulation. metrics.json strict-JSON clean on both models.
+  THREE RULINGS RE-RUN — two SATISFIED, one NOT:
+    1. COST MATRIX — decomposition SATISFIED. Factors are literal cited constants;
+       `prevented_value_multiplier()` computes the product FROM them, so the
+       flagged share cannot feed back into the factors. Both hard constraints hold
+       structurally. Constraint 1 STILL VIOLATED in the config text — see finding 2.
+    2. DOLLARS AT RISK — SATISFIED. `paired_difference` is emitted and reproduces:
+       champion − constant +17.9% [+4.2%, +51.7%], − payer rule +29.6% [+7.1%,
+       +53.4%]. Card carries the "do not quote a single number" instruction and
+       reports the payer rule's 8.7% < 20.4% finding prominently, not buried.
+    3. READ-THEN-DROP — **NOT FIXED.** See finding 1.
+  TEAM-LEAD CONDITIONS BOTH MET: the card states plainly that Model C's
+  probability "does not earn its place" and ships ENR for the cutoff and tiering
+  rather than the ordering, without dressing it up and without dismissing the
+  cutoff; and it states WHY there is no SHAP for Model C in terms of the measured
+  non-separation.
+  TWO DEFECTS FOUND IN MY OWN PREDECESSOR GATES by running them rather than
+  re-reading them; both fixed in 5b2d158, and fixing them did NOT clear ml:
+    - the cost-matrix constraint-1 check was line-based and reported a fragment of
+      a DISCLAIMER as an offence. Now sentence-level, requires a NUMBER spoken in
+      the generator's voice — and it then found a SECOND real instance the old
+      version missed.
+    - the dollars-at-risk check asserted interval fields against a dict of
+      COMPARISONS and failed on a metrics.json that satisfies the ruling
+      completely. That is a false leak report — p9's fixture defect class.
+  ONE NON-FINDING, recorded so nobody reconstructs it as one:
+  tests/leakage/test_model_c_boundary.py arrived as an add/add conflict. p10 and
+  ml-engineer-3 independently wrote files at that path on branches that had not
+  met; the file was never on main, so neither could see the other's. NAMING
+  COLLISION, NOT an ownership breach. Resolved as a union — ml's parametrized
+  boundary sweep is good work and is kept alongside qa's two gate assertions.
+  FINDINGS, all with repro commands, in the handoff report to team-lead:
+    1. sim_appeal_disputed_amount read-then-drop — STILL PRESENT at ml's tip
+    2. $29.88 generator anchor still in config/model.yaml, + a 2nd instance
+    3. §3.3 committed training matrix registered nowhere (team-lead's blocker)
+    4. §3.2 prefix lost by 4 features derived from sim_ columns
+    5. SHAP PNG ships with no synthetic-data banner
+    6. 12 artifact CSVs ship with no provenance beside them
+  NON-BLOCKING, measured: team-lead's determinism hypothesis is NOT SUPPORTED.
+  8 xgboost fits at n_jobs=4 and 8 at n_jobs=1 on the committed matrix give ONE
+  score digest, 97391a34056d0c3a, identical across thread counts. Isolates the
+  estimator fit only (not calibration or the bootstrap path), but the first
+  suspect is cleared and the divergence should be looked for elsewhere.
+  ALSO STILL OPEN, non-blocking, previously ruled: `written_at_utc` still churns
+  artifacts/features/model_a_training_matrix.json on every `make train`
+  (reproduced; only that field changes, the parquet is byte-stable).
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata
