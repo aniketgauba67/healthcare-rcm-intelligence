@@ -970,6 +970,48 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > Test at n_jobs=1 to confirm; if it holds, document it in the model card rather
 > than chasing it, and note that the CHAMPION is logistic so no headline figure
 > depends on it.
+> TEAM RULE — PIN THE SHA (team-lead, 2026-07-28, after a §3.2 finding was nearly
+> lost to a disagreement neither party could settle). qa-reviewer-p11 filed a
+> correct finding measured on c565ea3; ml-engineer-4 fixed it independently while
+> registering the matrix; team-lead then "disproved" it by reading the ml
+> worktree's WORKING TREE — which already contained the uncommitted fix — and
+> reported that as though it described c565ea3. Three parties, all measuring
+> correctly, two of different trees.
+> RULE: every finding names the commit it was measured on, AND every challenge to
+> a finding names the commit it was checked against. Team-lead violated the second
+> half, so this binds the coordinator too. On a project where several agents work
+> concurrently in separate worktrees against one shared database, an unpinned
+> observation is not reproducible even when it is correct.
+> WHAT THE FINDING ACTUALLY WAS, since it is the substantive lesson:
+> `overall_prior_denial_rate` shipped UNPREFIXED in the committed training matrix
+> from cd3e30c to 0a7960a. It is an aggregate of a fabricated denial, and in the
+> one data file a reader can open from a clean clone with no database it reads as
+> a real Medicare book rate. Nothing failed because nothing was checking. Renamed
+> to sim_overall_prior_denial_rate (Model C counterpart sim_overall_prior_overturn_
+> rate); NO metric moved. Now guarded on DECLARED LINEAGE rather than column name —
+> a name check cannot catch a name defect — with a negative control that restores
+> the old name, watches the test fail naming the offending lineage, and passes on
+> restore. `log_sim_denied_amount` infixes rather than prefixes and STAYS: qa
+> re-aimed that gate to fire on ABSENCE of the sim_ marker rather than its
+> position, which targets the property §3.2 protects instead of a spelling.
+> TEAM RULE — LABEL, DON'T NUMBER: the team-lead's spawn brief and the reviewer's
+> findings both used 1-4 for different work, so ml's "items 1-4 DONE" did not
+> answer qa's findings 1-2 and both parties briefly believed the other was
+> stalling. Fix lists now use LABELS ([READ-THEN-DROP], [GENERATOR-ANCHOR],
+> [SHAP-BANNER], [CSV-PROVENANCE]) and replies quote them back.
+> FOR PHASE 5 — [ARTIFACT-REWRITE], found by ml-engineer-4 by accident and worth
+> more than the accident: a training run against a TRANSIENTLY DEGRADED warehouse
+> silently PERSISTED a bad matrix (diagnosis_count all-null) over the committed
+> artifact, and the write landed BEFORE the run failed loudly. The artifact that
+> exists specifically so the §4.1 probes run without a warehouse is therefore
+> rewritable by the very condition it guards against — the same shape as p10's
+> staleness check that repaired what it was detecting, and the restore that rolled
+> back to zero views while looking like it never ran. Caught only because they
+> hashed before and after. FIX (Phase 5, not blocking Phase 4): a content sanity
+> check before persist — refuse to overwrite when row counts or null rates move
+> materially. Write path is ml's, guard shape is qa's, contract is shared.
+> ALSO RECORDED: running an integration test BY FILE PATH bypasses the
+> `-m "not integration"` filter. Not obvious, and it hit the shared warehouse.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
