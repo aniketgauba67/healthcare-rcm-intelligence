@@ -210,7 +210,7 @@ def test_add_prior_period_rates_names_and_shapes() -> None:
         smoothing=10.0,
     )
     for column in (
-        "overall_prior_denial_rate",
+        "sim_overall_prior_denial_rate",
         "sim_entity_prior_denial_rate",
         "sim_entity_prior_claims",
         "sim_other_prior_denial_rate",

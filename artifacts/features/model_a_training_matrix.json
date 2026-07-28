@@ -1,5 +1,4 @@
 {
-  "written_at_utc": "2026-07-27T23:35:34+00:00",
   "purpose": "Model A training matrix, discoverable by tests/leakage/ (CLAUDE.md \u00a74.1). Regenerate with `make features`.",
   "provenance": "CMS synthetic claim facts (SOURCE) + sim_-prefixed SIMULATED adjudication inputs. No real patient, provider or payer data.",
   "rows": 20867,
@@ -37,7 +36,7 @@
     "drg_cd",
     "provider_state_cd",
     "sim_submission_month",
-    "overall_prior_denial_rate",
+    "sim_overall_prior_denial_rate",
     "sim_payer_prior_denial_rate",
     "sim_payer_prior_claims",
     "sim_provider_prior_denial_rate",
@@ -60,5 +59,5 @@
     "test_rows": 4173
   },
   "leakage_config_digest": "997e2d7fb7a81e92",
-  "parquet_sha256_16": "479ea5b57d605acc"
+  "parquet_sha256_16": "d11bd0df5a918d0d"
 }

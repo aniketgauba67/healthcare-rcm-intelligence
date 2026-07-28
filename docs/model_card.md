@@ -231,6 +231,9 @@ explanation: ~33% of observed denials in this data are pure label noise with no
 mechanism behind them, by construction. An explanation of an unexplainable denial
 would be a fabrication.
 
+SHAP is published for **Model A only**. Model C has none, deliberately and for a
+measured reason — see §2, "No SHAP is published for Model C".
+
 ---
 
 ## 2. Model C — appeal success and Expected Net Recovery
@@ -312,11 +315,24 @@ covers 0.5 — e.g. PRIOR_AUTH_MISSING 0.7188 [0.4815, 0.9091] on 18 claims, and
 CODING_INVALID 0.3399 [0.2000, 0.5023] on 31. The point estimates are not
 findings. 157 providers in the test fold, **0 scorable**.
 
-**No SHAP is published for Model C, deliberately.** A model that a paired interval
-cannot separate from a category rule has nothing stable to attribute, and a
-waterfall over it would read as an explanation of a decision the data does not
-support. The analyst-facing explanation for a denial is the queue's tier and its
-`recommended_action`, which are rule-based and legible.
+**No SHAP is published for Model C. This is a deliberate omission, not an
+oversight, and the reason is the measurement two paragraphs up.** SHAP *is*
+delivered for Model A (§1, "Explanations"); the difference is what the two models
+measured. Model C's paired interval against the denial-category rule is
+**−0.0356 [−0.1325, +0.0597]** — it spans zero, so on this test fold the model is
+not distinguishable from a rule that needs no model at all, and every slice
+interval covers 0.5 besides. A model that cannot be separated from a lookup table
+has nothing stable to attribute. Publishing per-claim waterfalls over it would
+manufacture exactly the impression the numbers refuse to support: that the score
+has identifiable drivers a reader can act on. Attribution is only honest once
+there is a signal to attribute, and 193 test rows have not established one.
+
+What an analyst gets instead is not nothing, and it is not a weaker substitute:
+the explanation for a denial is the queue's **tier** and its
+`recommended_action`, which are rule-based, auditable, and true by construction
+rather than estimated. If a later refit on more appeal volume separates the model
+from the category rule, SHAP for Model C becomes appropriate and should be added
+then.
 
 ### The work queue
 
@@ -526,10 +542,52 @@ provenance rules are written to prevent.
    book. The sweep shows how much rests on them.
 6. Dollars-at-risk is measurable but not precise: the paired interval excludes
    zero and spans +4.2% to +51.7%.
-7. One Model A run in this session diverged from five others and could not be
-   reproduced afterwards; `tests/models/test_determinism.py` now guards it.
+7. One Model A run diverged from five others and has never been reproduced. The
+   leading hypothesis was tested and **rejected** (§5.1 below). Cause remains
+   unexplained; `tests/models/test_determinism.py` stands guard.
 8. Model C's live snapshot is degenerate on this warehouse (1 open claim) because
    of the thin 2023–24 tail.
+
+### 5.1 The unexplained run, and the hypothesis that did not survive
+
+One Model A run on 2026-07-27 reported `xgboost − logistic` ROC-AUC **+0.0026**
+where five other runs that day reported **+0.0003**, and uncalibrated ECE
+**0.02056** against **0.01964**. It has not recurred.
+
+The standing explanation was multi-threaded XGBoost: gradient histograms summed
+in a thread-scheduling-dependent order, floating-point addition not being
+associative, so identical inputs can yield slightly different splits — a known
+library property that would produce exactly this signature (rare, tiny, not
+reproducible on demand). `estimators.xgboost.n_jobs: 4` was the suspect.
+
+**Tested on 2026-07-28, and it does not hold here.** Fitting the same XGBoost
+pipeline on the same fit fold and hashing the raw test-fold scores gave **one
+distinct hash across 38 fits** — 20 at `n_jobs=4` and 20 at `n_jobs=1` in one
+process (identical to each other), plus 3 fits in each of six separate processes
+at `OMP_NUM_THREADS` of 1, 2, 3, 4, 8 and 16. Every one:
+`607f1d7abd126139`. XGBoost's `hist` tree method is bitwise deterministic on this
+data regardless of thread count, so thread scheduling cannot be the mechanism.
+
+Two further points argue against it independently. The figure that moved was
+`ece_uncalibrated`, which belongs to the **champion — and the champion is
+logistic**, not XGBoost; a defect confined to the tree model could not move it. A
+champion *flip* would explain both numbers at once, but the selection margin on
+the calibration fold is PR-AUC 0.2769 vs 0.2576, a gap far too wide for a
+floating-point perturbation to cross.
+
+So the cause is genuinely unknown, and it is recorded that way rather than
+attributed to a plausible mechanism that the measurement rejects. What limits the
+consequences is that **the champion is logistic**, so no headline figure in this
+card depends on the XGBoost path; the diverging quantity is a comparison against
+a model that loses either way. `tests/models/test_determinism.py` fails the build
+if two consecutive runs stop agreeing.
+
+One real order-instability *was* found and fixed while testing this: the SHAP
+global-importance table was sorted with pandas' default non-stable quicksort, so
+the features XGBoost never split on — all tied at exactly 0.0 — could reorder for
+reasons unrelated to the model. Both sorts now pass `kind="stable"`. That was
+never the divergence above (importances are not inputs to any metric), but it was
+making this artifact's diffs noisier than the underlying model.
 
 ## 6. Reproducing
 

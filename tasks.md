@@ -1103,6 +1103,96 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > Test at n_jobs=1 to confirm; if it holds, document it in the model card rather
 > than chasing it, and note that the CHAMPION is logistic so no headline figure
 > depends on it.
+- [x] §3.3 BLOCKER CLEARED — committed training matrix REGISTERED (ml-engineer-4).
+  docs/provenance_register.md gains "The committed Model A training matrix" and
+  docs/data_dictionary.md gains the matching section: what it is, `make features`
+  as the regeneration path, grain (one row per claim, 20,867 x 44), the split, and
+  per-column provenance for all 44 columns with an explicit statement that every
+  sim_-prefixed column is SIMULATED.
+  COUNTS VERIFIED AGAINST THE FILE, NOT BY HAND — and my hand count was wrong
+  twice: SIMULATED 34 (32 features + sim_denial_flag + sim_submission_date, not
+  33), SOURCE 4, DERIVED 6, sum 44, zero unaccounted. The register now states the
+  arithmetic so a reader can check it.
+- [x] §3.2 VIOLATION FOUND WHILE REGISTERING, AND FIXED (ml-engineer-4).
+  `overall_prior_denial_rate` shipped in the committed matrix UNPREFIXED since
+  cd3e30c. It is computed entirely from sim_denial_flag — an aggregate of a
+  fabricated denial — so §3.2 makes it a simulated column. In the ONE data file a
+  reader can open from a clean clone with no database, a column called
+  "overall_prior_denial_rate" reads as a real Medicare book rate. Nothing failed,
+  because nothing was checking. Renamed to `sim_overall_prior_denial_rate`, and
+  its Model C counterpart to `sim_overall_prior_overturn_rate`.
+  NO NUMBER MOVED: every Model A and Model C figure in the card reproduces exactly
+  (logistic ROC 0.6254 / PR 0.2210, xgboost - logistic +0.0003 [-0.0173, +0.0183],
+  ECE 0.01964 -> 0.01753, dollars +17.9% [+4.2%, +51.7%]; C xgboost 0.5611/0.4914,
+  category_rule 0.5571/0.4793, enr - largest -4.7% [-16.7%, +0.9%]). Metrics JSONs
+  diff to nothing but the rename. SHAP top drivers unchanged, no feature UNMAPPED.
+  GUARDED so the next one fails instead of shipping: tests/features/
+  test_matrix_provenance.py checks the DECLARATION, not the column name — a
+  feature whose declared lineage touches a sim_ source must carry the prefix.
+  NEGATIVE CONTROL RUN: restoring the old name makes it fail with the offending
+  lineage named, then passes again on restore. A guard that cannot fail is not one.
+- [x] WALL CLOCK DROPPED FROM THE COMMITTED MANIFEST (ml-engineer-4, per ruling).
+  `written_at_utc` removed outright rather than gated behind `make features`:
+  gating it would mean train.py REMOVING the field on every run, which is also a
+  diff. Every remaining field is a function of content or config, so all writers
+  emit identical bytes. `make features` prints the build time to stdout instead;
+  the build time of record is the git commit date.
+  MEASURED: two consecutive `make features` and two `make train` runs all leave
+  manifest sha256 d5c1ca88aa0786f7d39c7ac055b13c264654ea1a84ef9e75412c5d2fed454e8c
+  and parquet d11bd0df5a918d0debef9858e1dcc6c05de392f7dddb322741576a2ae73d42d8.
+  Guarded without a database by writing the artifact twice to tmp_path and
+  comparing bytes — the property stated directly, rather than grepping keys for
+  words that look like timestamps (my first attempt did that and false-positived
+  on `time_column`, which is a column NAME).
+- [x] DETERMINISM: THE n_jobs HYPOTHESIS IS REJECTED (ml-engineer-4). Tested as
+  instructed; it does not hold. Fitting the same xgboost pipeline on the same fit
+  fold and hashing raw test-fold scores gives ONE distinct hash (607f1d7abd126139)
+  across 38 fits — 20 at n_jobs=4 and 20 at n_jobs=1 in-process, plus 3 fits in
+  each of six SEPARATE processes at OMP_NUM_THREADS 1/2/3/4/8/16. xgboost `hist`
+  is bitwise deterministic on this data at every thread count, so thread
+  scheduling cannot be the mechanism.
+  TWO INDEPENDENT ARGUMENTS AGAINST IT: the figure that moved was ece_uncalibrated,
+  which belongs to the CHAMPION — and the champion is LOGISTIC, so a defect
+  confined to the tree model could not move it. A champion flip would explain both
+  numbers at once, but the calibration-fold margin is PR-AUC 0.2769 vs 0.2576, far
+  too wide for a floating-point perturbation to cross.
+  Cause therefore remains UNKNOWN and the card says so, in §5.1, rather than
+  attributing it to a plausible mechanism the measurement rejects. Consequences
+  bounded: champion is logistic, so no headline figure depends on the xgboost path.
+  ONE REAL ORDER-INSTABILITY WAS FOUND AND FIXED en route: the SHAP global
+  importance table sorted with pandas' default NON-stable quicksort, so features
+  xgboost never split on (all tied at exactly 0.0) could reorder for reasons
+  unrelated to the model — observed live, two zero rows swapping after an
+  unrelated rename. Both sorts now pass kind="stable". Never the divergence above
+  (importances feed no metric), but it was making the artifact's diffs noisy.
+- [x] MODEL C SHAP ABSENCE now states the MEASURED non-separation (ml-engineer-4,
+  team-lead condition). The card previously gave the reason in words ten lines
+  below the number; it now restates -0.0356 [-0.1325, +0.0597] inline, says the
+  interval spans zero, says SHAP IS delivered for Model A so the contrast is
+  visible, and names the condition under which Model C SHAP becomes appropriate.
+  A forward pointer was added to §1's Explanations section so a reader who goes
+  looking for Model C's SHAP finds the reason rather than a gap.
+> WARNING FOR qa-reviewer-p11 AND team-lead — CONCURRENT WAREHOUSE RELOAD SEEN
+> (ml-engineer-4, 2026-07-28 ~14:20Z). I queried the warehouse mid-run and found
+> sim_workflow_events at 0 rows (should be 131,077); it was back to 131,077 three
+> minutes later. Almost certainly qa's integration suite calling apply_ddl, which
+> drops and recreates. Two consequences worth knowing:
+> (1) MY MISTAKE, RECORDED: I ran `pytest tests/models/test_train_postgres.py
+>     tests/features/test_feature_store_postgres.py` by FILE PATH, which bypasses
+>     the `-m "not integration"` filter I had been using correctly everywhere
+>     else. Naming an integration file directly runs it. I will not do that again.
+> (2) THE REAL FINDING: that run PERSISTED A DEGRADED MATRIX OVER THE COMMITTED
+>     ARTIFACT — manifest sha moved to 1e3a00f7... with diagnosis_count all-null,
+>     because the warehouse was mid-reload. It failed loudly afterwards
+>     (cumsum on object dtype), but the WRITE had already happened. So the
+>     committed artifact is rewritable by any training run against a transiently
+>     degraded warehouse, and nothing in the write path checks that what it is
+>     about to persist is sane. I caught it only because I hashed before and after.
+>     Restored from git, rebuilt on a healthy warehouse, and both shas came back
+>     bit-identical to the clean build — but a content sanity check before persist
+>     (or a refusal to overwrite when row counts/null rates move) belongs on the
+>     Phase 5 list. Flagging, not fixing: the write path is mine but the guard's
+>     shape is qa's call.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
 
 ## Phase 5 — App + Packaging (lead: app-engineer)

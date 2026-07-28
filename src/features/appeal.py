@@ -152,7 +152,7 @@ def _spec_list() -> tuple[FeatureSpec, ...]:
                 prior_period_sources=("sim_appeal_outcome",),
             ),
             FeatureSpec(
-                name="overall_prior_overturn_rate",
+                name="sim_overall_prior_overturn_rate",
                 kind="numeric",
                 description="Book-wide prior-period overturn rate — the moving base rate the "
                 "others shrink toward.",
@@ -219,14 +219,14 @@ def _engineer(frame: pd.DataFrame, config: dict) -> pd.DataFrame:
         "sim_payer_prior_claims",
         "sim_category_prior_denial_rate",
         "sim_category_prior_claims",
-        "overall_prior_denial_rate",
+        "sim_overall_prior_denial_rate",
     ]
     renamed = {
         "sim_payer_prior_denial_rate": "sim_payer_prior_overturn_rate",
         "sim_payer_prior_claims": "sim_payer_prior_appeals",
         "sim_category_prior_denial_rate": "sim_category_prior_overturn_rate",
         "sim_category_prior_claims": "sim_category_prior_appeals",
-        "overall_prior_denial_rate": "overall_prior_overturn_rate",
+        "sim_overall_prior_denial_rate": "sim_overall_prior_overturn_rate",
     }
     # Model A's book DENIAL rate arrives on the merged frame under exactly the
     # name `add_prior_period_rates` produces for the book OVERTURN rate. Renaming
