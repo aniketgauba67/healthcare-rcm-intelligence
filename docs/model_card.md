@@ -585,6 +585,13 @@ champion *flip* would explain both numbers at once, but the selection margin on
 the calibration fold is PR-AUC 0.2769 vs 0.2576, a gap far too wide for a
 floating-point perturbation to cross.
 
+**qa-reviewer reached the same conclusion independently**, on a separately
+written probe: 8 fits at `n_jobs=4` and 8 at `n_jobs=1` on the committed matrix
+gave one score digest across all 16 — `97391a34056d0c3a`, identical between
+thread counts (qa-reviewer-p11, recorded on `feat/phase4-qa`; it isolates the
+estimator fit, not the calibration or bootstrap path). Two independent
+measurements, two different harnesses, same answer.
+
 A standing check rather than a note: `tests/models/test_determinism.py` refits
 both estimators and compares score vectors bitwise, and — under `RCM_SLOW_TESTS`
 — compares two full runs on every reported number. The divergence showed up in a
