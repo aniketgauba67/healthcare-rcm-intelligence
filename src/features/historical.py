@@ -187,7 +187,8 @@ def add_prior_period_rates(
     """Attach a `{prefix}_prior_denial_rate` / `_prior_claims` pair per entity.
 
     All rates shrink toward one shared prior-period global rate, computed once so
-    every entity is pulled toward the same moving target.
+    every entity is pulled toward the same moving target and emitted as
+    `sim_overall_prior_denial_rate`.
     """
     global_rate = prior_period_rate(
         frame,
@@ -199,7 +200,14 @@ def add_prior_period_rates(
     ).raw_rate
 
     out = frame.copy()
-    out["overall_prior_denial_rate"] = global_rate
+    # The book rate carries the `sim_` prefix (CLAUDE.md §3.2) because it is an
+    # aggregate of a SIMULATED outcome column, even though its keys are dates.
+    # Every entity rate below inherits the prefix from its `definitions` key; this
+    # one has no entity to inherit from, so the name states it directly. An
+    # unprefixed "overall_prior_denial_rate" sitting in the committed matrix would
+    # read to an outsider as a real Medicare denial rate, which is exactly the
+    # misreading the prefix rule exists to prevent.
+    out["sim_overall_prior_denial_rate"] = global_rate
     for prefix, key in definitions.items():
         result = prior_period_rate(
             frame,

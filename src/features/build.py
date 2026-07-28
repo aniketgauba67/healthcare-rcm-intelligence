@@ -172,7 +172,7 @@ def _spec_list() -> tuple[FeatureSpec, ...]:
                 sources=("sim_submission_date",),
             ),
             FeatureSpec(
-                name="overall_prior_denial_rate",
+                name="sim_overall_prior_denial_rate",
                 kind="numeric",
                 description="Book-wide denial rate over the embargoed prior window — the moving "
                 "base rate every other historical rate shrinks toward.",

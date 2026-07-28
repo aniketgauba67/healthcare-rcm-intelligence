@@ -122,7 +122,10 @@ REASON_CODES: dict[str, tuple[str, str]] = {
         "SVC-03",
         "Thin service-line history; treat the rate as uncertain.",
     ),
-    "overall_prior_denial_rate": ("BOOK-01", "Book-wide denial rate at the time of submission."),
+    "sim_overall_prior_denial_rate": (
+        "BOOK-01",
+        "Book-wide denial rate at the time of submission.",
+    ),
     "billed_charge_amt": ("CHG-01", "High-dollar claim; route for pre-bill review."),
     "log_billed_charge_amt": ("CHG-01", "High-dollar claim; route for pre-bill review."),
     "drg_cd": ("DRG-01", "DRG-specific risk; check DRG-to-documentation alignment."),
@@ -200,12 +203,19 @@ def explain_tree_model(
             "feature": owners,
             "mean_abs_shap": np.abs(values).mean(axis=0),
         }
-    ).sort_values("mean_abs_shap", ascending=False)
+    ).sort_values("mean_abs_shap", ascending=False, kind="stable")
 
+    # `kind="stable"` on both sorts, deliberately. Features xgboost never split on
+    # all carry mean_abs_shap exactly 0.0, and pandas' default quicksort orders
+    # tied rows arbitrarily — so the published importance table could reorder its
+    # zero-importance tail for reasons that have nothing to do with the model.
+    # Observed: renaming one feature reshuffled two unrelated zero rows. A stable
+    # sort pins ties to the declared feature order, so a diff in this table always
+    # means an importance actually moved.
     grouped = (
-        encoded_importance.groupby("feature", as_index=False)["mean_abs_shap"]
+        encoded_importance.groupby("feature", as_index=False, sort=False)["mean_abs_shap"]
         .sum()
-        .sort_values("mean_abs_shap", ascending=False)
+        .sort_values("mean_abs_shap", ascending=False, kind="stable")
         .reset_index(drop=True)
     )
     grouped["share"] = grouped["mean_abs_shap"] / grouped["mean_abs_shap"].sum()

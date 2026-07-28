@@ -114,8 +114,15 @@ def persist_training_matrix(
     stamped.to_parquet(path, index=False)
 
     split = split_from_config(frame, cfg)
+    # NO WALL CLOCK IN THIS MANIFEST. Every field below is a function of the
+    # matrix content or the config that produced it, so any writer — `make
+    # features`, `make train`, or a test that happens to train against live
+    # Postgres — emits byte-identical bytes. A committed artifact that changed on
+    # every test run trained reviewers to ignore its diff, which is exactly how a
+    # real content change slips through; qa reverted a spurious timestamp diff
+    # twice before this was removed. The build time of record is the git commit
+    # date; `make features` also prints it to stdout for the operator.
     manifest: dict[str, Any] = {
-        "written_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "purpose": "Model A training matrix, discoverable by tests/leakage/ "
         "(CLAUDE.md §4.1). Regenerate with `make features`.",
         "provenance": "CMS synthetic claim facts (SOURCE) + sim_-prefixed SIMULATED "
@@ -194,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin CLI
     frame = build_training_matrix(refresh=True)
     print(f"wrote {len(frame):,} rows x {len(frame.columns)} columns -> {MATRIX_PATH}")
     print(f"manifest -> {MANIFEST_PATH}")
+    # Printed, not persisted: the manifest is content-addressed on purpose.
+    print(f"built at {datetime.now(UTC).isoformat(timespec='seconds')}")
     return 0
 
 
