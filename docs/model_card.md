@@ -585,12 +585,11 @@ champion *flip* would explain both numbers at once, but the selection margin on
 the calibration fold is PR-AUC 0.2769 vs 0.2576, a gap far too wide for a
 floating-point perturbation to cross.
 
-**qa-reviewer reached the same conclusion independently**, on a separately
-written probe: 8 fits at `n_jobs=4` and 8 at `n_jobs=1` gave one digest across
-all 16, identical between thread counts. Two independent measurements, two
-different harnesses, same answer. The likeliest remaining explanation is the
-mundane one — that the diverging run was on a different tree mid-development,
-with no RNG involved at all.
+A standing check rather than a note: `tests/models/test_determinism.py` refits
+both estimators and compares score vectors bitwise, and — under `RCM_SLOW_TESTS`
+— compares two full runs on every reported number. The divergence showed up in a
+calibration statistic and not in an AUC, so the guard compares the whole report
+rather than a headline. If it ever fires, this section is where to start.
 
 So the cause is genuinely unknown, and it is recorded that way rather than
 attributed to a plausible mechanism that the measurement rejects. What limits the
@@ -628,9 +627,12 @@ pasted into a slide, long after this card is out of sight.
   checks structurally (AST) that every figure-writing function also writes a
   banner.
 - Each run writes a `README.md` into its artifact directory stating that every
-  outcome is simulated, calling out `slice_payer.csv` (a payer-level analysis, and
-  the payer dimension is 100% invented — CLAUDE.md §3.5) and `work_queue*.csv`
-  (which read as operational worklists for denials that never happened).
+  outcome is simulated, and calling out by name the files in *that* directory
+  most likely to be read out of context: `slice_payer.csv` (a payer-level
+  analysis, and the payer dimension is 100% invented — CLAUDE.md §3.5) and, for
+  Model C, `work_queue*.csv` (which read as operational worklists for denials
+  that never happened). The list is built from what the run actually wrote, so
+  the note never describes a file the directory does not hold.
 - `metrics.json` embeds a `provenance` key and is valid JSON with no bare `NaN`
   tokens.
 

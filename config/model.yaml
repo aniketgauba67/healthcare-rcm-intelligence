@@ -457,12 +457,14 @@ appeal_economics:
   # nothing else.
   #
   # NO GENERATOR CROSS-CHECK BELONGS HERE. A previous version of this comment
-  # reconciled $45 against the simulation's own realized cost per denied claim.
-  # It was offered as a consistency remark rather than a derivation, which is
-  # exactly the argument the §4.5 firewall rejects: once a generator-realized
-  # value is written next to a parameter, a later reader cannot tell whether the
-  # parameter was chosen from the citation or nudged toward the number beside it,
-  # and neither can the person who edits it next.
+  # reconciled the figure below against a quantity measured on our own generated
+  # layer, and the note recording its removal repeated that quantity's partner
+  # figure in the same breath — which re-establishes the reconciliation it claims
+  # to retract. Neither belongs. It was offered as a consistency remark rather
+  # than a derivation, which is exactly the argument the §4.5 firewall rejects:
+  # once such a value is written next to a parameter, a later reader cannot tell
+  # whether the parameter was chosen from the citation or nudged toward the
+  # number beside it, and neither can the person who edits it next.
   appeal_processing_cost_usd: 45.0
 
   # Medicare Part A/B redetermination: an appeal must be filed within 120 days of

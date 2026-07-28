@@ -186,12 +186,17 @@ def _save_figure(fig, path: pathlib.Path) -> pathlib.Path:  # noqa: ANN001
         color="0.35",
     )
     fig.tight_layout(rect=(0, 0.03, 1, 1))
-    fig.savefig(path, dpi=150)
+    # bbox_inches="tight" so the banner and the axis labels are measured into the
+    # saved bounds rather than trusting the layout rectangle. shap builds its own
+    # figure and its x-label was being clipped mid-word at this width.
+    fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     return path
 
 
-def _shap_plot(values: np.ndarray, names: list[str], path: pathlib.Path) -> pathlib.Path:
+def _shap_plot(
+    values: np.ndarray, names: list[str], path: pathlib.Path, title: str
+) -> pathlib.Path:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -201,6 +206,11 @@ def _shap_plot(values: np.ndarray, names: list[str], path: pathlib.Path) -> path
     shap.summary_plot(values, feature_names=names, show=False, max_display=20, plot_type="bar")
     fig = plt.gcf()
     fig.set_size_inches(7.5, 6.0)
+    # A bar chart headed by `sim_payer_prior_denial_rate` reads, to anyone who does
+    # not know the naming convention, as a finding about what drives real denials.
+    # The title says which model produced it; the banner says the layer is
+    # simulated. Neither is inferable from the filename once the PNG is in a slide.
+    fig.gca().set_title(title, fontsize=10)
     # shap's default x-label is long enough to be clipped mid-word at this figure
     # width, which reads as a rendering bug on the flagship explainability chart.
     # Stated in the units the axis is actually in.
@@ -227,8 +237,35 @@ def write_provenance_readme(
     reader who opens a CSV from a file browser sees this file in the same folder
     anyway. Written by the run, because `models_artifacts/` is gitignored and a
     committed note would describe artifacts that may not exist.
+
+    The call-out list is built from what is ACTUALLY on disk when the run ends.
+    A shared block naming `work_queue*.csv` put that warning in Model A's
+    directory, which has no work queue — and a provenance note that describes
+    files it does not have is the first thing a reader stops trusting.
     """
     artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    callouts = []
+    if (artifact_dir / "slice_payer.csv").exists():
+        callouts.append(
+            "- `slice_payer.csv` is a **payer-level analysis, and the payer dimension is 100%\n"
+            "  invented** (CLAUDE.md §3.5). Medicare FFS has exactly one payer; the\n"
+            "  archetypes compared here are not modelled on, or named after, any real insurer."
+        )
+    if any(artifact_dir.glob("work_queue*.csv")):
+        callouts.append(
+            "- `work_queue*.csv` read as operational worklists — claim ids, dollar amounts,\n"
+            "  recommended actions. **The denials being worked never happened.** They are not\n"
+            "  a queue anyone should action."
+        )
+    callout_block = (
+        "These files in particular are read out of context and should not be:\n\n"
+        + "\n".join(callouts)
+        + "\n"
+        if callouts
+        else ""
+    )
+
     path = artifact_dir / "README.md"
     path.write_text(
         f"""# Model {model} artifacts — EVERY OUTCOME HERE IS SIMULATED
@@ -245,15 +282,7 @@ adjudication data exists anywhere in this repository.**
 
 So no number in these files is evidence that a model would work on real claims.
 
-Two files in particular are read out of context and should not be:
-
-- `slice_payer.csv` is a **payer-level analysis, and the payer dimension is 100%
-  invented** (CLAUDE.md §3.5). Medicare FFS has exactly one payer; the
-  archetypes compared here are not modelled on, or named after, any real insurer.
-- `work_queue*.csv` read as operational worklists — claim ids, dollar amounts,
-  recommended actions. **The denials being worked never happened.** They are not
-  a queue anyone should action.
-
+{callout_block}
 ## Regenerating
 
 ```
@@ -713,14 +742,6 @@ def _write_artifacts(
     (artifact_dir / "metrics.json").write_text(
         json.dumps(json_safe(report), indent=2, allow_nan=False)
     )
-    write_provenance_readme(
-        artifact_dir,
-        model="A",
-        make_target="make features   # rebuild the committed feature matrix\nmake train      # this directory",
-        description="Pre-submission denial risk: calibration curve, SHAP global importance, "
-        "slice metrics by payer / service line / value band / provider, and the full "
-        "`metrics.json` report.",
-    )
     pd.concat([c.assign(series=name) for name, c in curves.items()]).to_csv(
         artifact_dir / "calibration_curve.csv", index=False
     )
@@ -737,6 +758,16 @@ def _write_artifacts(
         shap_result.values,
         shap_result.encoded_names,
         artifact_dir / "shap_global_importance.png",
+        f"Model A denial-risk drivers — {champion_name}, forward test fold",
+    )
+    # LAST, so its call-out list can be built from the files that actually landed.
+    write_provenance_readme(
+        artifact_dir,
+        model="A",
+        make_target="make features   # rebuild the committed feature matrix\nmake train      # this directory",
+        description="Pre-submission denial risk: calibration curve, SHAP global importance, "
+        "slice metrics by payer / service line / value band / provider, and the full "
+        "`metrics.json` report.",
     )
 
 
