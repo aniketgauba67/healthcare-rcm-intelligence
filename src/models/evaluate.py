@@ -149,6 +149,53 @@ def bootstrap_dollar_capture(
     return Interval(point, float(low), float(high))
 
 
+def bootstrap_dollar_capture_difference(
+    y_true: np.ndarray,
+    amounts: np.ndarray,
+    score_a: np.ndarray,
+    score_b: np.ndarray,
+    top_fraction: float = 0.10,
+    n_resamples: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 1337,
+) -> Interval:
+    """Paired interval for capture(a) − capture(b), on the SAME resampled claims.
+
+    This exists because two separate intervals cannot answer the question. The
+    champion captured 38.4% of denied dollars in the top decile with an interval
+    of [16.0%, 59.3%], against a constant scorer at 20.4% — and 20.4% is INSIDE
+    that interval. Reporting "38.4% vs 20.4%" from those two numbers would claim
+    a superiority the fold cannot support, because the two intervals share almost
+    all of their sampling noise: which decile one very large denial lands in
+    moves both.
+
+    Pairing removes that shared noise, exactly as `paired_bootstrap_difference`
+    does for the ranking metrics. If the paired interval still spans zero, the
+    honest reading is that this metric cannot support a business claim at this
+    fold size — and the reason is the concentration, not the model.
+    """
+    rng = np.random.default_rng(seed)
+    n = len(y_true)
+    point = dollars_at_risk_captured(
+        y_true, score_a, amounts, top_fraction, seed=seed
+    ) - dollars_at_risk_captured(y_true, score_b, amounts, top_fraction, seed=seed)
+    draws: list[float] = []
+    for _ in range(n_resamples):
+        idx = rng.integers(0, n, size=n)
+        a = dollars_at_risk_captured(
+            y_true[idx], score_a[idx], amounts[idx], top_fraction, seed=seed
+        )
+        b = dollars_at_risk_captured(
+            y_true[idx], score_b[idx], amounts[idx], top_fraction, seed=seed
+        )
+        if not (np.isnan(a) or np.isnan(b)):
+            draws.append(a - b)
+    if not draws:  # pragma: no cover - only with a fold holding no denied dollars
+        return Interval(point, float("nan"), float("nan"))
+    low, high = np.percentile(draws, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    return Interval(point, float(low), float(high))
+
+
 def bootstrap_interval(
     metric_fn,
     y_true: np.ndarray,
@@ -284,6 +331,8 @@ def slice_metrics(
     y_score: np.ndarray,
     by: str,
     min_positives: int = 20,
+    n_resamples: int = 0,
+    seed: int = 1337,
 ) -> pd.DataFrame:
     """Per-slice metrics with volumes, and an explicit too-thin-to-score marker.
 
@@ -291,6 +340,13 @@ def slice_metrics(
     this data is weak and noisy — the source DRG mix is concentrated and several
     service lines are small — so a rate without its denominator invites a
     confident conclusion the data does not support.
+
+    `n_resamples > 0` adds a bootstrap interval to each scorable slice's ROC-AUC.
+    It is worth the runtime here for the same reason it is worth it on the
+    headline: slices are by construction the smallest folds in the report, so a
+    slice AUC is the number in this project most likely to be read as a finding
+    when it is sampling noise. A slice whose interval covers 0.5 is not a slice
+    where the model works, however far its point estimate sits from 0.5.
     """
     work = pd.DataFrame(
         {
@@ -303,6 +359,17 @@ def slice_metrics(
     for value, group in work.groupby("slice", observed=True):
         positives = int(group["y"].sum())
         scorable = positives >= min_positives and positives < len(group)
+        interval = (
+            bootstrap_interval(
+                roc_auc_score,
+                group["y"].to_numpy(),
+                group["p"].to_numpy(),
+                n_resamples,
+                seed=seed,
+            )
+            if scorable and n_resamples > 0
+            else None
+        )
         rows.append(
             {
                 "slice": value,
@@ -312,6 +379,13 @@ def slice_metrics(
                 "mean_predicted": round(float(group["p"].mean()), 4),
                 "roc_auc": (
                     round(float(roc_auc_score(group["y"], group["p"])), 4) if scorable else None
+                ),
+                "roc_auc_ci_low": round(interval.low, 4) if interval else None,
+                "roc_auc_ci_high": round(interval.high, 4) if interval else None,
+                # The question a slice table is usually read to answer, made
+                # explicit so nobody has to eyeball two columns to get it.
+                "beats_chance": (
+                    bool(interval.low > 0.5 or interval.high < 0.5) if interval else None
                 ),
                 "pr_auc": (
                     round(float(average_precision_score(group["y"], group["p"])), 4)
@@ -323,6 +397,39 @@ def slice_metrics(
             }
         )
     return pd.DataFrame(rows).sort_values("n", ascending=False).reset_index(drop=True)
+
+
+def prevented_value_multiplier(config: dict) -> float:
+    """The cost matrix's value multiplier, as the product of its named factors.
+
+    `cost_matrix` no longer carries a single opaque multiplier. It carries
+    P(prevented | flagged and worked) and the share of a claim's value
+    permanently lost when a denial happens, each cited to a published benchmark
+    in `config/model.yaml`, because one number was hiding two assumptions and
+    the second of them (a denial costs the whole claim) was the badly wrong one.
+
+    Computed here rather than read from the config so the recorded product
+    cannot drift away from the factors it is supposed to be the product of.
+    """
+    block = config["cost_matrix"]
+    return float(block["p_prevented_given_flagged_and_worked"]) * float(
+        block["share_of_claim_value_permanently_lost"]
+    )
+
+
+def break_even_multiplier(
+    review_cost_usd: float, denial_rate: float, mean_amount_at_stake: float
+) -> float:
+    """The multiplier at which reviewing an average claim stops paying for itself.
+
+    Below it the cost-optimal threshold binds and carries information; above it,
+    reviewing everything is optimal and the threshold is degenerate. Reported
+    next to the configured factors so the reader can see how far apart they are,
+    rather than being told the threshold is degenerate and having to take it on
+    trust.
+    """
+    denominator = denial_rate * mean_amount_at_stake
+    return float(review_cost_usd / denominator) if denominator > 0 else float("nan")
 
 
 @dataclass(frozen=True)
@@ -353,10 +460,11 @@ def threshold_from_cost_matrix(
     `prevented_value_multiplier × amount_at_risk − review_cost_usd` when the
     claim would have been denied, and `−review_cost_usd` when it would not.
 
-    The multiplier is the assumption to argue with: at 1.0 it says a pre-submission
-    review always prevents the denial, which is an optimistic ceiling rather than
-    a forecast. It is a config knob (`cost_matrix.prevented_denial_value_multiplier`)
-    for exactly that reason, and the model card states it.
+    The multiplier is the assumption to argue with, and it is not one assumption
+    but two: how often a review prevents the denial, and how much of the claim a
+    denial permanently costs. `config/model.yaml: cost_matrix` states them
+    separately with their citations; `prevented_value_multiplier()` above is the
+    only place they are multiplied together.
 
     Chosen on the calibration fold and then applied unchanged to the test fold —
     picking it on test would be choosing the operating point with the answers in

@@ -1241,6 +1241,116 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > Test at n_jobs=1 to confirm; if it holds, document it in the model card rather
 > than chasing it, and note that the CHAMPION is logistic so no headline figure
 > depends on it.
+- [x] BLOCKER — training-matrix guard wired (ml-engineer-3, cd3e30c). PENDING qa.
+  qa's test_guard_is_wired_once_a_feature_store_exists was RED and the red test was
+  the smaller half of the problem: src/features/ satisfied NO discovery route, so
+  the §4.1 VALUE probes — the only kind that catch a renamed / logged / binned /
+  ratioed forbidden column — SKIPPED, and a skip reads like a pass.
+  All three routes now served: artifacts/features/model_a_training_matrix.parquet
+  (COMMITTED, .gitignore exception, 1.4 MB / 20,867 x 44), a no-required-argument
+  src.features.build_training_matrix() re-exported on the package, and
+  RCM_FEATURE_MATRIX already honoured. `make train` persists the matrix it is about
+  to fit on, so the guard checks the object the model saw, not a copy.
+  COMMITTED ON PURPOSE: regenerating on demand makes the guard live only on a
+  machine with a loaded warehouse — the same shape as the defect this project
+  already hit, a green suite over a degraded DB. Team-lead notified it is a
+  judgement call and offered the RCM_FEATURE_MATRIX alternative.
+  ONLY MODEL A GOES THERE and a test enforces it: qa's forbidden_columns fixture is
+  MODEL A's set, so a Model C matrix beside it would fail the guard correctly and
+  for entirely the wrong reason (C is permitted to see the denial) and the fix
+  someone would reach for is loosening the guard. Model C writes to
+  models_artifacts/model_c/, which the guard does not scan.
+  Staleness by measurement: sidecar manifest with rows, feature list, split
+  boundary, parquet sha256 and a digest of every forbidden_* block in
+  config/model.yaml, so a widened blacklist with no rebuild fails a unit test
+  instead of leaving the guard checking an older column set.
+  VERIFIED by checking qa's tests/leakage out over this tree, running it, then
+  restoring: guard 5 passed (was 1 failed + 4 skipped); test_live_leakage.py 8
+  passed on live PG across BOTH routes, strongest single-feature AUC 0.5859
+  (sim_payer_id) vs the 0.6778 oracle — reproduces qa-reviewer-p9's hand-
+  materialised figures exactly. Also adds `make features` and `make train-appeal`.
+- [x] Model C: appeal success + Expected Net Recovery work queue (ml-engineer-3,
+  1f4375c). PENDING qa. The preserved WIP HAD run — models_artifacts/model_c/ held
+  14:37 artifacts team-lead could not see because that directory is gitignored.
+  Reproduced, then fixed three defects:
+  (1) THE QUEUE COMPARISON MEASURED TWO DIFFERENT OBJECTS — the table ranked by the
+      TIERED queue while the paired bootstrap beside it ranked by the raw ENR score,
+      so a -2.2pt gap sat next to an interval centred on 2.2e-16. Both correct about
+      different rankings; nothing said so. Every rule is now a score vector over the
+      same claims (work_queue.priority_score() re-expresses the tiered queue as
+      -queue_position), so table and interval are one computation by construction.
+  (2) THE DEADLINE OVERRIDE FIRED IN NO REPORTED ARTIFACT. Property of the two
+      conventions, not of the rule: at-arrival triage gives every claim the full
+      window (backtest 0 DEADLINE_CRITICAL) and the live snapshot is one instant on
+      a thin 2023-24 tail (1 open claim, 467 out of window). Added rolling
+      month-start queues: 22 snapshots, 237 distinct claims reach the urgent tier,
+      guarantee re-asserted on every snapshot. Degenerate snapshot REPORTED with its
+      caveat, not dropped.
+  (3) THE APPEAL-SIDE EMBARGO WAS MODEL A's 60 days off the DENIAL posting, but an
+      appeal outcome is not known then. appeal_embargo_days: 180 from the published
+      Medicare Part A/B timetable (120 to file + 60 for the decision), and
+      deliberately NOT checked against sim_appeal_decision_date.
+  RESULTS. 2,663 denials / 967 appealed / test 193 with 86 overturned. Champion
+  xgboost ROC 0.5611; xgboost - category_rule -0.0356 [-0.1325, +0.0597] — no
+  difference from a rule needing no model. Queue at 10% capacity: largest-denial-
+  first 65.7%, enr_score 61.0%, tiered queue 59.8%, random 0.7%; enr_score minus
+  largest-first -4.7% [-16.7%, +0.9%]. THE PROBABILITY DOES NOT EARN ITS PLACE —
+  P is nearly flat so P x amount is dominated by amount. ENR ships for the CUTOFF
+  and the tiering, not the ordering, and the card says exactly that.
+  No SHAP published for Model C, deliberately: a model a paired interval cannot
+  separate from a category rule has nothing stable to attribute, and the analyst-
+  facing explanation is the tier + recommended_action, which are rule-based.
+- [x] COST MATRIX DECOMPOSED per the ruling (ml-engineer-3, 1f4375c).
+  p_prevented_given_flagged_and_worked 0.50 (Change Healthcare Denials Index: ~86%
+  potentially avoidable as a ceiling, ~half front-end in origin — the optimistic
+  end, it equates "front-end cause" with "caught and fixed in time") x
+  share_of_claim_value_permanently_lost 0.25 (same index: ~24% of avoidable denials
+  not recoverable; a FLOOR, since MGMA/CH put 50-65% of denials as never reworked
+  at all) = 0.125, multiplied in exactly one place. Neither derived from the
+  generator; both fixed BEFORE the threshold was computed.
+  WHAT FELL OUT, as instructed: break-even multiplier MEASURED at 0.0632 on the
+  calibration fold (0.0543 test, 0.0785 whole book). 0.125 is above it by ~2x where
+  1.0 was above by 16x. Flagged share 98.4% -> 60.1% at 73.2% recall. Still not an
+  operating point, and the sweep is why: 13.6% -> 59.9% -> 86.3% flagged as the
+  multiplier moves 0.075 -> 0.125 -> 0.25. Capacity-constrained stays PRIMARY.
+  I corrected my own pre-written prose mid-run — I had written "the decomposition
+  did not fix it" and the measured numbers contradicted it.
+  VERIFIED the predecessor's appeal_economics block rather than trusting it: $45
+  Premier-anchored, and the $29.88 note is a consistency remark, not load-bearing.
+- [x] DOLLARS-AT-RISK INSTRUMENT FIXED, and it CHANGES THE CONCLUSION
+  (ml-engineer-3, 1f4375c). Paired bootstrap on the DIFFERENCE over the same
+  resamples: champion - constant +17.9% [+4.2%, +51.7%]; champion - payer rule
+  +29.6% [+7.1%, +53.4%]. Both EXCLUDE zero, so the champion IS distinguishable
+  from arbitrary ranking — which the unpaired reading (38.4% [16.0, 59.3] vs 20.4%)
+  could not support and this can. Width still enormous; magnitude not pinned down;
+  ten largest denied claims hold 50.9% of denied dollars. Card forbids quoting a
+  single number from that row.
+  Also worth the reviewer's attention: the payer rule captures 8.7%, BELOW the
+  20.4% a constant score gets — it concentrates on a payer whose denials are small.
+  Ranking by count and ranking by dollars are different problems.
+- [x] Slice metrics + bootstrap CIs (ml-engineer-3, 1f4375c). Every scorable slice
+  AUC carries a CI and an explicit beats_chance column. Model A: MCR_FFS 0.5507
+  [0.4968, 0.6031] COVERS 0.5 and is the largest slice; service line only
+  AFTERCARE_REHAB and MSK_SKIN_ENDO clear chance, reproducing the Phase 2 warning
+  independently; value bands all clear; 1,801 providers / 1 scorable. Model C:
+  EVERY slice interval covers 0.5, 157 providers / 0 scorable.
+- [x] docs/model_card.md written (ml-engineer-3). Carries all six required items:
+  the SOURCE-exclusion honesty statement (corr 0.0477 / 0.0117 / 0.0008, clm_pmt_amt
+  identical to billed_charge_amt, so NOT empirically load-bearing — load-bearing on
+  the pipeline being right AS IF the data were real, and it does NOT imply a live
+  leak was caught), the covered-days classification, the Model C boundary with both
+  upheld calls, the cost-matrix decomposition, the dollars-at-risk caveat, and the
+  base-tables architecture decision. Every figure copied from metrics.json.
+  I re-verified the inherited claims rather than repeating them: top 10% of
+  providers hold 52.94% of claims, 72.5% of claims (83.0% post-2019) have provider
+  history, recovery ratio 0.811 sd 0.116, by category 0.740-0.834, corr with log
+  denied 0.024, disputed == denied on 967/967 with max abs diff 0.00.
+- [x] DETERMINISM GUARD (ml-engineer-3). One Model A run diverged from five others
+  this session (ROC diff +0.0026 vs +0.0003, ECE 0.02056 vs 0.01964). NOT
+  reproducible: two consecutive full 1,000-resample runs are byte-identical and
+  estimator scores hash identically across processes. Cause unknown, so
+  tests/models/test_determinism.py stands guard rather than leaving it as a note.
+  First place to look if it recurs is estimators.xgboost.n_jobs: 4.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported.
   qa-reviewer-p10 held FIVE INTENTIONAL REDS at handoff — rulings deferred rather
   than satisfied. State on feat/phase4-qa @ 69adf49: 312 passed / 1 skipped /

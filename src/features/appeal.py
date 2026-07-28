@@ -197,6 +197,12 @@ def _engineer(frame: pd.DataFrame, config: dict) -> pd.DataFrame:
     # so they contribute no history while still receiving a rate. Restricting the
     # frame to appealed rows instead would leave every un-appealed claim — two
     # thirds of the queue — with a null feature.
+    # The embargo is the APPEAL embargo, not Model A's 60-day posting cycle. An
+    # appeal outcome is known far later than a denial: the published Medicare
+    # Part A/B redetermination timetable allows 120 days to file and 60 more for
+    # the contractor's decision, so an outcome is only certainly on the books
+    # 180 days after the denial posted. Using 60 here would let a claim's rate
+    # be built from appeals that had not been decided yet.
     prior = config["feature_store"]["prior_period"]
     out["_overturned"] = (out[LABEL] == POSITIVE_OUTCOME).astype(float)
     out.loc[out[LABEL].isna(), "_overturned"] = np.nan
@@ -205,7 +211,7 @@ def _engineer(frame: pd.DataFrame, config: dict) -> pd.DataFrame:
         date_column=TIME_COLUMN,
         outcome_column="_overturned",
         definitions={"sim_payer": "sim_payer_id", "sim_category": "sim_denial_category"},
-        embargo_days=int(prior["embargo_days"]),
+        embargo_days=int(prior["appeal_embargo_days"]),
         smoothing=float(prior["smoothing"]),
     )
     carried = [

@@ -4,7 +4,10 @@ Model C predicts appeal success at triage, so a denials analyst's remittance
 advice is legitimately in scope: what was denied, how much, under which category
 and CARC group, when the payer adjudicated. Those are forbidden to Model A and
 permitted here (`docs/simulated_forbidden_columns.md` §5, configured under
-`model_c`).
+`model_c`). Widening the guard is the correct thing to do and also the easiest
+place in this project to widen it one column too far, so every assertion below is
+about a column that is nearly-but-not-quite on the right side of the line. The
+columns that are obviously wrong were never the risk.
 
 What stays forbidden is narrower and sharper, and this file pins the two calls
 team-lead UPHELD at GATE 1:
@@ -25,6 +28,17 @@ that the Expected Net Recovery score depends on and that nothing in the suite
 re-measured. That is the covered-days defect class: a fact checked once by hand,
 relied on afterwards, and invisible if a future load breaks it. The integration
 test below re-measures it.
+
+PROVENANCE OF THIS FILE (qa-reviewer-p11): qa-reviewer-p10 and ml-engineer-3
+independently wrote files at this path on branches that had not met, so the merge
+arrived as an add/add conflict. Neither could see the other's; this is a naming
+collision and NOT an ownership breach, and it is recorded here so a future reader
+does not reconstruct it as one. Resolved as a UNION rather than a choice — ml's
+parametrized sweep of the permitted/forbidden boundary is good work qa would have
+written substantially the same way, and qa's two gate assertions (the
+read-then-drop check on the extract query, and the live re-measurement of the
+equality) are the ones phase acceptance turns on. Dropping either half to resolve
+a conflict would have silently lost coverage that was already paid for.
 """
 
 from __future__ import annotations
@@ -34,15 +48,53 @@ import pytest
 from sqlalchemy import text
 
 from src.features.extract import APPEAL_TARGET_QUERY, DENIAL_QUERY
-from src.features.leakage import LeakageError, assert_no_forbidden_columns, forbidden_columns
+from src.features.leakage import (
+    LeakageError,
+    assert_no_forbidden_columns,
+    forbidden_columns,
+    load_model_config,
+)
 
 _MECHANISM = "sim_denial_driver_mechanism"
 _DISPUTED = "sim_appeal_disputed_amount"
 _DENIED = "sim_denied_amount"
 
+# What the remittance advice actually carries: what was denied, how much, under
+# which category and CARC group, and when the payer adjudicated it.
+_REMITTANCE = (
+    "sim_denial_flag",
+    "sim_denial_type",
+    "sim_denial_category",
+    "sim_denial_carc_group",
+    "sim_denied_amount",
+    "sim_allowed_amount",
+    "sim_paid_amount",
+    "sim_patient_responsibility_amount",
+    "sim_contractual_adjustment_amount",
+    "sim_adjudication_date",
+    "sim_denial_review_date",
+    "sim_days_to_adjudication",
+)
+
+
+@pytest.mark.parametrize("column", _REMITTANCE)
+def test_the_remittance_advice_is_available_to_model_c(column: str) -> None:
+    """Forbidden to A, permitted to C. If this fails, the boundary collapsed onto A's."""
+    with pytest.raises(LeakageError):
+        assert_no_forbidden_columns([column], model="A")
+    assert_no_forbidden_columns([column], model="C")
+
 
 def test_the_driver_mechanism_is_forbidden_for_both_models() -> None:
-    """The whole §5 boundary in one column: permitted neighbours, forbidden itself."""
+    """The whole §5 boundary in one column: permitted neighbours, forbidden itself.
+
+    It sits next to the denial category in the schema and is forbidden while the
+    category is permitted, which is exactly why it needs its own test. A category
+    is a CARC group on a remittance advice that a human being can read. The
+    driver mechanism is the simulation's internal statement of what caused the
+    denial, appears on no remittance advice anyone has ever worked, and admitting
+    it would invert the CLAUDE.md §4.5 firewall through a column name.
+    """
     assert _MECHANISM in forbidden_columns("A")
     assert _MECHANISM in forbidden_columns("C"), (
         "sim_denial_driver_mechanism became permitted for Model C. Team-lead UPHELD it as "
@@ -63,9 +115,91 @@ def test_the_permitted_denial_neighbours_really_are_permitted_for_model_c() -> N
     )
 
 
+@pytest.mark.parametrize(
+    "column",
+    [
+        "sim_appeal_sk",
+        "sim_appeal_level",
+        "sim_appeal_filed_date",
+        "sim_appeal_decision_date",
+        "sim_appeal_outcome",
+        "sim_appeal_disputed_amount",
+        "sim_appeal_recovered_amount",
+        "sim_appeal_latent_p",
+    ],
+)
+def test_no_appeal_column_is_a_model_c_feature(column: str) -> None:
+    """Every sim_appeals column postdates the decision being predicted.
+
+    Including the two that are targets: a target is not a feature, and the only
+    thing standing between those two roles is this guard.
+    """
+    with pytest.raises(LeakageError, match=column):
+        assert_no_forbidden_columns([column], model="C")
+
+
 def test_the_disputed_amount_is_forbidden_and_its_substitute_is_not() -> None:
+    """The two coincide numerically; they do not coincide in time.
+
+    sim_appeal_disputed_amount equals sim_denied_amount on all 967 level-1
+    appeals — re-measured against live Postgres by the integration test below —
+    so the recoverable amount the Expected Net Recovery score needs is available
+    from the permitted column. That is not a workaround. The denied amount is on
+    the remittance advice at triage time; the disputed amount is a fact about an
+    appeal nobody has filed yet, and reading it would mean the score could only
+    be computed for claims that were going to be appealed anyway.
+    """
     assert _DISPUTED in forbidden_columns("C")
     assert _DENIED not in forbidden_columns("C")
+    with pytest.raises(LeakageError, match=_DISPUTED):
+        assert_no_forbidden_columns([_DISPUTED], model="C")
+    assert_no_forbidden_columns([_DENIED], model="C")
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        "sim_latent_p",
+        "sim_provider_quality_latent",
+        "sim_label_noise_applied",
+        "sim_appeal_latent_p",
+    ],
+)
+def test_the_latent_internals_are_forbidden_to_every_model(column: str) -> None:
+    """§1 of the firewall document does not relax at any boundary."""
+    for model in ("A", "C"):
+        with pytest.raises(LeakageError, match=column):
+            assert_no_forbidden_columns([column], model=model)
+
+
+def test_the_payment_is_still_forbidden_after_the_denial() -> None:
+    """A payment posting after an appeal IS the appeal's result."""
+    for column in ("sim_payment_date", "sim_days_to_payment"):
+        with pytest.raises(LeakageError, match=column):
+            assert_no_forbidden_columns([column], model="C")
+
+
+def test_model_c_relaxes_the_guard_and_does_not_replace_it() -> None:
+    """C's blacklist must be A's minus the remittance, not a shorter list of its own.
+
+    Written as a set relation rather than a count so that a future column added
+    to A's list is automatically covered here: the only permitted difference
+    between the two blacklists is the configured `permitted_beyond_model_a`.
+    """
+    config = load_model_config()
+    relaxed = forbidden_columns("A", config) - forbidden_columns("C", config)
+    permitted = set(config["model_c"]["permitted_beyond_model_a"])
+    assert relaxed == permitted, (
+        "Model C's guard differs from Model A's by something other than the configured "
+        f"post-denial facts: unexpected relaxations {sorted(relaxed - permitted)}"
+    )
+
+
+def test_the_crosswalk_stays_forbidden_to_model_c_too() -> None:
+    """Display-only linkage is display-only at every boundary (CLAUDE.md §3.4)."""
+    for column in ("sim_facility_ccn", "facility_ccn", "real_npi"):
+        with pytest.raises(LeakageError, match=column):
+            assert_no_forbidden_columns([column], model="C")
 
 
 def test_the_extract_queries_do_not_read_what_model_c_may_not_use() -> None:

@@ -50,11 +50,14 @@ from src.models.calibrate import calibrate, method_from_config
 from src.models.evaluate import (
     apply_threshold,
     bootstrap_dollar_capture,
+    bootstrap_dollar_capture_difference,
+    break_even_multiplier,
     calibration_curve_points,
     evaluate_classifier,
     expected_calibration_error,
     flagged_share_by_multiplier,
     paired_bootstrap_difference,
+    prevented_value_multiplier,
     slice_metrics,
     threshold_at_capacity,
     threshold_from_cost_matrix,
@@ -383,19 +386,22 @@ def run_model_a(
 
     # --- operating threshold -------------------------------------------------
     economics = dict(cfg["cost_matrix"])
+    # One number, two assumptions — so the config states them separately and
+    # they are multiplied in exactly one place. See evaluate.prevented_value_multiplier.
+    multiplier = prevented_value_multiplier(cfg)
     chosen = threshold_from_cost_matrix(
         y_cal,
         _score(champion, x_cal),
         amounts[folds.calibrate],
         review_cost_usd=float(economics["review_cost_usd"]),
-        prevented_value_multiplier=float(economics["prevented_denial_value_multiplier"]),
+        prevented_value_multiplier=multiplier,
     )
     applied = apply_threshold(
         y_test,
         champion_test_score,
         amounts[folds.test],
         chosen,
-        prevented_value_multiplier=float(economics["prevented_denial_value_multiplier"]),
+        prevented_value_multiplier=multiplier,
     )
     # The cost-optimal threshold is degenerate on this data — see
     # config/model.yaml: operating_point — so a capacity-constrained point is
@@ -407,14 +413,14 @@ def run_model_a(
         amounts[folds.calibrate],
         capacity_share=capacity,
         review_cost_usd=float(economics["review_cost_usd"]),
-        prevented_value_multiplier=float(economics["prevented_denial_value_multiplier"]),
+        prevented_value_multiplier=multiplier,
     )
     capacity_applied = apply_threshold(
         y_test,
         champion_test_score,
         amounts[folds.test],
         capacity_choice,
-        prevented_value_multiplier=float(economics["prevented_denial_value_multiplier"]),
+        prevented_value_multiplier=multiplier,
     )
     sensitivity = flagged_share_by_multiplier(
         y_cal,
@@ -423,13 +429,33 @@ def run_model_a(
         review_cost_usd=float(economics["review_cost_usd"]),
         multipliers=list(cfg["operating_point"]["multiplier_sensitivity"]),
     )
+    # What the threshold would have to believe before it started to bind. The
+    # denial rate and mean exposure are read off the calibration fold, which is
+    # the fold the threshold is chosen on.
+    cal_amounts = amounts[folds.calibrate]
+    break_even = break_even_multiplier(
+        float(economics["review_cost_usd"]),
+        float(y_cal.mean()),
+        float(cal_amounts[y_cal == 1].mean()) if (y_cal == 1).any() else float("nan"),
+    )
     threshold_report = {
         "cost_optimal": {
             "chosen_on_calibration_fold": vars(chosen),
             "applied_to_test_fold": vars(applied),
-            "reading": "Degenerate by construction, not by defect: at these costs "
-            "reviewing every claim pays, so the threshold carries no information. "
-            "Reported because hiding it would be the dishonest option.",
+            "reading": "Still not an operating point, but the decomposition moved it a "
+            "long way and the honest report is the movement, not a slogan. A claim is "
+            "worth reviewing when multiplier x P(denial) x dollars_at_stake exceeds the "
+            f"review cost; on the calibration fold that break-even multiplier is "
+            f"{break_even:.4f}, and the decomposed factors give {multiplier:.4f} — above "
+            "it, but by a factor of two rather than the factor of sixteen the old 1.0 "
+            f"implied. The threshold now flags {applied.flagged_share:.1%} of the test "
+            f"queue at {applied.recall:.1%} recall, where 1.0 flagged 98.4%. "
+            "What the multiplier_sensitivity sweep then shows is the real reason not to "
+            "operate here: flagged share runs 13.6% -> 59.9% -> 86.3% as the multiplier "
+            "moves 0.075 -> 0.125 -> 0.25. The cost-optimal point is dominated by an "
+            "assumption nobody has measured on this book, so the capacity-constrained "
+            "point below is the primary one — a work queue is ranked against finite "
+            "analyst hours, not thresholded against a guess.",
         },
         "capacity_constrained": {
             "review_capacity_share": capacity,
@@ -439,7 +465,16 @@ def run_model_a(
             f"{capacity:.0%} of the queue by score.",
         },
         "multiplier_sensitivity": sensitivity.to_dict(orient="records"),
-        "cost_matrix": economics,
+        "cost_matrix": {
+            **economics,
+            "prevented_denial_value_multiplier_used": round(multiplier, 6),
+            "break_even_multiplier_calibration_fold": round(break_even, 6),
+            "decomposition": "P(prevented | flagged and worked) x share of claim value "
+            "permanently lost. Both factors are DESIGN CHOICES set from published "
+            "benchmarks (Change Healthcare Denials Index; MGMA; Premier 2024) and NOT "
+            "from the generator's realized rates, which are behind the CLAUDE.md §4.5 "
+            "firewall.",
+        },
     }
 
     # --- dollars at risk, with the interval it needs -------------------------
@@ -457,9 +492,29 @@ def run_model_a(
             ).as_dict()
             for name in (f"{champion_name}_calibrated", "payer_rule", "base_rate")
         },
+        # The instrument that decides whether any of the above is a business
+        # claim. Two overlapping intervals cannot answer it: the champion's
+        # interval contains the constant scorer's point estimate, and both
+        # intervals are dominated by the same few large denials. Paired
+        # resampling removes that shared noise; whatever it says is what gets
+        # reported.
+        "paired_difference": {
+            f"champion_minus_{name}": bootstrap_dollar_capture_difference(
+                y_test,
+                test_amounts,
+                test_scores[f"{champion_name}_calibrated"],
+                test_scores[name],
+                n_resamples=n_resamples,
+                seed=seed,
+            ).as_dict()
+            for name in ("base_rate", "payer_rule")
+        },
         "note": "The base-rate row is the floor: a constant score ranks nothing, so its "
-        "capture is whatever a random tenth of the queue happens to hold. Its interval is "
-        "the width to judge every other row against.",
+        "capture is whatever a random tenth of the queue happens to hold. Read the "
+        "paired_difference block, not the gap between two point estimates — the two "
+        "unpaired intervals share almost all of their sampling noise, because denied "
+        "dollars here are concentrated enough that which decile a handful of large "
+        "claims land in moves both at once.",
     }
 
     # --- slices --------------------------------------------------------------
@@ -471,7 +526,14 @@ def run_model_a(
         ("service_line", "sim_service_line_id"),
         ("value_band", "value_band"),
     ):
-        table = slice_metrics(test_frame, y_test, champion_test_score, by=column)
+        table = slice_metrics(
+            test_frame,
+            y_test,
+            champion_test_score,
+            by=column,
+            n_resamples=n_resamples,
+            seed=seed,
+        )
         slices[key] = table.to_dict(orient="records")
 
     provider_table = slice_metrics(test_frame, y_test, champion_test_score, by="prvdr_num")
@@ -604,10 +666,13 @@ def _headline(report: dict[str, Any]) -> str:
             f"{(f'{dollars:.1%}' if dollars is not None else '-'):>14}"
         )
     diff = report["comparisons"]["xgboost_minus_logistic"]["roc_auc"]
+    dollars = report["dollars_at_risk"]["paired_difference"]["champion_minus_base_rate"]
     lines += [
         "",
         f"  xgboost - logistic ROC-AUC: {diff['point']:+.4f} "
         f"[{diff['ci_low']:+.4f}, {diff['ci_high']:+.4f}]",
+        f"  $ top-decile capture, champion - constant (PAIRED): {dollars['point']:+.1%} "
+        f"[{dollars['ci_low']:+.1%}, {dollars['ci_high']:+.1%}]",
         f"  champion: {report['champion_selection']['champion']} (chosen on the calibration fold)",
         f"  ECE {report['calibration']['ece_uncalibrated']:.5f} -> "
         f"{report['calibration']['ece_calibrated']:.5f} after {report['calibration']['method']}",

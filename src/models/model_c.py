@@ -67,7 +67,9 @@ from src.models.work_queue import (
     assert_no_deadline_claim_was_outranked,
     bootstrap_capture_difference,
     build_work_queue,
+    expected_net_recovery,
     fit_recovery_ratio,
+    priority_score,
     realised_recovery_at_capacity,
 )
 
@@ -85,48 +87,131 @@ def _queue_comparison(
     economics: AppealEconomics,
     recovered: pd.Series,
     capacity_share: float,
+    n_resamples: int,
+    seed: int,
 ) -> dict[str, Any]:
-    """Model-ranked queue against the two rules it has to beat.
+    """Ranking rules compared as SCORE VECTORS over the same claims.
 
-    The rules are not strawmen. "Work the biggest denials" is what most billing
-    offices actually do, and it needs no model at all; if Expected Net Recovery
-    cannot beat it, the honest conclusion is that the probability adds nothing on
-    this data and the queue should stay simple.
+    Every rule below is a score aligned to `frame`, so the headline share and its
+    confidence interval are computed from one object. That is a correction: the
+    table used to rank by the TIERED queue while the interval beside it ranked by
+    the raw Expected Net Recovery, and the two disagreed by 2.2 points with
+    nothing in the output to say why.
+
+    Four rules, and none of them is a strawman:
+
+    * `enr_score` — Expected Net Recovery, ordered purely by money. This is what
+      the model is worth with no policy applied.
+    * `enr_tiered_queue` — the queue actually shipped, deadline and mandatory-
+      review tiers included. Comparing it to the row above prices the policy: the
+      overrides are meant to cost some dollars, and this says how many.
+    * `largest_denial_first` — sort by denied amount. What most billing offices
+      already do, needs no model, and is the rule Expected Net Recovery has to
+      beat to justify existing.
+    * `random` — the floor.
     """
-    ranked = {
-        "expected_net_recovery": build_work_queue(frame, probability, economics),
-        "largest_denial_first": build_work_queue(frame, np.ones(len(frame)), economics).sort_values(
-            "recoverable_amt", ascending=False
-        ),
-        "random": build_work_queue(
-            frame, np.random.default_rng(1337).uniform(size=len(frame)), economics
-        ).sample(frac=1.0, random_state=1337),
-    }
-    lookup = pd.Series(np.asarray(recovered, float), index=frame["claim_sk"].to_numpy())
-    out: dict[str, Any] = {}
-    for name, queue in ranked.items():
-        out[name] = realised_recovery_at_capacity(
-            queue, queue["claim_sk"].map(lookup), capacity_share
-        )
+    realised = np.asarray(recovered, dtype=float)
+    claims = frame["claim_sk"]
+    tiered = build_work_queue(frame, probability, economics)
 
-    # The comparison that decides whether the probability earned its place. Both
-    # rankings are scored on the same resampled claims.
-    enr = ranked["expected_net_recovery"].set_index("claim_sk")["expected_net_recovery"]
-    realised = np.asarray(recovered, float)
-    claims = frame["claim_sk"].to_numpy()
-    difference = bootstrap_capture_difference(
-        enr.reindex(claims).to_numpy(),
-        frame["sim_denied_amount"].to_numpy(float),
-        realised,
-        capacity_share,
-    )
-    out["enr_minus_largest_denial_first"] = difference.as_dict()
+    scores: dict[str, np.ndarray] = {
+        "enr_score": expected_net_recovery(
+            probability, frame["sim_denied_amount"].to_numpy(dtype=float), economics
+        ),
+        "enr_tiered_queue": priority_score(tiered, claims),
+        "largest_denial_first": frame["sim_denied_amount"].to_numpy(dtype=float),
+        "random": np.random.default_rng(seed).uniform(size=len(frame)),
+    }
+
+    out: dict[str, Any] = {
+        name: realised_recovery_at_capacity(score, realised, capacity_share, seed=seed)
+        for name, score in scores.items()
+    }
+
+    # The comparisons that decide whether the probability and the policy earned
+    # their places. Paired: every rule is scored on identical resampled claims.
+    out["differences"] = {
+        f"{a}_minus_{b}": bootstrap_capture_difference(
+            scores[a], scores[b], realised, capacity_share, n_resamples=n_resamples, seed=seed
+        ).as_dict()
+        for a, b in (
+            ("enr_score", "largest_denial_first"),
+            ("enr_tiered_queue", "largest_denial_first"),
+            ("enr_tiered_queue", "enr_score"),
+        )
+    }
     out["reading"] = (
-        "A difference whose interval spans zero means the probability adds nothing "
-        "to a queue already sorted by size, and the honest recommendation is the "
-        "simpler rule."
+        "enr_score minus largest_denial_first is the one that matters: an interval "
+        "spanning zero means the probability adds nothing to a queue already sorted by "
+        "size, and the honest recommendation is then the simpler rule. "
+        "enr_tiered_queue minus enr_score prices the policy overrides — they are "
+        "expected to cost dollars, and this is how many."
     )
     return out
+
+
+def _deadline_pressure(
+    frame: pd.DataFrame,
+    probability: np.ndarray,
+    economics: AppealEconomics,
+    time_column: str,
+    freq: str = "MS",
+) -> dict[str, Any]:
+    """Does the deadline override ever actually fire? Rolling month-end queues.
+
+    Neither reported queue exercises it, and that is a property of the two
+    conventions rather than of the rule. The backtest triages every claim on the
+    day its denial posts, so every claim has the whole filing window ahead of it
+    and nothing is ever urgent. The live snapshot is one instant, and on this
+    warehouse the 2023-24 tail is thin enough that the instant holds almost
+    nothing.
+
+    A deadline rule that never fires in any reported artifact is a rule nobody
+    has seen work. So the queue is rebuilt at each month start across the window
+    over the claims open on that date, which is how a worklist is really read —
+    a claim sits on it, ages, and eventually becomes urgent. This reports how
+    often the tier is reached and re-asserts the ordering guarantee on every one
+    of those queues, not just on the two headline ones.
+    """
+    dates = pd.to_datetime(frame[time_column])
+    if dates.empty:
+        return {"snapshots": 0, "note": "no denials in the window"}
+
+    counts: dict[str, int] = {}
+    snapshots = 0
+    ever_critical: set[int] = set()
+    for as_of in pd.date_range(dates.min(), dates.max(), freq=freq):
+        open_now = (dates <= as_of) & (
+            dates + pd.Timedelta(days=economics.filing_window_days) >= as_of
+        )
+        if not open_now.any():
+            continue
+        queue = build_work_queue(
+            frame.loc[open_now].reset_index(drop=True),
+            np.asarray(probability)[open_now.to_numpy()],
+            economics,
+            as_of=as_of,
+        )
+        # The guarantee, re-checked on every snapshot rather than only on the two
+        # queues that reach the report.
+        assert_no_deadline_claim_was_outranked(queue)
+        snapshots += 1
+        for tier, n in queue["tier"].value_counts().items():
+            counts[str(tier)] = counts.get(str(tier), 0) + int(n)
+        ever_critical.update(
+            queue.loc[queue["tier"] == "DEADLINE_CRITICAL", "claim_sk"].astype(int).tolist()
+        )
+
+    return {
+        "snapshots": snapshots,
+        "frequency": freq,
+        "claim_appearances_by_tier": dict(sorted(counts.items())),
+        "distinct_claims_that_became_deadline_critical": len(ever_critical),
+        "note": "Counts are claim-appearances across snapshots, not distinct claims — a "
+        "claim open for four months is counted in four queues, which is the point: the "
+        "same claim moves from VALUE to DEADLINE_CRITICAL as it ages. The ordering "
+        "guarantee was re-asserted on every snapshot.",
+    }
 
 
 def run_model_c(
@@ -285,7 +370,13 @@ def run_model_c(
         economics,
         appealed_test["sim_appeal_recovered_amount"],
         capacity,
+        n_resamples=n_resamples,
+        seed=seed,
     )
+
+    # (3) DEADLINE PRESSURE: rolling month-start queues, so the urgency override
+    # is exercised on real data rather than only asserted in a unit test.
+    pressure = _deadline_pressure(queue_frame, queue_probability, economics, TIME_COLUMN)
 
     calibration_report = {
         "method": method,
@@ -305,18 +396,39 @@ def run_model_c(
         "picture of sampling noise.",
     }
 
+    # Slices carry volumes and an explicit too-thin marker: with 193 test rows
+    # every slice here is small, and a rate without its denominator invites a
+    # conclusion this fold cannot support.
+    slice_frame = labelled.loc[split.test]
     slices = {
-        "denial_category": slice_metrics(
-            labelled.loc[split.test],
+        key: slice_metrics(
+            slice_frame,
             y_test,
             champion_test,
-            by="sim_denial_category",
+            by=column,
             min_positives=10,
-        ).to_dict(orient="records"),
-        "payer": slice_metrics(
-            labelled.loc[split.test], y_test, champion_test, by="sim_payer_id", min_positives=10
-        ).to_dict(orient="records"),
+            n_resamples=n_resamples,
+            seed=seed,
+        ).to_dict(orient="records")
+        for key, column in (
+            ("denial_category", "sim_denial_category"),
+            ("payer", "sim_payer_id"),
+            ("service_line", "sim_service_line_id"),
+            ("facility_provider", "prvdr_num"),
+        )
     }
+    # Provider is the facility slice (CLAUDE.md §3.4: group on the synthetic
+    # prvdr_num, never the crosswalked real CCN). At 193 test rows essentially no
+    # provider is scorable, which is the finding rather than an omission.
+    provider_rows = slices.pop("facility_provider")
+    slices["facility_provider_summary"] = [
+        {
+            "providers_in_test_fold": len(provider_rows),
+            "scorable_providers": sum(not r["too_thin_to_score"] for r in provider_rows),
+            "note": "Reported as a count only. A 193-row appealed test fold cannot support "
+            "per-provider appeal metrics, and a table of nulls would imply it nearly could.",
+        }
+    ]
 
     report: dict[str, Any] = {
         "model": "C — appeal success and expected net recovery",
@@ -373,11 +485,20 @@ def run_model_c(
                 .drop(columns=["as_of"])
                 .round(2)
                 .to_dict(orient="records"),
+                "caveat": "This snapshot is DEGENERATE on this warehouse and is reported "
+                "rather than quietly dropped. The last denial posts in 2024 and the 2023-24 "
+                "tail holds ~3% of claims, so almost nothing is still inside its 120-day "
+                "filing window on the final day — a true statement about the data and not a "
+                "work queue. The backtest and the deadline_pressure block below are the "
+                "ones to read; this exists to show the shape a dashboard would render.",
             },
             "backtest_at_arrival": {
                 "rows": int(len(backtest)),
                 "tier_counts": backtest["tier"].value_counts().to_dict(),
+                "note": "No claim is DEADLINE_CRITICAL here by construction: at-arrival "
+                "triage gives every claim the full filing window. See deadline_pressure.",
             },
+            "deadline_pressure": pressure,
             "value_at_capacity": queue_value,
         },
         "slices": slices,
@@ -416,17 +537,22 @@ def _headline(report: dict[str, Any]) -> str:
             f"(${value['recovered_dollars_captured']:,.0f} of "
             f"${value['recovered_dollars_total']:,.0f})"
         )
-    diff = report["queue"]["value_at_capacity"]["enr_minus_largest_denial_first"]
-    lines.append(
-        f"    ENR - largest-first:  {diff['point']:+.1%} "
-        f"[{diff['ci_low']:+.1%}, {diff['ci_high']:+.1%}]"
-    )
+    lines.append("  paired differences (same resampled claims):")
+    for name, diff in report["queue"]["value_at_capacity"]["differences"].items():
+        lines.append(
+            f"    {name:<46}{diff['point']:+.1%} [{diff['ci_low']:+.1%}, {diff['ci_high']:+.1%}]"
+        )
+    pressure = report["queue"]["deadline_pressure"]
     lines += [
         "",
         f"  live snapshot as of {report['queue']['live_snapshot']['as_of']}: "
         f"{report['queue']['live_snapshot']['rows']} open claims, "
         f"tiers {report['queue']['live_snapshot']['tier_counts']}",
         f"  backtest tiers: {report['queue']['backtest_at_arrival']['tier_counts']}",
+        f"  deadline pressure over {pressure['snapshots']} monthly queues: "
+        f"{pressure['claim_appearances_by_tier']}",
+        f"    distinct claims that became deadline-critical: "
+        f"{pressure['distinct_claims_that_became_deadline_critical']}",
     ]
     return "\n".join(lines)
 

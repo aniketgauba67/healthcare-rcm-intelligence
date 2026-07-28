@@ -42,6 +42,17 @@ feature_store:
     # fitted to observed adjudication timing, which would mean designing a
     # feature from a forbidden column.
     embargo_days: 60
+    # Model C's prior-period rates are OVERTURN rates, and an appeal outcome is
+    # known much later than a denial. Two published Medicare Part A/B
+    # redetermination rules bound it: the appeal must be filed within 120 days of
+    # the initial determination, and the contractor then has 60 days to issue a
+    # decision. 180 days after the denial posts is therefore the worst case for
+    # "this outcome is on the books". Derived from the published appeals
+    # timetable and deliberately NOT checked against sim_appeal_decision_date,
+    # which is forbidden for Model C — fitting the embargo to the observed
+    # decision lag would be designing a feature out of a forbidden column, the
+    # same error the 60-day figure above is written to avoid.
+    appeal_embargo_days: 180
     # m-estimate weight. An entity with this many prior claims is weighted half
     # its own rate, half the book rate. The median provider here has two claims,
     # so most provider rates are almost entirely shrunk — which is the honest
@@ -330,24 +341,99 @@ estimators:
 # ---------------------------------------------------------------------------
 # Decision thresholds and economics
 # ---------------------------------------------------------------------------
+# The value of catching a denial before it happens is NOT the claim. The first
+# version of this block asserted that it was (`prevented_denial_value_multiplier:
+# 1.0`), and that single number quietly made two separate claims at once: that a
+# review prevents the denial WITH CERTAINTY, and that a denial costs the FULL
+# claim value. Both are wrong, the second badly so — denials are appealed and
+# substantially overturned, so the real loss is the unrecovered fraction plus
+# rework, not the claim.
+#
+# So it is decomposed into two named factors, each set from PUBLISHED benchmarks
+# and each labelled DESIGN CHOICE in the sense docs/assumptions.md uses: a
+# defensible number nobody has measured on THIS book, stated so it can be argued
+# with rather than buried in a product.
+#
+#   prevented_denial_value_multiplier
+#     = p_prevented_given_flagged_and_worked x share_of_claim_value_permanently_lost
+#
+# NEITHER FACTOR IS DERIVED FROM THE SIMULATION. The generator's realized
+# overturn and rework rates are behind the CLAUDE.md §4.5 firewall, and reading
+# them to set a business parameter would make the operating point a function of
+# exactly what the firewall exists to hide. Published sources only, and the
+# factors were fixed BEFORE the resulting threshold was computed — a cost matrix
+# reverse-engineered from a pleasing flagged share is the same failure as tuning
+# a model to beat a baseline.
 cost_matrix:
+  # MGMA benchmarks the administrative labour to rework a single denied claim at
+  # roughly $25-$118. $25 is the low end of that range and is the right end for
+  # a PRE-submission review, which is a scrub-and-fix on an open claim rather
+  # than a denial workup.
   review_cost_usd: 25
-  prevented_denial_value_multiplier: 1.0
-  false_negative_penalty: full_expected_reimbursement_loss
 
-# MEASURED 2026-07-27, and it changes how the threshold must be read: with a $25
-# review, a mean $3,800 at stake on a denied claim and a 12% denial rate, the
-# expected value of reviewing an AVERAGE claim is about $456. Reviewing
-# everything is therefore optimal and the cost-maximising threshold flags ~99% of
-# the queue — a correct answer to the question the cost matrix asks, and a
-# useless operating point, because no billing office has reviewers for 99% of its
-# claims. The binding constraint here is capacity, not economics, so a second
-# operating point is reported: work the top share of the queue by score. Both are
-# in the model card, and the multiplier sensitivity sweep shows how much of the
-# cost-optimal answer is the multiplier assumption rather than the model.
+  # FACTOR 1 — P(the denial is actually prevented | the claim was flagged and a
+  # reviewer worked it). Change Healthcare's Denials Index puts 86% of denials in
+  # the "potentially avoidable" bucket, which is a ceiling on what any pre-bill
+  # intervention could ever reach, and reports that about HALF of denials arise
+  # from front-end causes — registration/eligibility (the largest single cause,
+  # near 27%), authorization, and service-not-covered. Those are the causes a
+  # pre-submission review can see and act on; a medical-necessity or bundling
+  # determination made downstream by the payer is largely not.
+  # 0.50 therefore reads as "the front-end share", and it is the OPTIMISTIC end
+  # of honest: it equates 'this denial had a front-end cause' with 'this review
+  # caught it and fixed it in time', which will not be true of every claim.
+  p_prevented_given_flagged_and_worked: 0.50
+
+  # FACTOR 2 — the share of a denied claim's value PERMANENTLY lost. The same
+  # Denials Index reports that of the potentially-avoidable denials, about 24%
+  # are not recoverable; the rest are ultimately reworked or appealed into
+  # payment. Premier Inc.'s 2024 survey points the same way, with a majority of
+  # contested denials ultimately overturned and paid.
+  # 0.25 is a FLOOR on the true loss, and deliberately so: it describes a billing
+  # office that actually works its denial queue. MGMA and Change Healthcare both
+  # report that 50-65% of denied claims are never reworked at all, and in a shop
+  # like that the permanently-lost share is far higher. Taking the floor keeps
+  # the threshold from being flattered by an assumption of institutional neglect.
+  share_of_claim_value_permanently_lost: 0.25
+
+  # Product: 0.50 x 0.25 = 0.125. Recorded here for readability only —
+  # src/models/evaluate.py computes it from the factors, so editing this line
+  # changes nothing and a test asserts the two agree.
+  prevented_denial_value_multiplier_derived: 0.125
+
+  false_negative_penalty: unrecovered_share_of_expected_reimbursement
+
+# WHAT FALLS OUT OF THOSE FACTORS, reported because the ruling was to report it
+# whatever it said. The cost-optimal threshold is STILL degenerate: it flags
+# essentially the whole queue.
+#
+# The reason is arithmetic and worth stating, because it is a finding about this
+# problem rather than about this model. A claim is worth reviewing when
+#   multiplier x P(denial) x dollars_at_stake  >  review_cost
+# MEASURED, not asserted — src/models/evaluate.py: break_even_multiplier(), and
+# the run records it in metrics.json. On the CALIBRATION fold (the fold the
+# threshold is chosen on) the denial rate is 0.1306 and the mean denied amount is
+# $3,029.75, so the BREAK-EVEN multiplier is 0.0632. The same figure is 0.0543 on
+# the test fold and 0.0785 across the whole book: near 0.05-0.08 however it is
+# measured. Every honest reading of the published benchmarks lands above that —
+# the old 1.0 by a factor of sixteen, the decomposed 0.125 by about two. A
+# pre-submission review would have to be under ~6% effective at recovering value
+# before the threshold started to bind.
+#
+# So the degeneracy was never the bad constant. At a $25 review cost against
+# thousands of dollars of exposure, reviewing everything really is worth it, and
+# the binding constraint is REVIEWER CAPACITY, not economics. That is why the
+# capacity-constrained point is the PRIMARY reported operating point: a work
+# queue is ranked against finite analyst hours, not thresholded.
+#
+# The sensitivity sweep stays a first-class artifact regardless. A business
+# parameter nobody has measured on this book is a guess, and the sweep is the
+# honest way to show a guess. The break-even 0.055 sits inside its range on
+# purpose, so the reader can see where the threshold would start to carry
+# information and how far the benchmarks are from it.
 operating_point:
   review_capacity_share: 0.10
-  multiplier_sensitivity: [0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
+  multiplier_sensitivity: [0.005, 0.01, 0.025, 0.055, 0.075, 0.125, 0.25, 0.5, 1.0]
 
 # ---------------------------------------------------------------------------
 # Model C economics and the work-queue rules.
