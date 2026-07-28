@@ -508,19 +508,21 @@ def run_model_c(
         (artifact_dir / "metrics.json").write_text(
             json.dumps(json_safe(report), indent=2, allow_nan=False)
         )
-        write_provenance_readme(
-            artifact_dir,
-            model="C",
-            make_target="make train-appeal",
-            description="Appeal success and Expected Net Recovery work queue: the ranked "
-            "queues (live snapshot, backtest, rolling monthly), the appeal-selection "
-            "table, slice metrics, and the full `metrics.json` report.",
-        )
         snapshot.to_csv(artifact_dir / "work_queue_live_snapshot.csv", index=False)
         backtest.to_csv(artifact_dir / "work_queue_backtest.csv", index=False)
         selection.to_csv(artifact_dir / "appeal_selection.csv", index=False)
         for name, rows in slices.items():
             pd.DataFrame(rows).to_csv(artifact_dir / f"slice_{name}.csv", index=False)
+        # LAST, so its call-out list can be built from the files that actually landed.
+        write_provenance_readme(
+            artifact_dir,
+            model="C",
+            make_target="make train-appeal",
+            description="Appeal success and Expected Net Recovery work queue: the ranked "
+            "queues as CSVs (live snapshot, backtest), the appeal-selection table, slice "
+            "metrics, and the full `metrics.json` report — which also carries the rolling "
+            "month-start deadline-pressure summary, for which no CSV is written.",
+        )
     return report
 
 

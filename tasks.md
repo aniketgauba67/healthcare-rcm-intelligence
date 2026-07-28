@@ -1805,6 +1805,62 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   frame) and p10's 0.5871 on the full 20,867, and BOTH are right. Conclusion is
 >   untouched — both sit far below the 0.6778 ceiling — so this is a precision nit,
 >   not a correctness one. Add "on the probe population" and it is closed.
+- [x] PRESERVED WIP VERIFIED AND EXTENDED (ml-engineer-5, measured on be25ee7 =
+  4ecc4c5 merged with main 1df3904). ml-engineer-4's four labelled fixes were
+  committed but never run. Ran them against qa's ACTUAL gates (checked
+  feat/phase4-qa's tests/ out over this tree, ran, then removed — they are qa's
+  files and are not in my commit). THREE of the four held; ONE DID NOT.
+  [READ-THEN-DROP]  HELD. sim_appeal_disputed_amount is excluded at
+      APPEAL_TARGET_QUERY, the post-join drop is gone, and `make train-appeal`
+      reproduces every Model C figure to the digit (xgboost 0.5611/0.4914,
+      category_rule 0.5571/0.4793, enr − largest −4.7% [−16.7%, +0.9%], 237
+      deadline-critical claims). The column was inert, which is why nothing caught
+      it — the fix is about the boundary, not the number.
+  [GENERATOR-ANCHOR] FAILED, and the gate is right. The $29.88 anchor was gone,
+      but the NOTE RECORDING ITS REMOVAL re-established the reconciliation:
+      "reconciled $45 against the simulation's own realized cost per denied
+      claim" pairs a number with the generator's voice, which is the consistency
+      remark the ruling ordered out — a retraction that repeats the fact it
+      retracts is not a retraction. Rewritten to name no figure on either side.
+      The failing run IS the negative control: the gate fired on the real defect
+      before I touched it.
+  [SHAP-BANNER]     PARTIAL. The banner was there and _save_figure is a better
+      answer than qa asked for (single savefig writer ⇒ a new plot carries the
+      banner by construction). But qa's spec named THREE things and two were
+      missing: no title naming the model, and tight_layout instead of
+      bbox_inches="tight". Both added. The AST gate only checks the banner, so it
+      passed on an incomplete fix — a gate is not a spec. PNG inspected, not just
+      asserted: title, full x-axis label, banner all render.
+  [CSV-PROVENANCE]  HELD, with a defect I found by reading the output. The note
+      was written BEFORE the CSVs, and its call-out list was a fixed block, so
+      model_a/README.md warned about `work_queue*.csv` — files that directory does
+      not contain. A provenance note that describes files it does not have is the
+      first thing a reader stops trusting. Both writers now run LAST and build the
+      list from what actually landed. Also removed a stale gitignored
+      work_queue.csv (Jul 27, no remaining writer) and corrected model_c's
+      description, which promised rolling-monthly queues as CSVs when they exist
+      only as a metrics.json summary.
+  MODEL CARD: the +44 lines team-lead flagged as unexamined are accurate against
+  the code, with ONE EXCEPTION I removed. The card credited qa-reviewer with an
+  independent 16-fit determinism probe ("8 at n_jobs=4 and 8 at n_jobs=1, one
+  digest"). No committed qa artifact contains it — qa's tests/models/
+  test_determinism.py is a different, two-fit check — so under PIN-THE-SHA it is
+  an unpinned secondhand measurement in the project's honesty document. Replaced
+  with the standing guard that does exist. If qa DID run that probe, restore it
+  with a commit to point at; I removed the claim, not the finding.
+  EVIDENCE. `make train` and `make train-appeal` end to end on live PG (read-only;
+  9 views / 20,867 claims / 131,077 workflow events / drg_desc 167 verified before
+  and unchanged after). Every Model A headline reproduces: logistic ROC 0.6254 /
+  PR 0.2210 / Brier 0.10280, xgboost − logistic +0.0003 [−0.0173, +0.0183], ECE
+  0.01964 → 0.01753, dollars +17.9% [+4.2%, +51.7%]. 40 of 40 metric-table figures
+  and every narrative figure I could machine-check reproduce to the digit against
+  the freshly written metrics.json. Committed artifacts UNCHANGED across four
+  consecutive rebuilds: parquet d11bd0df5a918d0d, manifest d5c1ca88aa0786f7.
+  qa's gates 49 passed; full non-integration suite 310 passed / 12 skipped with
+  qa's tree overlaid, 264 / 12 on mine alone; ruff clean.
+  NEGATIVE CONTROLS, because a gate never shown to fail proves nothing: a savefig
+  function bypassing _save_figure fails the banner gate; removing model_a/README.md
+  fails the directory gate; both pass on restore.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata
