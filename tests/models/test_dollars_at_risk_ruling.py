@@ -95,7 +95,24 @@ def test_metrics_json_reports_the_paired_difference() -> None:
     dollars = report.get("dollars_at_risk")
     assert dollars, "metrics.json has no dollars_at_risk section"
 
-    paired = {key: value for key, value in dollars.items() if _PAIRED_KEY.search(key)}
+    # The paired block may sit at the top of `dollars_at_risk` or one level down
+    # under a `paired_difference` grouping key — both are reasonable shapes and
+    # the ruling is about the CONTENT. An earlier version of this test assumed the
+    # flat shape, matched the grouping key itself, and then asserted the interval
+    # fields against a dict of COMPARISONS. It failed against a metrics.json that
+    # satisfied the ruling completely, which is a false leak report: the same
+    # defect class as p9's fixture reading `forbidden_table_columns` as a flat set.
+    paired: dict[str, dict] = {}
+    for key, value in dollars.items():
+        if not isinstance(value, dict):
+            continue
+        if _PAIRED_KEY.search(key):
+            for inner_key, inner in value.items():
+                if isinstance(inner, dict) and "point" in inner:
+                    paired[f"{key}.{inner_key}"] = inner
+            if "point" in value:
+                paired[key] = value
+
     assert paired, (
         "metrics.json reports dollars-at-risk capture without any paired difference. "
         f"present keys: {sorted(dollars)}. Per the ruling, add the champion-minus-reference "

@@ -108,33 +108,70 @@ def test_the_multiplier_is_decomposed_into_named_factors() -> None:
         )
 
 
+# A phrase that attributes a quantity to OUR generated layer rather than to a
+# published source. "this warehouse" and "simulated appeals" are here because the
+# defect is not limited to the word "realized" — see the second instance below.
+_GENERATOR_VOICE = re.compile(
+    r"simulation's|the simulation\b|generator's|the generator\b|realized|"
+    r"this warehouse|simulated (?:appeals|claims|denials)|sim_[a-z_]+",
+    re.IGNORECASE,
+)
+
+# Cross-references carry digits that are not measurements. Stripping them is what
+# lets the numeric test below stay simple without firing on "CLAUDE.md §4.5".
+_REFERENCE_NOISE = re.compile(r"§\s*\d+(?:\.\d+)*|CLAUDE\.md|[\w/]+\.(?:md|yaml|py)\b")
+
+_NUMERIC = re.compile(r"\d")
+
+
+def _economics_prose(text: str) -> list[str]:
+    """The economics section's comment prose, as sentences.
+
+    Sentence-level rather than line-level because YAML comments wrap mid-sentence,
+    and the previous line-based version of this check reported a fragment of a
+    DISCLAIMER ("NEITHER FACTOR IS DERIVED FROM THE SIMULATION. The generator's
+    realized") as an offence. A test that cannot tell an anchor from a denial that
+    there is an anchor is worse than no test: the fix a reader reaches for is
+    deleting the honest sentence.
+    """
+    start = text.find("# Decision thresholds and economics")
+    assert start != -1, "could not locate the economics section of config/model.yaml"
+
+    prose = " ".join(
+        line.strip().lstrip("#").strip()
+        for line in text[start:].splitlines()
+        if line.strip().startswith("#")
+    )
+    return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", prose) if sentence.strip()]
+
+
 def test_the_factors_are_not_validated_against_the_generator() -> None:
-    """Constraint 1: no factor may be anchored to a generator-realized quantity.
+    """Constraint 1: no parameter may be anchored to a generator-realized quantity.
 
     Checked on the comment text, because that is where such an anchor shows up.
     No code reads `sim_operating_costs`, and this test takes no position on how
     the figure was obtained — the published board is the likely route. The harm
     is the anchoring itself: it makes the business parameter a function of the
     layer the §4.5 firewall exists to hide, whichever way it was read.
-    """
-    text = _CONFIG_PATH.read_text()
-    economics_start = text.find("# Decision thresholds and economics")
-    assert economics_start != -1, "could not locate the economics section of config/model.yaml"
-    economics = text[economics_start:]
 
-    # Deliberately narrow. A test that flagged every mention of the simulation here
-    # would be over-broad and would get deleted; these three phrases are the
-    # unambiguous ones — each anchors a parameter to generator-realized output.
+    The offence is a NUMBER spoken in the generator's voice. Saying "neither
+    factor is derived from the simulation" is the opposite of the offence and
+    must not be flagged; saying "the simulation's own realized cost is $29.88" is
+    the offence whether or not the sentence goes on to call it non-load-bearing.
+    """
     offenders = [
-        line.strip()
-        for line in economics.splitlines()
-        if re.search(r"simulation's own|\brealized\b|sim_operating_costs", line)
+        sentence
+        for sentence in _economics_prose(_CONFIG_PATH.read_text())
+        if _GENERATOR_VOICE.search(sentence) and _NUMERIC.search(_REFERENCE_NOISE.sub("", sentence))
     ]
     assert not offenders, (
-        "a business parameter is being reconciled against the generator's realized output, "
-        "which constraint 1 of the cost-matrix ruling forbids:\n  "
+        "a business parameter is reconciled against a quantity measured on our own generated "
+        "layer, which constraint 1 of the cost-matrix ruling forbids — team-lead ruled the "
+        "reference comes OUT of config/model.yaml, 'even as a consistency remark':\n  "
         + "\n  ".join(offenders)
         + "\nCite the published benchmark and stop there. Whether the generator happens to "
         "agree is not evidence about the real world, and checking makes the operating point "
-        "a function of the layer the firewall exists to hide."
+        "a function of the layer the firewall exists to hide. Move the observation to the "
+        "model card if it is worth keeping; it does not belong in the file that sets the "
+        "parameter."
     )
