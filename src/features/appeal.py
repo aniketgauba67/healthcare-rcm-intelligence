@@ -22,11 +22,18 @@ result.
 
 **`sim_appeal_disputed_amount` deserves a note**, because it is forbidden and
 its value is available anyway. It equals `sim_denied_amount` exactly on all 967
-appealed claims — I checked before relying on it — so the recoverable amount
-used by the Expected Net Recovery score is read from the permitted column. That
-is not a workaround: the denied amount is on the remittance advice at triage
-time, and the disputed amount is a fact about an appeal that has not been filed
-yet. They coincide numerically; they do not coincide in time.
+appealed claims — a one-time manual check, not something this module recomputes
+— so the recoverable amount used by the Expected Net Recovery score is read from
+the permitted column. That is not a workaround: the denied amount is on the
+remittance advice at triage time, and the disputed amount is a fact about an
+appeal that has not been filed yet. They coincide numerically; they do not
+coincide in time.
+
+The column is now excluded at the QUERY (`extract.py: APPEAL_TARGET_QUERY`). It
+was previously selected and then dropped a few lines below the join here, which
+is not the same thing: the drop was one refactor from vanishing while the read
+stayed, leaving a forbidden column on the frame with nothing objecting. A
+forbidden column must never be READ — the `clm_utlztn_day_cnt` ruling.
 
 **Population and selection.** The scoring population is every denied claim
 (2,663). The *training* population is the 967 that were actually appealed, and
@@ -267,8 +274,11 @@ def build_model_c_frame(engine: Engine, config: dict | None = None) -> pd.DataFr
     if targets["claim_sk"].duplicated().any():
         raise ValueError("more than one level-1 appeal per claim; the grain is not what it claims")
 
+    # No drop here any more: `sim_appeal_disputed_amount` is never selected by
+    # APPEAL_TARGET_QUERY, so there is nothing to remove. Enforcing it at the
+    # query means a future edit to this join cannot silently readmit it.
     merged = base.merge(denials, on="claim_sk", how="inner").merge(
-        targets.drop(columns=["sim_appeal_disputed_amount"]), on="claim_sk", how="left"
+        targets, on="claim_sk", how="left"
     )
     if len(merged) != len(denials):
         raise ValueError(f"denial grain broken: {len(denials)} denials became {len(merged)} rows")

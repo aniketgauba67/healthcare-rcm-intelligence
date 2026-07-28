@@ -452,18 +452,26 @@ appeal_economics:
   # docs/assumptions.md §9 anchors the cost to rework a denied claim at roughly
   # $25-$120, citing MGMA (~$25/appealed claim) at the low end and Premier's 2024
   # ~$44 per contested claim above it. $45 is the Premier-anchored figure for
-  # preparing an APPEAL specifically. The simulation's own realized denial rework
-  # + appeal cost is $29.88 per DENIED claim, which averages over the two thirds
-  # of denials nobody appeals, so an appeal-specific cost above it is consistent
-  # rather than contradictory. sim_operating_costs is a forbidden table for both
-  # models, so this is an assumption from published benchmarks and not a value
-  # read out of the generator.
+  # preparing an APPEAL specifically. sim_operating_costs is a forbidden table
+  # for both models, so this is an assumption from published benchmarks and
+  # nothing else.
+  #
+  # NO GENERATOR CROSS-CHECK BELONGS HERE. A previous version of this comment
+  # reconciled $45 against the simulation's own realized cost per denied claim.
+  # It was offered as a consistency remark rather than a derivation, which is
+  # exactly the argument the §4.5 firewall rejects: once a generator-realized
+  # value is written next to a parameter, a later reader cannot tell whether the
+  # parameter was chosen from the citation or nudged toward the number beside it,
+  # and neither can the person who edits it next.
   appeal_processing_cost_usd: 45.0
 
   # Medicare Part A/B redetermination: an appeal must be filed within 120 days of
   # receiving the initial determination. Used to derive days-to-deadline for the
-  # urgency rule. Consistent with this warehouse: 965 of 967 simulated appeals
-  # were filed within 120 days of the denial posting (median 15 days).
+  # urgency rule. Taken from the published timetable and from nothing else — the
+  # previous comment here validated this window against the simulated appeals in
+  # this warehouse, which is worse than the cost anchor above rather than milder:
+  # checking a POLICY PARAMETER against the generated layer is precisely the
+  # dependency §4.5 exists to prevent, whatever the observed agreement was.
   filing_window_days: 120
   # Inside this many days of the deadline a claim is worked regardless of score.
   deadline_critical_days: 14

@@ -61,7 +61,7 @@ from src.models.evaluate import (
     slice_metrics,
 )
 from src.models.preprocess import prepare_matrix
-from src.models.train import json_safe
+from src.models.train import json_safe, write_provenance_readme
 from src.models.work_queue import (
     AppealEconomics,
     assert_no_deadline_claim_was_outranked,
@@ -507,6 +507,14 @@ def run_model_c(
     if write:
         (artifact_dir / "metrics.json").write_text(
             json.dumps(json_safe(report), indent=2, allow_nan=False)
+        )
+        write_provenance_readme(
+            artifact_dir,
+            model="C",
+            make_target="make train-appeal",
+            description="Appeal success and Expected Net Recovery work queue: the ranked "
+            "queues (live snapshot, backtest, rolling monthly), the appeal-selection "
+            "table, slice metrics, and the full `metrics.json` report.",
         )
         snapshot.to_csv(artifact_dir / "work_queue_live_snapshot.csv", index=False)
         backtest.to_csv(artifact_dir / "work_queue_backtest.csv", index=False)
