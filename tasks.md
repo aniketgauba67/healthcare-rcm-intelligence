@@ -1579,6 +1579,146 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   ALSO STILL OPEN, non-blocking, previously ruled: `written_at_utc` still churns
   artifacts/features/model_a_training_matrix.json on every `make train`
   (reproduced; only that field changes, the parquet is byte-stable).
+> TEAM RULE — PIN THE SHA (team-lead, 2026-07-28, after a §3.2 finding was nearly
+> lost to a disagreement neither party could settle). qa-reviewer-p11 filed a
+> correct finding measured on c565ea3; ml-engineer-4 fixed it independently while
+> registering the matrix; team-lead then "disproved" it by reading the ml
+> worktree's WORKING TREE — which already contained the uncommitted fix — and
+> reported that as though it described c565ea3. Three parties, all measuring
+> correctly, two of different trees.
+> RULE: every finding names the commit it was measured on, AND every challenge to
+> a finding names the commit it was checked against. Team-lead violated the second
+> half, so this binds the coordinator too. On a project where several agents work
+> concurrently in separate worktrees against one shared database, an unpinned
+> observation is not reproducible even when it is correct.
+> WHAT THE FINDING ACTUALLY WAS, since it is the substantive lesson:
+> `overall_prior_denial_rate` shipped UNPREFIXED in the committed training matrix
+> from cd3e30c to 0a7960a. It is an aggregate of a fabricated denial, and in the
+> one data file a reader can open from a clean clone with no database it reads as
+> a real Medicare book rate. Nothing failed because nothing was checking. Renamed
+> to sim_overall_prior_denial_rate (Model C counterpart sim_overall_prior_overturn_
+> rate); NO metric moved. Now guarded on DECLARED LINEAGE rather than column name —
+> a name check cannot catch a name defect — with a negative control that restores
+> the old name, watches the test fail naming the offending lineage, and passes on
+> restore. `log_sim_denied_amount` infixes rather than prefixes and STAYS: qa
+> re-aimed that gate to fire on ABSENCE of the sim_ marker rather than its
+> position, which targets the property §3.2 protects instead of a spelling.
+> TEAM RULE — LABEL, DON'T NUMBER: the team-lead's spawn brief and the reviewer's
+> findings both used 1-4 for different work, so ml's "items 1-4 DONE" did not
+> answer qa's findings 1-2 and both parties briefly believed the other was
+> stalling. Fix lists now use LABELS ([READ-THEN-DROP], [GENERATOR-ANCHOR],
+> [SHAP-BANNER], [CSV-PROVENANCE]) and replies quote them back.
+> FOR PHASE 5 — [ARTIFACT-REWRITE], found by ml-engineer-4 by accident and worth
+> more than the accident: a training run against a TRANSIENTLY DEGRADED warehouse
+> silently PERSISTED a bad matrix (diagnosis_count all-null) over the committed
+> artifact, and the write landed BEFORE the run failed loudly. The artifact that
+> exists specifically so the §4.1 probes run without a warehouse is therefore
+> rewritable by the very condition it guards against — the same shape as p10's
+> staleness check that repaired what it was detecting, and the restore that rolled
+> back to zero views while looking like it never ran. Caught only because they
+> hashed before and after. FIX (Phase 5, not blocking Phase 4): a content sanity
+> check before persist — refuse to overwrite when row counts or null rates move
+> materially. Write path is ml's, guard shape is qa's, contract is shared.
+> ALSO RECORDED: running an integration test BY FILE PATH bypasses the
+> `-m "not integration"` filter. Not obvious, and it hit the shared warehouse.
+- [x] qa-reviewer-p11 FIX LIST 1/2/5/6 CLEARED (ml-engineer-4). 3 and both
+  non-blocking items were already fixed in 0a7960a; the list was compiled against
+  c565ea3, so 3 (§3.3 registration), the written_at_utc churn and the determinism
+  write-up read as open on the board but were not on my branch.
+  (1) sim_appeal_disputed_amount NO LONGER READ. It was selected by
+      APPEAL_TARGET_QUERY and dropped again after the join, which is not the same
+      as never reading it: the drop was one refactor from vanishing while the read
+      stayed, leaving a forbidden column on the frame with nothing objecting. Now
+      excluded at the QUERY (extract.py), per the clm_utlztn_day_cnt ruling. The
+      card's "equal on all 967 level-1 appeals" claim is relabelled a ONE-TIME
+      MANUAL CHECK, since the pipeline no longer recomputes it — the same
+      correction applied to appeal.py's module docstring, which said "I checked
+      before relying on it" and would otherwise have described code that is gone.
+      Model C figures unchanged (0.5611/0.4914, category_rule 0.5571/0.4793,
+      enr - largest -4.7% [-16.7%, +0.9%]): the column was inert, which is why
+      nothing caught it.
+  (2) BOTH generator cross-checks out of config/model.yaml. The $29.88 anchor and
+      the "965 of 967 filed within 120 days" check are deleted, Premier/MGMA
+      citations kept. I did NOT argue the "not load-bearing" line again — the
+      ruling pre-rejected it and the second instance shows why: it validated a
+      POLICY parameter against the generated layer. Each comment now records what
+      was removed and why, so the next reader does not helpfully re-add it.
+      Verified the one surviving "generator's realized" mention at :360 is the
+      opposite of an anchor — it states that neither cost factor is derived from
+      the simulation, and names no generator value.
+  (5) SHAP PNG BANNER — fixed at the shape, not the file. `_save_figure` is now
+      the ONLY place in the project that calls savefig; both plots route through
+      it, so a new plot carries the banner by construction and one that bypasses
+      it fails qa's AST gate. x-axis label was being clipped mid-word and is
+      restated in the units the axis is in.
+  (6) One README.md per artifact directory, WRITTEN BY THE RUN (models_artifacts/
+      is gitignored, so a committed note would describe files that may not exist).
+      Names slice_payer.csv (§3.5 payer-level analysis) and work_queue*.csv
+      (reads as an operational worklist for denials that never happened).
+  VERIFIED AGAINST qa's ACTUAL GATES, not against my reading of them: checked
+  tests/leakage/test_plot_provenance_banner.py and
+  test_artifact_directory_provenance.py out of 2afb693 over this tree, ran them
+  (5 passed), then REMOVED them — they are qa's files and are not in my commit.
+  NEGATIVE CONTROLS RUN on both: adding a savefig function that bypasses
+  _save_figure fails the banner gate; removing model_a/README.md fails the
+  directory gate. Both pass again on restore.
+  Full suite 264 passed / 12 skipped, ruff clean, warehouse read-only.
+> ON HOLD as instructed: qa's finding 4 (§3.2 prefix through feature engineering).
+> Not acted on. For the reconciliation — the four names qa flagged exist WITH the
+> prefix because I renamed them in 0a7960a after finding the violation myself
+> while registering the matrix; team-lead's count of 7 unprefixed features, all
+> genuine SOURCE or SOURCE-derived, is measured on that commit and matches mine.
+> qa was reading c565ea3, where `overall_prior_denial_rate` really was unprefixed.
+> I believe we found the same defect independently, one commit apart.
+> `log_sim_denied_amount` (appeal.py:183) is a separate question and I have left
+> it alone pending the ruling.
+> CRASH + RE-SPAWN #4 2026-07-28 14:45Z (team-lead): qa-reviewer-p11 and
+> ml-engineer-4 hit the cap together, the FOURTH simultaneous double-crash in two
+> days. Re-spawned as ml-engineer-5 and qa-reviewer-p12.
+> PRESERVED: 4ecc4c5 on feat/phase4-ml. ml-engineer-4 was cut off MINUTES after I
+> asked them to commit and send qa a SHA, so all four labelled fixes existed only
+> in the working tree. Preserved verbatim, ruff clean, but NOT verified — no test
+> run, no `make train`, no qa pass. Working-tree state as found:
+>   [READ-THEN-DROP]   extract.py:115 states the column is deliberately NOT
+>                      selected; appeal.py:277 confirms the inline drop is gone.
+>   [GENERATOR-ANCHOR] zero matches for $29.88 or "965 of 967" in config/model.yaml.
+>   [SHAP-BANNER]      train.py:180-183 adds the fig.text banner qa specified.
+>   [CSV-PROVENANCE]   train.py:232 writes README.md into the artifact directory.
+> qa-reviewer-p11 was left holding 5 reds at 1907286, waiting on that SHA.
+> LESSON, now explicit: pin-the-SHA only works if the work is COMMITTED. "Report
+> done" must mean "committed and named", never "done on my disk". This is the
+> third time in two days that uncommitted work caused a coordination problem —
+> twice as crash losses, once as a fix qa could not see and reasonably flagged.
+> Warehouse verified healthy after the crash: 9 views, 20,867 claims, 131,077
+> workflow events, drg_desc 167, 0 orphans, reconciliation 21/21.
+> QA RULINGS A/B/C (qa-reviewer-p11 @ 1907286, all accepted by team-lead):
+>   A. `log_sim_denied_amount` — NON-BLOCKING, do not rename. Exposure MEASURED at
+>      zero: only the Model A matrix is committed, there is no committed Model C
+>      matrix, and Model C has no SHAP by team-lead ruling, so the name reaches no
+>      artifact a reader can open. It also mirrors `log_billed_charge_amt`, its
+>      SOURCE analogue. Revisit in Phase 5 IF a Model C matrix is committed or a
+>      dashboard surfaces it — that is when exposure begins.
+>   B. Degraded-persist guard — PHASE 5. SHAPE (qa's, and the reasoning is the
+>      load-bearing part): refuse the write when row count, column set or
+>      per-column null rates deviate from the COMMITTED manifest read from git —
+>      NOT from the previous run. Comparing to the previous run reproduces the
+>      defect qa already fixed once, where the check repairs the condition it
+>      exists to detect and "was never bad" becomes indistinguishable from "was bad
+>      and got quietly rewritten". Must fail loudly; a silent skip is what let the
+>      original through.
+>   C. `split` stays unprefixed — OUTCOME upheld, REASONING replaced, and the
+>      correction matters. ml-engineer-4 justified it as "qa's guard discovers it
+>      by name, so prefixing would blind the temporal check", and team-lead
+>      initially upheld THAT. qa rejected it: a guard must NEVER be the reason a
+>      correctness-improving rename cannot happen — that turns the safety net into
+>      a constraint on the code it protects. The correct reason does not depend on
+>      the tests at all: `split` is a fold assignment, metadata about OUR
+>      EXPERIMENT, not an attribute of the claim or a statement about the simulated
+>      world. §3.2 governs simulated values; a partition label is not one.
+>      Recorded rather than silently swapped, because the wrong reasoning would
+>      have licensed the general form "we cannot rename X because a guard looks for
+>      it by name", which must always lose. The name-based discovery contract is
+>      qa's debt and Phase 5 work.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata
