@@ -65,6 +65,7 @@ from __future__ import annotations
 import pathlib
 import re
 
+import pytest
 import yaml
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -121,7 +122,67 @@ _GENERATOR_VOICE = re.compile(
 # lets the numeric test below stay simple without firing on "CLAUDE.md §4.5".
 _REFERENCE_NOISE = re.compile(r"§\s*\d+(?:\.\d+)*|CLAUDE\.md|[\w/]+\.(?:md|yaml|py)\b")
 
-_NUMERIC = re.compile(r"\d")
+_NUMERIC = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _declared_values(config: dict) -> set[float]:
+    """Every number this config actually sets as a parameter.
+
+    The discriminator for the check below. A generator-voice sentence that quotes
+    only the config's OWN parameter values discloses nothing about the generated
+    layer; one that quotes a number from somewhere else, in that voice, has taken
+    it from the layer the firewall hides.
+    """
+    found: set[float] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        elif isinstance(node, (int, float)) and not isinstance(node, bool):
+            found.add(float(node))
+
+    walk(config)
+    return found
+
+
+def _generator_anchors(text: str, declared: set[float]) -> list[str]:
+    """Sentences that speak a FOREIGN number in the generator's voice.
+
+    Third iteration of this check, and the two it replaces both failed the same
+    way — they could not tell an anchor from a statement ABOUT an anchor:
+
+      1. LINE-based: reported a fragment of the "NEITHER FACTOR IS DERIVED FROM
+         THE SIMULATION" disclaimer, because YAML comments wrap mid-sentence.
+      2. SENTENCE-based + "contains any digit": reported ml-engineer-4's REMOVAL
+         NOTE, "A previous version of this comment reconciled $45 against the
+         simulation's own realized cost per denied claim." That sentence deletes
+         the anchor and discloses no generator value — $29.88 is gone — and $45
+         is this config's own `appeal_processing_cost_usd`.
+
+    Both misfires push a reader toward deleting the honest sentence, which is the
+    opposite of what the ruling wants. Team-lead's standing preference is on the
+    board: "Recorded rather than scrubbed — an honest record of a near-miss is
+    worth more than a clean-looking config."
+
+    So the offence is stated as the property the ruling actually protects: NO
+    GENERATOR-REALIZED VALUE MAY BE READABLE FROM THIS FILE. A number that the
+    config itself sets is not such a value; any other number in generator voice
+    is. That keeps both known true positives red (29.88; 965 of 967) and lets a
+    removal note say what was removed without re-committing the offence.
+    """
+    offenders = []
+    for sentence in _economics_prose(text):
+        if not _GENERATOR_VOICE.search(sentence):
+            continue
+        cleaned = _REFERENCE_NOISE.sub("", sentence)
+        foreign = [number for number in _NUMERIC.findall(cleaned) if float(number) not in declared]
+        if foreign:
+            offenders.append(f"{sentence}   [foreign numbers: {', '.join(foreign)}]")
+    return offenders
 
 
 def _economics_prose(text: str) -> list[str]:
@@ -154,16 +215,16 @@ def test_the_factors_are_not_validated_against_the_generator() -> None:
     is the anchoring itself: it makes the business parameter a function of the
     layer the §4.5 firewall exists to hide, whichever way it was read.
 
-    The offence is a NUMBER spoken in the generator's voice. Saying "neither
-    factor is derived from the simulation" is the opposite of the offence and
-    must not be flagged; saying "the simulation's own realized cost is $29.88" is
-    the offence whether or not the sentence goes on to call it non-load-bearing.
+    The offence is a FOREIGN number spoken in the generator's voice — foreign
+    meaning "not a value this config itself sets". Saying "neither factor is
+    derived from the simulation" is the opposite of the offence and must not be
+    flagged; nor must a note recording that an anchor was REMOVED, so long as it
+    does not repeat the number. Saying "the simulation's own realized cost is
+    $29.88" is the offence whether or not the sentence goes on to call it
+    non-load-bearing. See `_generator_anchors` for why this is the third
+    formulation of the check.
     """
-    offenders = [
-        sentence
-        for sentence in _economics_prose(_CONFIG_PATH.read_text())
-        if _GENERATOR_VOICE.search(sentence) and _NUMERIC.search(_REFERENCE_NOISE.sub("", sentence))
-    ]
+    offenders = _generator_anchors(_CONFIG_PATH.read_text(), _declared_values(_config()))
     assert not offenders, (
         "a business parameter is reconciled against a quantity measured on our own generated "
         "layer, which constraint 1 of the cost-matrix ruling forbids — team-lead ruled the "
@@ -174,4 +235,63 @@ def test_the_factors_are_not_validated_against_the_generator() -> None:
         "a function of the layer the firewall exists to hide. Move the observation to the "
         "model card if it is worth keeping; it does not belong in the file that sets the "
         "parameter."
+    )
+
+
+# --------------------------------------------------------------------------
+# Negative controls. The two anchors that were really in this file are replayed
+# against the detector, because a check rewritten to stop firing on a false
+# positive is exactly the check most likely to have stopped firing on the true
+# ones. Both instances below are the verbatim text that shipped in
+# config/model.yaml before the fix.
+# --------------------------------------------------------------------------
+
+_HISTORICAL_ANCHORS = {
+    "cost anchor ($29.88 per denied claim)": (
+        "  # The simulation's own realized denial rework\n"
+        "  # + appeal cost is $29.88 per DENIED claim, which averages over the two thirds\n"
+        "  # of denials nobody appeals, so an appeal-specific cost above it is consistent\n"
+        "  # rather than contradictory.\n"
+    ),
+    "filing-window check (965 of 967)": (
+        "  # Consistent with this warehouse: 965 of 967 simulated appeals\n"
+        "  # were filed within 120 days of the denial posting (median 15 days).\n"
+    ),
+}
+
+
+@pytest.mark.parametrize("label", sorted(_HISTORICAL_ANCHORS))
+def test_the_detector_still_catches_the_anchors_that_were_really_there(label: str) -> None:
+    """Replay each removed anchor; the detector must reject it."""
+    text = _CONFIG_PATH.read_text()
+    marker = "# Decision thresholds and economics"
+    injected = text.replace(marker, marker + "\n" + _HISTORICAL_ANCHORS[label], 1)
+    assert injected != text, "could not inject the anchor; the section marker moved"
+
+    offenders = _generator_anchors(injected, _declared_values(_config()))
+    assert offenders, (
+        f"the detector went silent on {label}, an anchor that really shipped in "
+        "config/model.yaml. The check has been relaxed past the thing it exists to catch."
+    )
+
+
+def test_a_removal_note_is_not_itself_an_offence() -> None:
+    """The false positive that forced the third formulation, pinned as a control.
+
+    A note saying an anchor was removed, quoting only the config's own parameter
+    value, must stay quiet — otherwise the fix a reader reaches for is deleting
+    the honest record, and team-lead ruled that record worth keeping.
+    """
+    text = _CONFIG_PATH.read_text()
+    marker = "# Decision thresholds and economics"
+    note = (
+        "  # A previous version of this comment reconciled $45 against the\n"
+        "  # simulation's own realized cost per denied claim.\n"
+    )
+    injected = text.replace(marker, marker + "\n" + note, 1)
+
+    assert not _generator_anchors(injected, _declared_values(_config())), (
+        "a removal note that discloses no generator value was reported as an anchor. "
+        "That is the false positive this check has now made three times; it drives the "
+        "reader to scrub the honest sentence rather than the offending one."
     )
