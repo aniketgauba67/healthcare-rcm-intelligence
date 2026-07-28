@@ -112,8 +112,16 @@ from {SCHEMA}.sim_claim_adjudication a
 where a.sim_denial_flag
 """
 
+# `sim_appeal_disputed_amount` is deliberately NOT selected here. It was once
+# read and dropped again a few lines after the join, which looked equivalent and
+# is not: the drop is one refactor from disappearing while the read stays, and
+# the column would then be sitting on the frame with nothing objecting. Same
+# ruling as clm_utlztn_day_cnt — a forbidden column must never be READ, so the
+# boundary is enforced at the query, where it cannot be undone by accident.
+# The card's note that it equals sim_denied_amount on all 967 level-1 appeals is
+# a one-time manual verification, not something this pipeline recomputes.
 APPEAL_TARGET_QUERY = f"""
-select claim_sk, sim_appeal_outcome, sim_appeal_recovered_amount, sim_appeal_disputed_amount
+select claim_sk, sim_appeal_outcome, sim_appeal_recovered_amount
 from {SCHEMA}.sim_appeals
 where sim_appeal_level = 1
 """

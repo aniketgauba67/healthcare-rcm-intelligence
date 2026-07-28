@@ -262,10 +262,20 @@ Two calls define the edge of that widening, and both stand:
   happened, appears on no remittance advice anyone has ever worked, and admitting
   it would invert the §4.5 firewall through a column name.
 * **`sim_appeal_disputed_amount` stays out, with `sim_denied_amount` as the
-  substitute.** The two are equal on all 967 level-1 appeals (verified against
-  live Postgres; maximum absolute difference 0.00). They coincide numerically;
-  they do not coincide in time. The denied amount is on the remittance advice at
-  triage; the disputed amount is a fact about an appeal nobody has filed yet.
+  substitute.** The two are equal on all 967 level-1 appeals (a one-time manual
+  check against live Postgres; maximum absolute difference 0.00 — the pipeline
+  does not recompute it, see below). They coincide numerically; they do not
+  coincide in time. The denied amount is on the remittance advice at triage; the
+  disputed amount is a fact about an appeal nobody has filed yet.
+
+  **The column is no longer read at all.** It was previously selected by
+  `APPEAL_TARGET_QUERY` and dropped again a few lines after the join. That looks
+  equivalent to never reading it and is not: the drop was one refactor away from
+  disappearing while the read remained, leaving a forbidden column on the frame
+  with nothing objecting. It is now excluded at the query
+  (`src/features/extract.py`), the same ruling applied to `clm_utlztn_day_cnt`.
+  A forbidden column must never be READ, because a boundary enforced by a later
+  cleanup step is a boundary that can be removed by accident.
 
 Every `sim_appeals` column is forbidden as a feature — including the two targets,
 because a target is not a feature and this guard is the only thing between those
@@ -575,6 +585,13 @@ champion *flip* would explain both numbers at once, but the selection margin on
 the calibration fold is PR-AUC 0.2769 vs 0.2576, a gap far too wide for a
 floating-point perturbation to cross.
 
+**qa-reviewer reached the same conclusion independently**, on a separately
+written probe: 8 fits at `n_jobs=4` and 8 at `n_jobs=1` gave one digest across
+all 16, identical between thread counts. Two independent measurements, two
+different harnesses, same answer. The likeliest remaining explanation is the
+mundane one — that the diverging run was on a different tree mid-development,
+with no RNG involved at all.
+
 So the cause is genuinely unknown, and it is recorded that way rather than
 attributed to a plausible mechanism that the measurement rejects. What limits the
 consequences is that **the champion is logistic**, so no headline figure in this
@@ -597,6 +614,25 @@ make train          # Model A -> models_artifacts/model_a/
 make train-appeal   # Model C -> models_artifacts/model_c/
 make test           # includes tests/leakage/
 ```
+
+### Artifacts carry their own provenance
+
+Everything these runs write is designed to be honest **when read alone**, because
+that is how artifacts are actually read — a CSV opened from a file browser, a PNG
+pasted into a slide, long after this card is out of sight.
+
+- Every saved figure carries the synthetic-data banner, applied by the single
+  writer `_save_figure` in `src/models/train.py` — the only place in the project
+  that calls `savefig`. A new plot gets the banner by construction, and one that
+  bypasses the writer fails `tests/leakage/test_plot_provenance_banner.py`, which
+  checks structurally (AST) that every figure-writing function also writes a
+  banner.
+- Each run writes a `README.md` into its artifact directory stating that every
+  outcome is simulated, calling out `slice_payer.csv` (a payer-level analysis, and
+  the payer dimension is 100% invented — CLAUDE.md §3.5) and `work_queue*.csv`
+  (which read as operational worklists for denials that never happened).
+- `metrics.json` embeds a `provenance` key and is valid JSON with no bare `NaN`
+  tokens.
 
 Seeds live in `config/model.yaml` (`seed: 1337`) and are never hardcoded.
 
