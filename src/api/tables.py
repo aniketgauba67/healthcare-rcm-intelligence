@@ -7,16 +7,23 @@ emitter is probed by perturbing a simulated input and checking that no emitted
 column moves without carrying a `sim_` marker, and that is only possible when the
 frame-building step is a function you can call.
 
-THE ONE PLACE THIS LAYER RE-MARKS A COLUMN, AND WHY
-----------------------------------------------------
-`rcm.vw_work_queue_priority` emits `dollars_at_stake` and `heuristic_priority_score`
-with no `sim_` marker, and both are computed from simulated money. That is the
-[QUEUE-PREFIX] defect one layer upstream, in a view this agent does not own. It is
-reported to team-lead rather than fixed here — but it is also not passed through
-unmarked, because this module IS the last boundary before a reader. So the marker
-is restored on the way out and `RE_MARKED_COLUMNS` records every rename, so the
-disagreement between the warehouse's spelling and the wire's is visible rather
-than quietly introduced. Delete these entries the day the view is corrected.
+WHERE THIS LAYER RE-MARKS A COLUMN, AND WHY
+--------------------------------------------
+`rcm.vw_work_queue_priority` emits `dollars_at_stake`, `heuristic_priority_score`
+and `action_type` with no `sim_` marker, and all three are derived from simulated
+values. That is the [QUEUE-PREFIX] defect one layer upstream, in a view this agent
+does not own. It is reported to team-lead rather than fixed here — but it is also
+not passed through unmarked, because this module IS the last boundary before a
+reader. So the marker is restored on the way out and `RE_MARKED_COLUMNS` records
+every rename, so the disagreement between the warehouse's spelling and the wire's
+is visible rather than quietly introduced. Delete these entries the day the view
+is corrected.
+
+`action_type` was on `PROCESS_METADATA_COLUMNS` until ml-engineer-7 measured what
+builds it: `vw_work_queue_priority:78-82` is a CASE on `sim_denial_flag`, so the
+column IS the label wearing a process name, and it is now forbidden as a feature
+in `config/model.yaml`. A rank or a recommendation is a statement about our
+process; a case statement on the outcome is a statement about the outcome.
 """
 
 from __future__ import annotations
@@ -27,15 +34,18 @@ import pandas as pd
 
 #: Columns arriving from a curated view WITHOUT the `sim_` marker that §3.2
 #: requires, re-marked here at the last boundary. Each entry is a finding against
-#: the view, not a preference: the value is derived from simulated money.
+#: the view, not a preference: the value is derived from simulated money or, in
+#: `action_type`'s case, from the simulated denial label itself.
 RE_MARKED_COLUMNS: dict[str, str] = {
     "dollars_at_stake": "sim_dollars_at_stake",
     "heuristic_priority_score": "sim_heuristic_priority_score",
+    "action_type": "sim_action_type",
 }
 
 #: Statements about OUR process rather than about the simulated world, in the
 #: sense the exposure probe uses: a rank, a tier, a recommendation, a query
-#: parameter. These legitimately carry no `sim_` marker.
+#: parameter. These legitimately carry no `sim_` marker. `action_type` is NOT
+#: here — see the module docstring.
 PROCESS_METADATA_COLUMNS: frozenset[str] = frozenset(
     {
         "tier",
@@ -43,7 +53,6 @@ PROCESS_METADATA_COLUMNS: frozenset[str] = frozenset(
         "queue_position",
         "recommended_action",
         "priority_tier",
-        "action_type",
         "queue_mode",
         "as_of",
         "is_heuristic_placeholder",
@@ -178,9 +187,7 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
     rather than a thing somebody checked once.
     """
     totals = {
-        name: float(monthly[name].fillna(0).sum())
-        for name in _SUMMABLE
-        if name in monthly.columns
+        name: float(monthly[name].fillna(0).sum()) for name in _SUMMABLE if name in monthly.columns
     }
     claims = totals.get("claims_submitted", 0.0)
     appealed = totals.get("claims_appealed", 0.0)

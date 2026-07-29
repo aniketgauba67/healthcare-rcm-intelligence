@@ -362,7 +362,9 @@ def _resolve_overturn_probability(request: AppealScoreRequest) -> tuple[float, s
     rates = scoring.category_overturn_rates()
     category = str(request.sim_denial_category)
     if category in rates:
-        return rates[category], f"{scoring.PROBABILITY_FROM_CATEGORY_RULE}. {scoring.CATEGORY_RULE_NOTE}"
+        return rates[
+            category
+        ], f"{scoring.PROBABILITY_FROM_CATEGORY_RULE}. {scoring.CATEGORY_RULE_NOTE}"
     return (
         scoring.book_overturn_rate(),
         (
@@ -384,7 +386,9 @@ def get_claim(
         str,
         Path(description="A `clm_id` (e.g. -10000930037831) or a warehouse `claim_sk`."),
     ],
-    role: Annotated[Role, Query(description="`analyst` returns the full column set.")] = "executive",
+    role: Annotated[
+        Role, Query(description="`analyst` returns the full column set.")
+    ] = "executive",
 ) -> ClaimResponse:
     """One enriched claim, resolved by `clm_id` first and then by `claim_sk`.
 

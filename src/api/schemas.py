@@ -242,9 +242,7 @@ class AppealScoreResponse(BaseModel):
     sim_expected_recovery_amt: float
     sim_expected_net_recovery: float
     sim_days_to_deadline: int
-    tier: Literal[
-        "DEADLINE_CRITICAL", "MANDATORY_REVIEW", "VALUE", "BELOW_COST", "EXPIRED"
-    ]
+    tier: Literal["DEADLINE_CRITICAL", "MANDATORY_REVIEW", "VALUE", "BELOW_COST", "EXPIRED"]
     recommended_action: str
     recovery_ratio: float
     processing_cost_usd: float
@@ -280,7 +278,8 @@ class ClaimResponse(BaseModel):
         description=(
             "Real facility identifiers reached this record through a seeded random "
             "crosswalk and are DISPLAY-ONLY: 4,876 synthetic providers map onto 2,857 real "
-            "CCNs, worst case 8:1. Never group on these; group on prvdr_num."
+            "CCNs (worst case 8:1) and onto only 2,816 distinct display NAMES (worst case "
+            "15:1). Never group on either; group on prvdr_num."
         )
     )
     sim_denial_risk: float | None = Field(

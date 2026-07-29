@@ -76,8 +76,14 @@ train-appeal:
 score:
 	uv run python -m src.models.score
 
+# Build the bundled DuckDB demo extract (CLAUDE.md §2 locked decision: the hosted
+# demo reads a bundle, not live Postgres). READS the curated views and the model
+# artifacts; writes dashboard/demo_data/rcm_demo.duckdb, which is COMMITTED — a
+# deployed app has no other way to get data. Needs `make views`, `make train` and
+# `make train-appeal` to have run. `--skip-models` builds a warehouse-only bundle
+# for iterating on the extract; it is not shippable and says so on stderr.
 demo-extract:
-	uv run python -m src.ingestion.export_demo_duckdb
+	uv run python -m src.demo.build
 
 dashboard:
 	uv run streamlit run dashboard/app.py
