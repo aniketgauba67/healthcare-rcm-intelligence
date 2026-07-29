@@ -166,6 +166,16 @@ workflow_events:
 # DERIVED columns of sql/views/ (not generated columns, so outside the scope of
 # the firewall document) that are functions of forbidden columns. CLAUDE.md §4.1
 # requires blocking derived columns too. Value = what it is derived from.
+#
+# HOW THESE ARE MATCHED, because it decides what an entry here has to say.
+# src/features/leakage.py `_offenders` matches EXACT first, then SUBSTRING — a
+# forbidden column wearing a hat. So an entry keeps blocking a column that is
+# later renamed to a SUPERSTRING of it: `dollars_at_stake` still blocks
+# `sim_dollars_at_stake`. MEASURED, not assumed. It does NOT survive a rename
+# that changes a word — `sim_amount_at_stake` is not blocked by anything here —
+# so a view rename still has to land in lockstep with this block. The names are
+# also resolved by FNMATCH in the test suite; a glob written here would pass the
+# dead-pattern test and block nothing at runtime, so do not write one.
 forbidden_derived_features:
   adjudicated: derived from sim_adjudication_date
   clean_claim_flag: derived from sim_denial_flag and first-pass payment
@@ -175,7 +185,24 @@ forbidden_derived_features:
   heuristic_priority_score: vw_work_queue_priority, built on sim_denial_flag
   priority_tier: vw_work_queue_priority, built on sim_denial_flag
   dollars_at_stake: vw_work_queue_priority, built on sim_denied_amount
+  # Added 2026-07-29 (ml-engineer-7). It was missing, and nothing else here was a
+  # substring of it, so it was blocked by nothing: vw_work_queue_priority:78-82
+  # builds it as a CASE on sim_denial_flag, which encodes the LABEL directly. It
+  # is a stronger leak than two entries that were already on this list.
+  action_type: vw_work_queue_priority, a CASE on sim_denial_flag; encodes the label
   appeal_levels: count over sim_appeals; non-zero implies a denial
+
+# vw_work_queue_priority.age_days is DELIBERATELY NOT on the list above, recorded
+# here because an unexplained omission from a blacklist reads as an oversight.
+# It is `as_of_date - sim_submission_date`: a monotone function of the
+# point-in-time boundary plus one global constant. sim_submission_date is the
+# boundary itself and is permitted, and features derived from it are live and
+# legitimate (sim_days_service_to_submission, sim_filing_headroom_days,
+# sim_submission_month). Blocking age_days would bar a column that is
+# informationally identical to columns Model A already uses. What is
+# label-bearing about that view is MEMBERSHIP in it — the where clause selects
+# denied-or-open-AR claims — and membership is not a column, so no blacklist
+# entry can express it. Never build a Model A feature from a filtered view.
 
 # SOURCE columns from the CMS claim that are adjudication OUTPUTS. They are real
 # rather than simulated, so the firewall document does not cover them, but a
