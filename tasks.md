@@ -2397,6 +2397,102 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > `test_the_dashboard_exists_before_phase_5_is_accepted`. Repro:
 > `uv run pytest tests/contracts/test_user_facing_disclosures.py
 > tests/contracts/test_dashboard_banner.py -q`.
+> QA REVIEW ROUND 2 (qa-reviewer-p17), measured on feat/phase5-qa @ 6e7b288 =
+> main a04d38c + feat/phase5-blockers f18dfc7 + feat/phase5-app 08d88cc. Baseline
+> before the merges: 7 failed / 437 passed (the six inherited RED gates + the
+> dashboard-exists gate). After: 8 failed / 443 passed — the one new red is
+> [EMITTER-HOLE]'s route detector firing on src/api/main.py, which is the gate
+> working. Repro for everything below:
+>   uv run pytest -q -p no:randomly --ignore=tests/integration
+>   RCM_DATA_SOURCE=postgres uv run python -c "<TestClient over src.api.main:app>"
+>
+> [APP-R2] THE API RUNS. Nobody had run these 1,816 lines. Exercised against the
+> live warehouse (read-only, RCM_DATA_SOURCE=postgres): /health 200 (degraded, as
+> designed — no model_c_work_queue outside a bundle), /metrics/executive 200 with
+> claims_submitted=20867 and denied_claims=2663, which are the control-query
+> figures, /work-queue?queue_mode=heuristic 200, /claims/1 200,
+> /work-queue (model modes) 501 with the correct hint. No 500s. The schemas are
+> strict enough that a malformed data_source block is rejected by pydantic — found
+> that by hitting it with a stub.
+>
+> [PASSTHROUGH-BLIND] — THE FINDING OF THIS ROUND, and it is about MY OWN GATE.
+> The [EMITTER-HOLE] fix made the detector SEE src/api/main.py. Registering it as
+> a surface would make the gate GREEN AND PROVE NOTHING. Measured: I built the
+> surface (route function, stub source, frame shaped like vw_work_queue_priority)
+> and ran the exposure probe. It reported ZERO unmarked simulated columns —
+> including on `sim_dollars_at_stake`, the very column the app re-marks. The
+> reason is structural, not a bug: the probe perturbs a simulated INPUT and sees
+> which emitted columns MOVE, so it can only see columns the surface COMPUTES. The
+> entire API read side is PASS-THROUGH — every column arrives already computed by
+> a view — so nothing moves and everything reads clean. The probe was built for
+> src/models/work_queue.py, which computes its columns; at the wire it is the
+> wrong instrument. **A perturbation probe cannot measure provenance across a
+> pass-through boundary; only a DECLARATION can.** Same family as
+> MATCHER-EXPRESSIVENESS: the instrument that runs is weaker than the instrument
+> the gate's green implies.
+>
+> [WIRE-UNMARKED] What the right instrument finds. Cross-referencing the columns
+> vw_work_queue_priority actually emits (verified against the live PG catalog, and
+> a static parse of the view SQL agrees for 8 of 9 views) against
+> config/model.yaml `forbidden_derived_features` — ml's own list, with ml's own
+> reasons, so this is not a QA opinion:
+>   sim_ marked on the wire: dollars_at_stake -> sim_dollars_at_stake,
+>     heuristic_priority_score -> sim_heuristic_priority_score (app re-marks both).
+>   UNMARKED AND UNDECLARED: `ar_open_flag` ("derived from sim_payment_date") and
+>     `appeal_levels` ("count over sim_appeals; non-zero implies a denial"). They
+>     are in neither RE_MARKED_COLUMNS nor PROCESS_METADATA_COLUMNS. They ship.
+>     Confirmed in a live response body.
+>   WRONGLY EXEMPTED: `action_type` is declared PROCESS METADATA by
+>     src/api/tables.py:39-51, while config/model.yaml:192 forbids it as "a CASE on
+>     sim_denial_flag; encodes the label directly". A rank or a recommendation is
+>     process metadata under RULING C; a restatement of the label under a workflow
+>     name is not. Every row of the live heuristic response carries
+>     action_type=DENIAL_REWORK beside sim_denial_flag=true.
+>   `priority_tier` is a rank and stays exempt under RULING C — recorded so the
+>     omission does not read as an oversight (the age_days precedent).
+>
+> [EXEMPT-NO-REASON] src/api/tables.py::PROCESS_METADATA_COLUMNS is a BARE
+> frozenset of 9 names. The qa exemption list it mirrors requires a REASON per
+> entry and has `test_no_exemption_is_speculative` to refuse any exemption the
+> probe would not otherwise have reported. Two lists, same job, and the one that
+> actually runs at the wire has neither property. This is how `action_type` above
+> got exempted with nothing to argue with.
+>
+> [REMARK-IS-API-ONLY] `re_mark_simulated_columns` lives in src/api/tables.py.
+> dashboard/ is a separate package that will read the same views through the same
+> src/demo/source.py. If the dashboard renders a queue frame without calling it,
+> the identical unmarked columns ship on the SCREEN while the API is clean —
+> and the screen is the surface the human's honesty instruction names.
+> app-engineer-2: the re-marking belongs below both, not inside src/api/.
+>
+> [BUNDLE-ABSENT] `git ls-files` finds no .duckdb and no dashboard/demo_data/.
+> src/demo/source.py:157 tells the reader "A clean clone ships one" and
+> src/demo/spec.py:5 calls it "a COMMITTED data file". Neither is true yet, so the
+> §7 clean-clone criterion is unmet by construction and the default data source
+> raises on a fresh checkout. Not a defect in the code — the build step is
+> pending — but the docstrings state it in the present tense TODAY.
+> src/demo/spec.py declares provenance and contains_simulated PER DATASET, not per
+> column; team-lead's acceptance condition already requires per-column
+> classification for the bundle, and [PASSTHROUGH-BLIND] is the argument for why
+> that per-column declaration is the only instrument that can check the wire.
+>
+> [MEMBERSHIP-UNDISCLOSED] ml-engineer-7's observation, checked at the API and not
+> just reserved for the page: WorkQueueResponse carries `ranking`,
+> `ordering_caveat` and `limitations`, and all three describe the ORDER. None
+> states the MEMBERSHIP — that the where clause selected denied-or-open-AR claims,
+> so the list already knows the outcome. Applies to /work-queue in both modes.
+>
+> [ROC-MISMATCH] low severity, honesty surface. src/api/main.py:79 tells every
+> caller "the champion is a regularized logistic regression at ROC-AUC 0.6254"
+> while /health on the same process reports roc_auc_test_fold 0.6185 for
+> "logistic + isotonic". Both numbers are in docs/model_card.md:69-71 (uncalibrated
+> vs calibrated) so neither is wrong, but the two statements the service makes
+> about itself do not agree and a reader cannot tell which is the shipped number.
+>
+> OWNERSHIP NOTE, not a blocker: ml-engineer added tests/features/
+> test_derived_blacklist_tracks_views.py and test_feature_marker_position.py.
+> tests/ is qa's under §5. Both are good tests and both stay; recorded so the
+> boundary does not erode by precedent.
 - [ ] FastAPI endpoints with schemas + version metadata
 - [ ] Streamlit dashboard (5 pages, synthetic banner on all)
 - [ ] DuckDB/Parquet demo extract for hosted deployment
