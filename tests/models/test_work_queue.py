@@ -72,7 +72,8 @@ def test_a_tiny_expiring_claim_outranks_a_huge_comfortable_one() -> None:
     assert first["tier"] == "DEADLINE_CRITICAL"
     # And the big claim really did score far higher, so the tier is what moved it.
     assert (
-        queue.set_index("claim_sk").loc[2, "expected_net_recovery"] > first["expected_net_recovery"]
+        queue.set_index("claim_sk").loc[2, "sim_expected_net_recovery"]
+        > first["sim_expected_net_recovery"]
     )
 
 
@@ -139,7 +140,7 @@ def test_a_mandatory_review_category_survives_a_negative_score() -> None:
     queue = build_work_queue(frame, np.array([0.5, 0.5]), ECONOMICS, as_of=as_of).set_index(
         "claim_sk"
     )
-    assert queue.loc[1, "expected_net_recovery"] < 0
+    assert queue.loc[1, "sim_expected_net_recovery"] < 0
     assert queue.loc[1, "tier"] == "MANDATORY_REVIEW"
     assert queue.loc[2, "tier"] == "BELOW_COST"
 
