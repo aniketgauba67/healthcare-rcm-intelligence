@@ -64,6 +64,7 @@ from src.models.evaluate import (
 )
 from src.models.explain import claim_waterfall, explain_tree_model, unmapped_features
 from src.models.preprocess import prepare_matrix
+from src.models.run_stamp import run_stamp, stamp_lines
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 ARTIFACT_DIR = REPO_ROOT / "models_artifacts" / "model_a"
@@ -244,6 +245,7 @@ def write_provenance_readme(
     files it does not have is the first thing a reader stops trusting.
     """
     artifact_dir.mkdir(parents=True, exist_ok=True)
+    stamp = run_stamp()
 
     callouts = []
     if (artifact_dir / "slice_payer.csv").exists():
@@ -283,6 +285,15 @@ adjudication data exists anywhere in this repository.**
 So no number in these files is evidence that a model would work on real claims.
 
 {callout_block}
+## Which tree built these
+
+{stamp_lines(stamp)}
+
+This directory is gitignored, so these files carry no commit of their own and
+cannot be pinned by inspection — which is how a §7 acceptance came to be measured
+against the wrong tree. The line above is the stamp; on a dirty tree it says so
+rather than naming a commit these artifacts did not come from.
+
 ## Regenerating
 
 ```
@@ -691,6 +702,10 @@ def run_model_a(
     report: dict[str, Any] = {
         "model": "A — pre-submission denial risk",
         "generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        # models_artifacts/ is gitignored, so this block is the only thing tying
+        # the numbers below to a tree. On a dirty tree it says so instead of
+        # naming a commit. See src/models/run_stamp.py.
+        "run_stamp": run_stamp(),
         "seed": seed,
         "provenance": "Label and all sim_ features are SIMULATED (CLAUDE.md §3). "
         "Claim facts are CMS synthetic SOURCE data. No real patient or payer data.",
