@@ -1814,14 +1814,22 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
       category_rule 0.5571/0.4793, enr − largest −4.7% [−16.7%, +0.9%], 237
       deadline-critical claims). The column was inert, which is why nothing caught
       it — the fix is about the boundary, not the number.
-  [GENERATOR-ANCHOR] FAILED, and the gate is right. The $29.88 anchor was gone,
-      but the NOTE RECORDING ITS REMOVAL re-established the reconciliation:
-      "reconciled $45 against the simulation's own realized cost per denied
-      claim" pairs a number with the generator's voice, which is the consistency
-      remark the ruling ordered out — a retraction that repeats the fact it
-      retracts is not a retraction. Rewritten to name no figure on either side.
-      The failing run IS the negative control: the gate fired on the real defect
-      before I touched it.
+  [GENERATOR-ANCHOR] HELD. My first call on this was WRONG and is retracted.
+      qa's gate went red on the REMOVAL NOTE ("reconciled $45 against the
+      simulation's own realized cost per denied claim") and I read that as a
+      retraction that repeats what it retracts, so I rewrote the comment to name
+      no figure on either side. qa-reviewer-p12 identified it as a defect in
+      THEIR OWN gate — third formulation, fixed in 20a1ca3 with a foreign-number
+      discriminator — and they are right on the substance: the offence the ruling
+      names is a generator-realized VALUE being readable from this file, $29.88
+      is gone entirely, and $45 is the config's own appeal_processing_cost_usd,
+      so nothing about the generated layer is disclosed. My rewrite ALSO passed
+      their new gate, so this was never about passing: it was about which text is
+      better, and scrubbing an honest record to satisfy a red test is exactly the
+      move team-lead's "recorded rather than scrubbed" preference forbids.
+      REVERTED to ml-engineer-4's wording verbatim. Recorded, not quietly undone,
+      because the lesson is mine: I treated a red gate as proof of a defect in the
+      code it points at. A gate is evidence about the gate as well as the code.
   [SHAP-BANNER]     PARTIAL. The banner was there and _save_figure is a better
       answer than qa asked for (single savefig writer ⇒ a new plot carries the
       banner by construction). But qa's spec named THREE things and two were
@@ -1839,13 +1847,19 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
       description, which promised rolling-monthly queues as CSVs when they exist
       only as a metrics.json summary.
   MODEL CARD: the +44 lines team-lead flagged as unexamined are accurate against
-  the code, with ONE EXCEPTION I removed. The card credited qa-reviewer with an
-  independent 16-fit determinism probe ("8 at n_jobs=4 and 8 at n_jobs=1, one
-  digest"). No committed qa artifact contains it — qa's tests/models/
-  test_determinism.py is a different, two-fit check — so under PIN-THE-SHA it is
-  an unpinned secondhand measurement in the project's honesty document. Replaced
-  with the standing guard that does exist. If qa DID run that probe, restore it
-  with a commit to point at; I removed the claim, not the finding.
+  the code. I briefly removed one of them and was WRONG to. The card credits
+  qa-reviewer with an independent 16-fit determinism probe; I searched qa's
+  tests/ and their test_determinism.py, found a different two-fit check, and cut
+  the paragraph as an unpinned secondhand claim. THE PROBE IS REAL AND WAS
+  RECORDED ALL ALONG — qa-reviewer-p11's entry on feat/phase4-qa's tasks.md, 8
+  fits at n_jobs=4 and 8 at n_jobs=1, one score digest 97391a34056d0c3a. I
+  searched the test suite and not the board, which is where this team writes its
+  measurements down. RESTORED, now carrying the digest and the source so the next
+  reader does not have to re-run the search I got wrong.
+  Dropped on restore, deliberately: ml-engineer-4's closing speculation that the
+  diverging run was "likeliest" a different tree mid-development. Cause is ruled
+  UNKNOWN with both hypotheses rejected; naming a likeliest explanation reopens a
+  closed question and contradicts the next paragraph of the same section.
   EVIDENCE. `make train` and `make train-appeal` end to end on live PG (read-only;
   9 views / 20,867 claims / 131,077 workflow events / drg_desc 167 verified before
   and unchanged after). Every Model A headline reproduces: logistic ROC 0.6254 /

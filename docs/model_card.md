@@ -476,8 +476,11 @@ two headline queues.
   check cannot catch — **skipped**, and a skip reads like a pass. The matrix is now
   exported to `artifacts/features/model_a_training_matrix.parquet` and **committed**,
   so the probes run on a clean clone with no warehouse and no environment
-  variables. Strongest single-feature AUC **0.5859** (`sim_payer_id`) against the
-  **0.6778** oracle ceiling.
+  variables. Strongest single-feature AUC **0.5859** (`sim_payer_id`) **measured on
+  the matrix-truth intersection (`shared`)**; the same column scores **0.5871** on
+  the full 20,867-claim matrix. Both are correct and they measure different
+  populations, so neither number is quoted here without the population it came
+  from. Either way it sits below the **0.6778** oracle ceiling.
 
 ### Two SOURCE columns worth naming
 
@@ -584,6 +587,13 @@ logistic**, not XGBoost; a defect confined to the tree model could not move it. 
 champion *flip* would explain both numbers at once, but the selection margin on
 the calibration fold is PR-AUC 0.2769 vs 0.2576, a gap far too wide for a
 floating-point perturbation to cross.
+
+**qa-reviewer reached the same conclusion independently**, on a separately
+written probe: 8 fits at `n_jobs=4` and 8 at `n_jobs=1` on the committed matrix
+gave one score digest across all 16 — `97391a34056d0c3a`, identical between
+thread counts (qa-reviewer-p11, recorded on `feat/phase4-qa`; it isolates the
+estimator fit, not the calibration or bootstrap path). Two independent
+measurements, two different harnesses, same answer.
 
 A standing check rather than a note: `tests/models/test_determinism.py` refits
 both estimators and compares score vectors bitwise, and — under `RCM_SLOW_TESTS`
