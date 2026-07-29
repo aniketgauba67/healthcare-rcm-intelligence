@@ -2144,6 +2144,54 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   touch it. It still PASSES (the prefixed name contains the marker), but its
 >   docstring cites `log_sim_denied_amount` as the live example of the infix case
 >   it deliberately permits; that example is now historical.
+> [ARTIFACT-REGEN] (ml-engineer-7) models_artifacts/ regenerated on
+>   feat/phase5-blockers @ e19836c, clean tree, both metrics.json stamping
+>   {"describe": "e19836c", "dirty": false}. Queue CSV headers now carry the
+>   markers. Every headline reproduces: Model A logistic ROC 0.6254 / PR 0.2210,
+>   xgboost − logistic +0.0003 [−0.0173, +0.0183]; Model C xgboost 0.5611, queue
+>   65.7 / 61.0 / 59.8 / 0.7. The feat+phase4-ml worktree's pre-rename copies are
+>   correct FOR THAT TREE and were left alone; nothing should be bundled from any
+>   worktree — regenerate after the merge so the stamp matches what ships.
+> [BLACKLIST-LOCKSTEP] (ml-engineer-7) PARTIALLY LANDED; the rename half waits on
+>   app-engineer's final column names, requested and not guessed.
+>   MEASURED FIRST, and it changes the risk story: the runtime guard
+>   (src/features/leakage.py `_offenders`) matches exact-then-SUBSTRING, so
+>   `dollars_at_stake` STILL BLOCKS `sim_dollars_at_stake`. A `sim_` prefix rename
+>   does NOT open a hole in either commit order — Model A stays protected through
+>   the window. What breaks is a rename that changes a WORD: `sim_amount_at_stake`
+>   is blocked by nothing. That is the case lockstep actually exists for.
+>   TWO REAL GAPS FOUND WHILE MEASURING, neither caused by the rename:
+>     - `action_type` was on NO list and nothing else was a substring of it, so it
+>       was blocked by nothing — vw_work_queue_priority:78-82 builds it as a CASE
+>       on sim_denial_flag, encoding the LABEL. Now forbidden.
+>     - `age_days` deliberately NOT forbidden, with the reason written into the
+>       config: it is a monotone function of the permitted point-in-time boundary
+>       plus one global constant, and sim_submission_date-derived features are
+>       already live and legitimate. What is label-bearing in that view is
+>       MEMBERSHIP, which is not a column and no blacklist entry can express.
+>   ANSWER TO THE QUESTION TEAM-LEAD PUT TO qa-reviewer-p16 — would the existing
+>   config-vs-doc test have CAUGHT this drift? **In CI, NO. On a loaded warehouse,
+>   YES.** test_forbidden_config_agreement.py's dead-pattern check is explicitly
+>   scoped to `forbidden_features` and its own docstring excludes the DERIVED view
+>   block, because the generated schema is the wrong universe for it.
+>   test_live_leakage.py DOES cover it against the whole rcm catalog — but that
+>   module is pytest.mark.integration, excluded from CI unit runs, and skips
+>   outright when no views are present. So on a clean clone, in CI, or before
+>   `make views`, the drift is invisible. Closed by
+>   tests/features/test_derived_blacklist_tracks_views.py, which resolves every
+>   `forbidden_derived_features` key against the sql/views/ TEXT with no database.
+>   A staleness tripwire, not proof of existence — the live check stays the
+>   authority — and it moves discovery to the commit that renames the column.
+>   NEGATIVE CONTROL RUN: replaying the rename in the view text strands exactly
+>   `dollars_at_stake` and `heuristic_priority_score` and nothing else.
+>   A TRAP RECORDED IN THE CONFIG: the tests resolve these names with fnmatch, the
+>   RUNTIME guard has no glob support. `*dollars_at_stake` would pass every test
+>   and block nothing. Third test in the new file refuses a glob outright.
+>   The blacklist widening tripped the manifest's leakage_config_digest guard, as
+>   designed, so the committed matrix was rebuilt in the same commit: parquet
+>   BYTE-IDENTICAL (d11bd0df5a918d0d, p10/p11/p12's digest across four sessions),
+>   manifest diff exactly one line. That was [ARTIFACT-REWRITE]'s second live use
+>   and it correctly did NOT refuse a legitimate digest-only update.
 > VINTAGE SKEW — MEASURED by team-lead from config/sources.yaml, for the honesty
 > pass. The code sets are CORRECT and unskewed (ICD-10-CM/PCS FY2023, HCPCS 2023,
 > MS-DRG v40 FY2023 — all match the 2023-04 claims). The SKEW is in the crosswalk
