@@ -1915,7 +1915,135 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   658 lines, every headline figure machine-checked against a freshly written
   metrics.json; slice metrics by payer/facility/service line for BOTH models, each
   with CI and beats_chance. FIREWALL-POPULATION and README-STALE closed 71cee4b.
-- [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
+- [x] ACCEPTANCE (qa-reviewer-p13): **PHASE 4 PASSES §7.** Measured on
+  feat/phase4-ml @ **71cee4b** (ml's tip, not a preservation commit), merged into
+  feat/phase4-qa as **328b1d5**. The merged tree is byte-identical to 71cee4b for
+  every path except `tests/` and `tasks.md` — verified with
+  `git diff --stat 71cee4b HEAD -- . ':(exclude)tests' ':(exclude)tasks.md'`, which
+  is EMPTY. So these measurements are measurements of 71cee4b.
+  ARTIFACTS REGENERATED BEFORE JUDGING, per the trap that caught p12: I moved the
+  whole of `models_artifacts/` aside and re-ran `make train` + `make train-appeal`
+  from this tree. Nothing in this entry describes a file I inherited on disk.
+  THE THREE fbd4503 DEFECTS ARE GENUINELY GONE, each verified in the regenerated
+  output rather than in the diff that claims to fix it:
+    - SHAP PNG: I OPENED it. Title "Model A denial-risk drivers — logistic,
+      forward test fold" renders, the x-axis label reads in full, and the banner
+      renders. `_save_figure` uses `bbox_inches="tight"` (train.py:192).
+    - `model_a/README.md` no longer warns about `work_queue*.csv`. It cannot: the
+      call-out list is built by globbing what actually landed (train.py:248-260)
+      and both writers now run LAST. model_a gets the slice_payer call-out only;
+      model_c gets both. Every file each README names exists in its directory.
+    - model_c's description now says the rolling month-start summary lives in
+      metrics.json "for which no CSV is written", which is true.
+  §7 ML BAR, item by item, every figure REPRODUCED from the fresh run:
+    - baseline vs advanced REPORTED (not won): logistic ROC 0.6254 / PR 0.2210 /
+      Brier 0.10280 champion; xgboost − logistic +0.0003 [−0.0173, +0.0183];
+      folds 13,356 / 3,338 / 4,173; base rate 0.1205; ECE 0.01964 → 0.01753.
+    - calibration plot PRODUCED and inspected; title + banner render.
+    - leakage tests PASS: 325 passed / 0 failed / 0 skipped non-integration, plus
+      35 passed on the read-only live-PG probes. Firewall reproduces: strongest
+      single-feature AUC 0.5859 (`sim_payer_id`) on `shared` against the 0.6778
+      oracle ceiling, nothing at or above it.
+    - slice metrics by payer / facility / service line REPORTED for BOTH models
+      (A also value_band; C also denial_category), each with CI + beats_chance.
+    - model card CURRENT at 670 lines; every headline figure present and matching.
+  TEAM-LEAD's 71cee4b REVIEWED AS ANYONE'S WORK, and both fixes are sound:
+    [FIREWALL-POPULATION] I re-measured BOTH numbers with the project's OWN
+      detector rather than trusting either. `single_feature_auc` over the full
+      committed matrix (n=20,867) gives **0.5871 sim_payer_id**; the suite gives
+      **0.5859** on `shared`. Both reproduce exactly, both sit below 0.6778, and
+      the card now quotes neither without its population. NOTE: my first pass used
+      naive ordinal encoding and got 0.5602 — the detector cross-fit
+      target-encodes categoricals, and the instrument is part of the measurement.
+    [README-STALE] Every claim in the new README is true against the run:
+      logistic champion, gradient boosting does not beat it, Model C's probability
+      does not earn its place. Pointer-only; Phase 5 still owns "README final".
+  [GENERATOR-ANCHOR] RETRACTION CONFIRMED. `git diff 4ecc4c5 HEAD -- config/model.yaml`
+  is EMPTY, so the file is ml-engineer-4's wording verbatim, and p12's fixed gate
+  (foreign-number discriminator + 3 controls) is 5 passed on it. $29.88 and
+  "965 of 967" are absent; the surviving mention at :360 names no value and is a
+  prohibition, not an anchor. ml-engineer-5 was right to retract.
+  DETERMINISM: I RAN THE SKIP. `tests/models/test_determinism.py` skips its
+  1,000-resample comparison unless `RCM_SLOW_TESTS=1` — and a skip reads like a
+  pass, which is this project's own lesson. With it set: **2 passed**, two full
+  runs agree on every reported number. Cause of the historical divergence stays
+  UNKNOWN with both hypotheses rejected; the card says so.
+  REPRODUCIBILITY MEASURED, not assumed. Committed artifacts byte-identical across
+  four `make train` runs (parquet d11bd0df5a918d0d, manifest d5c1ca88aa0786f7,
+  matching p10/p11/p12 across four session boundaries) and `git status` stayed
+  CLEAN throughout, including after the live-PG probes — the second-writer churn
+  is closed. Every artifact CSV and PNG is byte-identical across three consecutive
+  runs; the ONLY moving byte in the entire artifact surface is
+  `model_a/metrics.json`'s `generated_at_utc`. That is NOT the `written_at_utc`
+  defect and must not be "fixed" as one: that ruling turned on a COMMITTED file
+  whose churn trains reviewers to ignore its diff. `models_artifacts/` is
+  gitignored, there is no diff to ignore, and a run stamp there is useful.
+  HONESTY PASS CLEAN. §4.5 firewall intact — no ml module imports src/simulation
+  (only two comments name the path). Every "fraud" occurrence in the repo is an
+  explicit negation. Both metrics.json carry a `provenance` key. Payer archetypes
+  are codes, not insurer names. Warehouse left HEALTHY: 9 views, 20,867 claims,
+  20,867 adjudications, 131,077 workflow events, 998 appeals, drg_desc 167, 0
+  orphans, 0 unprefixed crosswalk columns, reconciliation 21/21 PASS.
+  NO DESTRUCTIVE WINDOW OPENED. I re-verified by grep that every `apply_ddl`
+  caller lives under `tests/integration/`, and ran the live-PG probes with
+  `-m integration tests/leakage tests/features tests/models` — never by naming
+  `tests/integration/` files, which is the filter bypass ml-engineer-4 recorded.
+> ONE NON-BLOCKING FINDING (qa-reviewer-p13 @ 71cee4b), and it is the artifacts-
+> alone read team-lead asked for:
+> [QUEUE-PREFIX] `models_artifacts/model_c/work_queue_backtest.csv` and
+>   `work_queue_live_snapshot.csv` ship `recoverable_amt`, which is
+>   `sim_denied_amount` VERBATIM with the marker stripped — `work_queue.py:148`
+>   defaults `recoverable_column="sim_denied_amount"` and :175 copies it under the
+>   new name. These files are one row per CLAIM keyed on claim_sk, which is exactly
+>   the shape §3.2 governs, and the inconsistency is INSIDE one file: the simulated
+>   CATEGORICAL keeps its marker (`sim_denial_category`) while the simulated DOLLAR
+>   AMOUNT loses it, beside a `recommended_action` column reading "Appeal — expected
+>   recovery exceeds the cost of working it." Structurally the same defect as
+>   `overall_prior_denial_rate`, and stronger: that was an aggregate, this is a
+>   rename. `p_overturn` / `expected_recovery_amt` / `expected_net_recovery` /
+>   `days_to_deadline` are the same family.
+>   WHY IT DOES NOT BLOCK, under the team's OWN settled tests rather than my
+>   preference: standing ruling A fixes the exposure test at "committed, or
+>   surfaced by a dashboard". `git ls-files` shows no Model C artifact is committed;
+>   models_artifacts/ is gitignored; Model C has no SHAP by ruling. And the accepted
+>   mitigation is present and specific — the README written beside these CSVs names
+>   `work_queue*.csv` by glob and says "The denials being worked never happened."
+>   WHY IT IS WORTH RECORDING ANYWAY: ruling A pre-authorised this revisit, and
+>   **Phase 5 is the trigger it named.** app-engineer's work-queue dashboard page
+>   surfaces exactly these columns, and dashboard headers come from these names. So
+>   this is a Phase 5 blocker in waiting, not a Phase 4 defect. Two notes for
+>   whoever takes it: ml-engineer-4's declaration-based guard
+>   (tests/features/test_matrix_provenance.py) is scoped to the Model A matrix and
+>   does not reach the Model C artifact path, so nothing is checking here — the same
+>   "nothing failed because nothing was checking" that let the last one run four
+>   commits; and the fix is ml's (src/models/work_queue.py), the guard's shape qa's.
+> ANSWER TO TEAM-LEAD'S OPEN QUESTION — stamp the generating git SHA into
+> metrics.json and the artifact READMEs? **YES on substance, PHASE 5 not Phase 4,
+> and the naive version is worse than nothing.**
+>   Not Phase 4, on the same reasoning that made 71cee4b legitimate and this not:
+>   README.md and model_card.md are §5 SHARED files and those fixes were pointers.
+>   The write path is `src/models/`, which is ml's alone, and ml-engineer is not
+>   spawned. Landing an unguarded feature during an acceptance pass to close a gap
+>   that acceptance has already closed is how this project acquires defects — a
+>   gate written under time pressure is the recurring shape here.
+>   It is also not load-bearing. The gap it addresses is a REVIEWER-PROCESS gap and
+>   the process fix already works: regenerate from the pinned tree before judging
+>   the output. I did that this cycle at zero code cost and it caught nothing,
+>   because there was nothing left to catch. A stamp makes that cheaper, not
+>   possible-versus-impossible.
+>   THE DESIGN POINT THAT MATTERS, and why the obvious version must not ship:
+>   a BARE SHA IS A LIE ON A DIRTY TREE. p12's actual error was reading artifacts
+>   built from ml-engineer-5's uncommitted work and attributing them to 4ecc4c5. A
+>   stamp that emitted `4ecc4c5` there would have converted a reviewer's mistake
+>   into a machine-attested falsehood — worse, because it would have survived
+>   challenge. So the requirement is `git describe --always --dirty` plus an
+>   explicit UNCOMMITTED-CHANGES line when the tree is dirty, loud enough that no
+>   reader treats a dirty-tree artifact as pinned. Refusing to write is too strong;
+>   an unlabelled SHA is too weak.
+>   CHEAPER THAN IT LOOKS, in one direction only: `model_a/metrics.json` already
+>   carries `generated_at_utc`, so the slot exists — but `model_c/metrics.json`
+>   carries no run-stamp field at all, so it is a two-place change plus the two
+>   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata
