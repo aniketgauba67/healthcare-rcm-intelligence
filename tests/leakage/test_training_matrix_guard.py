@@ -10,9 +10,23 @@ The guard finds matrices without needing to know how they were built:
 3. `src.features.build_training_matrix()`, if `src/features/` exposes a callable of
    that name taking no required arguments.
 
-Any one of those is enough. `claim_sk` and `clm_id` are recognised as the matrix key
-and `sim_denial_flag` as the Model A label; every other column is treated as a feature
-and must survive every probe.
+Any one of those is enough.
+
+WHICH COLUMNS ARE FEATURES — DECLARED, NOT GUESSED
+--------------------------------------------------
+A matrix says which of its columns are the key, the label, the fold assignment and
+the time axis; `tests/leakage/roles.py` reads that declaration and everything else is
+a feature that must survive every probe. This replaces the name sets this module used
+to carry (`{"is_train", "split", "fold"}`, and five spellings of "label"), which is
+[SPLIT-DISCOVERY] — the debt qa-reviewer-p8 left and team-lead scheduled into Phase 5.
+
+The reason it had to change is team-lead's QA RULING C: name-based discovery made a
+correct rename look dangerous, and *a guard must never be the reason a
+correctness-improving rename cannot happen*. The fold column may now be called
+anything; the temporal check follows the declaration. An UNdeclared column is treated
+as a feature, so forgetting to declare makes this guard stricter, never laxer — and
+`roles.validate()` polices the only remaining way out, which is declaring a leaky
+column into a non-feature role.
 
 WHY THE NAME CHECK IS NOT THE POINT
 -----------------------------------
@@ -41,58 +55,65 @@ import pathlib
 import pandas as pd
 import pytest
 
-from tests.leakage import detectors, firewall_doc
+from tests.leakage import detectors, roles
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 FEATURES_PACKAGE = REPO_ROOT / "src" / "features"
 MATRIX_DIRECTORIES = (REPO_ROOT / "artifacts" / "features", REPO_ROOT / "data" / "features")
-LABEL_COLUMNS = frozenset({"sim_denial_flag", "denial_flag", "label", "target", "y"})
-SPLIT_COLUMNS = frozenset({"is_train", "split", "fold"})
 
 
 def _read(path: pathlib.Path) -> pd.DataFrame:
     return pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
 
 
-def _discover() -> list[tuple[str, pd.DataFrame]]:
-    """Every training matrix the contract above can find."""
-    found: list[tuple[str, pd.DataFrame]] = []
+def _discover() -> list[tuple[str, pd.DataFrame, roles.ColumnRoles | None]]:
+    """Every training matrix the contract above can find, with the roles it declares."""
+    found: list[tuple[str, pd.DataFrame, roles.ColumnRoles | None]] = []
+
+    def add(source: str, matrix: pd.DataFrame, path: pathlib.Path | None) -> None:
+        declared = roles.declare(matrix, path, source)
+        if declared is not None:
+            roles.validate(declared, matrix)
+        found.append((source, matrix, declared))
 
     override = os.environ.get("RCM_FEATURE_MATRIX")
     if override:
         path = pathlib.Path(override)
         assert path.exists(), f"RCM_FEATURE_MATRIX points at a missing file: {path}"
-        found.append((str(path), _read(path)))
+        add(str(path), _read(path), path)
 
     for directory in MATRIX_DIRECTORIES:
         if not directory.is_dir():
             continue
         for path in sorted(directory.iterdir()):
             if path.suffix in {".parquet", ".csv"}:
-                found.append((str(path.relative_to(REPO_ROOT)), _read(path)))
+                add(str(path.relative_to(REPO_ROOT)), _read(path), path)
 
     try:  # pragma: no cover - exercised once ml-engineer lands the feature store
         import src.features as features_package
 
         builder = getattr(features_package, "build_training_matrix", None)
         if callable(builder):
-            found.append(("src.features.build_training_matrix()", builder()))
+            add("src.features.build_training_matrix()", builder(), None)
     except Exception as exc:  # noqa: BLE001 - a broken builder is reported, not hidden
         pytest.fail(f"src.features.build_training_matrix() could not be called: {exc!r}")
 
     return found
 
 
-def _feature_columns(matrix: pd.DataFrame) -> list[str]:
-    return [
-        c
-        for c in matrix.columns
-        if c not in firewall_doc.JOIN_KEYS and c not in LABEL_COLUMNS and c not in SPLIT_COLUMNS
-    ]
+def _feature_columns(matrix: pd.DataFrame, declared: roles.ColumnRoles | None) -> list[str]:
+    """Every column with no declared non-feature role.
+
+    An undeclared matrix has no non-feature columns at all: nothing is excused,
+    which is the strict end of the failure direction and not the lax one.
+    """
+    if declared is None:
+        return list(matrix.columns)
+    return declared.feature_columns(matrix)
 
 
 @pytest.fixture(scope="module")
-def matrices() -> list[tuple[str, pd.DataFrame]]:
+def matrices() -> list[tuple[str, pd.DataFrame, roles.ColumnRoles | None]]:
     return _discover()
 
 
@@ -130,8 +151,8 @@ def test_guard_is_wired_once_a_feature_store_exists(matrices):
 def test_no_forbidden_column_enters_a_matrix_by_name(require_matrices, forbidden_columns):
     """The cheap pass. Necessary, and nowhere near sufficient."""
     failures: list[str] = []
-    for source, matrix in require_matrices:
-        findings = detectors.name_findings(_feature_columns(matrix), forbidden_columns)
+    for source, matrix, declared in require_matrices:
+        findings = detectors.name_findings(_feature_columns(matrix, declared), forbidden_columns)
         failures += [f"{source}: {finding}" for finding in findings]
     assert not failures, "forbidden columns present in a training matrix:\n" + "\n".join(failures)
 
@@ -139,11 +160,11 @@ def test_no_forbidden_column_enters_a_matrix_by_name(require_matrices, forbidden
 def test_no_surrogate_key_is_smuggled_in_as_a_feature(require_matrices):
     """§7: claim_sk encodes source-file order, and therefore time."""
     failures: list[str] = []
-    for source, matrix in require_matrices:
+    for source, matrix, declared in require_matrices:
         if "claim_sk" not in matrix.columns:
             continue
         findings = detectors.identifier_findings(
-            matrix[_feature_columns(matrix)], matrix["claim_sk"]
+            matrix[_feature_columns(matrix, declared)], matrix["claim_sk"]
         )
         failures += [f"{source}: {finding}" for finding in findings]
     assert not failures, "surrogate keys used as features:\n" + "\n".join(failures)
@@ -156,27 +177,27 @@ def test_no_unrecognised_date_enters_a_matrix(require_matrices, permitted_column
     note in `detectors.dependency_findings`.
     """
     failures: list[str] = []
-    for source, matrix in require_matrices:
+    for source, matrix, declared in require_matrices:
         findings = detectors.unrecognised_date_findings(
-            matrix[_feature_columns(matrix)], permitted_columns
+            matrix[_feature_columns(matrix, declared)], permitted_columns
         )
         failures += [f"{source}: {finding}" for finding in findings]
     assert not failures, "unrecognised date columns in a training matrix:\n" + "\n".join(failures)
 
 
 def test_split_is_temporal_where_the_matrix_declares_one(require_matrices):
-    """CLAUDE.md §4.3. A random split leaves training rows past the earliest test row."""
+    """CLAUDE.md §4.3. A random split leaves training rows past the earliest test row.
+
+    The fold column and the time axis are whatever the matrix DECLARES them to be,
+    so this check survives any rename of either — see this module's docstring and
+    `tests/leakage/roles.py`.
+    """
     failures: list[str] = []
-    for source, matrix in require_matrices:
-        split_column = next((c for c in SPLIT_COLUMNS if c in matrix.columns), None)
-        date_column = next(
-            (c for c in ("sim_submission_date", "submission_date") if c in matrix.columns), None
-        )
-        if split_column is None or date_column is None:
+    for source, matrix, declared in require_matrices:
+        if declared is None or declared.split is None or declared.time is None:
             continue
-        is_train = matrix[split_column]
-        if is_train.dtype == object:
-            is_train = is_train.astype(str).str.lower().eq("train")
-        findings = detectors.temporal_findings(matrix[date_column], is_train)
+        findings = detectors.temporal_findings(
+            matrix[declared.time], roles.train_mask(matrix, declared)
+        )
         failures += [f"{source}: {finding}" for finding in findings]
     assert not failures, "non-temporal split:\n" + "\n".join(failures)
