@@ -205,6 +205,24 @@ def _surfaces() -> list[exposure.Surface]:
 
 SURFACE_MODULES = frozenset({"src/models/work_queue.py"})
 
+#: Modules that emit a table but COMPUTE none of its columns — every column
+#: arrives already built by a curated view and is copied to the wire. The
+#: perturbation probe cannot measure these: nothing moves when a simulated input
+#: to the SURFACE moves, because the view already ran, so a probe registered here
+#: would report a clean surface whatever the columns are made of. MEASURED
+#: 2026-07-29 against `src/api/main.py::work_queue` — zero columns reported,
+#: including `sim_dollars_at_stake`, the one the API re-marks BECAUSE it is
+#: simulated money. Registering such a module in `SURFACE_MODULES` would turn this
+#: gate green and prove nothing, so it is declared here instead, WITH the gate that
+#: does cover it. Each entry names a real, running test.
+PASSTHROUGH_MODULES: dict[str, str] = {
+    "src/api/main.py": (
+        "pure pass-through of curated view columns; provenance checked by declaration in "
+        "tests/leakage/test_wire_provenance.py::"
+        "test_no_simulated_derived_column_reaches_the_wire_unaccounted"
+    ),
+}
+
 
 @pytest.fixture(scope="module")
 def measured() -> list[tuple[exposure.Surface, dict[str, set[str]]]]:
@@ -377,7 +395,7 @@ def test_every_user_facing_emitter_is_registered() -> None:
     unregistered: list[str] = []
     for path in _swept_modules():
         relative = str(path.relative_to(REPO_ROOT))
-        if relative in SURFACE_MODULES:
+        if relative in SURFACE_MODULES or relative in PASSTHROUGH_MODULES:
             continue
         if _emits_a_table(ast.parse(path.read_text())):
             unregistered.append(relative)
@@ -393,7 +411,58 @@ def test_every_user_facing_emitter_is_registered() -> None:
         "`exposure.Surface` for it in `_surfaces()`. The probe perturbs each simulated input "
         "and reports emitted columns that move without carrying a `sim_` marker. If a column "
         "is genuinely process metadata — a rank, a tier, our own recommendation — declare it "
-        "in `process_metadata` WITH the reason; do not widen the probe."
+        "in `process_metadata` WITH the reason; do not widen the probe.\n\n"
+        "IF THE MODULE COMPUTES NOTHING — it copies columns a curated view already built — "
+        "the probe cannot see it and registering it here would be a green tick over an "
+        "unmeasured surface. Declare it in `PASSTHROUGH_MODULES` instead, naming the "
+        "declaration-based gate in tests/leakage/test_wire_provenance.py that covers it."
+    )
+
+
+def test_a_registered_module_actually_has_a_probe_behind_it() -> None:
+    """The registry may not be silenced by adding a string to it.
+
+    `SURFACE_MODULES` is the set that switches the check above off, and until this
+    test existed a module could be "registered" with a one-line edit and no probe
+    attached — the failure this project already has a name for, a check that reads
+    like it ran when it did not. A module belongs here only if `_surfaces()`
+    actually builds a surface for it.
+    """
+    probed = {surface.name.split("::")[0] for surface in _surfaces()}
+    unprobed = sorted(SURFACE_MODULES - probed)
+    assert not unprobed, (
+        "these modules are registered as probed surfaces but `_surfaces()` builds no "
+        f"`exposure.Surface` for them, so nothing measures their columns: {unprobed}\n"
+        "Either add the surface, or — if the module computes none of its columns — move it "
+        "to `PASSTHROUGH_MODULES` and name the wire gate that covers it."
+    )
+
+
+def test_every_passthrough_declaration_names_a_gate_that_exists() -> None:
+    """A pass-through declaration is only worth the test it points at.
+
+    Each entry must name a test function that is really defined in
+    `tests/leakage/test_wire_provenance.py`; a stale pointer would leave the
+    module exempted here and covered nowhere.
+    """
+    wire_gate = REPO_ROOT / "tests" / "leakage" / "test_wire_provenance.py"
+    assert wire_gate.exists(), f"the declared wire gate is missing: {wire_gate}"
+    defined = {
+        node.name
+        for node in ast.walk(ast.parse(wire_gate.read_text()))
+        if isinstance(node, ast.FunctionDef)
+    }
+    dangling: list[str] = []
+    for module, reason in PASSTHROUGH_MODULES.items():
+        assert reason.strip(), f"{module}: pass-through declaration states no reason"
+        named = [word.strip("`.,") for word in reason.split() if word.startswith("test_")]
+        named += [part for part in reason.replace("::", " ").split() if part.startswith("test_")]
+        if not any(name in defined for name in named):
+            dangling.append(f"{module} -> {reason}")
+    assert not dangling, (
+        "these pass-through declarations do not name a test that exists in "
+        "tests/leakage/test_wire_provenance.py, so the module is exempted here and covered "
+        "nowhere:\n  " + "\n  ".join(dangling)
     )
 
 

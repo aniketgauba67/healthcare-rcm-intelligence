@@ -322,6 +322,43 @@ def _wire_fields(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
     }
 
 
+def test_the_api_computes_no_row_column_of_its_own(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The premise of the pass-through declaration, checked rather than assumed.
+
+    `PASSTHROUGH_MODULES` in tests/leakage/test_output_surface_provenance.py
+    exempts `src/api/main.py` from the perturbation probe on the grounds that it
+    computes none of its columns. That is true today and nothing enforced it: the
+    day a route adds a column of its own, the probe would be the right instrument
+    again and the exemption would be silently wrong. So the premise is the test —
+    every row column must be a column of the view it came from, or a declared
+    re-marking of one.
+    """
+    from src.api import main as api_main
+    from src.api.tables import RE_MARKED_COLUMNS
+
+    frames = {"vw_work_queue_priority": wire.frame_like(WORK_QUEUE_COLUMNS)}
+    source = _StubSource(frames)
+    monkeypatch.setattr(api_main, "_source", lambda: source)
+    monkeypatch.setattr(api_main, "_frame", lambda dataset: frames[dataset])
+
+    rows = api_main.work_queue(
+        queue_mode="heuristic", tier=None, limit=5, offset=0, role="analyst"
+    ).model_dump()["rows"]
+    assert rows, "the fixture produced no rows, so this test measures nothing"
+
+    unmarking = {new: old for old, new in RE_MARKED_COLUMNS.items()}
+    invented = sorted(
+        column for column in rows[0] if unmarking.get(column, column) not in set(WORK_QUEUE_COLUMNS)
+    )
+    assert not invented, (
+        "the /work-queue route emits column(s) that the view does not: "
+        f"{invented}\nThe API is no longer a pure pass-through, so the pass-through "
+        "declaration in tests/leakage/test_output_surface_provenance.py::PASSTHROUGH_MODULES "
+        "no longer holds. Register `src/api/main.py` as a probed `exposure.Surface` instead, "
+        "or declare the new column as a re-marking."
+    )
+
+
 def test_no_simulated_derived_column_reaches_the_wire_unaccounted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
