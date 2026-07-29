@@ -389,6 +389,27 @@ PUBLISHED_SURFACES: tuple[PublishedSurface, ...] = (
         grain="one row per denial category",
         undeclared_reason=_EVALUATION_TABLE,
     ),
+    PublishedSurface(
+        glob="dashboard/demo_data/*.duckdb",
+        grain="a CONTAINER of 16 declared datasets, not one table; 9 are `select *` copies "
+        "of curated rcm.vw_ views, 5 are model output, 2 are self-describing meta tables",
+        undeclared_reason="The hosted-demo bundle (CLAUDE.md §2), and the most exposed "
+        "surface this project has: committed, openable from a clean clone with no database. "
+        "It gets an undeclared_reason rather than a schema because 16 heterogeneous tables "
+        "cannot honestly share ONE column schema, and a schema that pretended otherwise "
+        "would be the weaker declaration. What IS declared, in src/demo/spec.py, is "
+        "per-DATASET and not per-column: a provenance class (SOURCE/DERIVED/REFERENCE/"
+        "SIMULATED/MIXED), a grain, a contains_simulated flag and a note; simulated COLUMNS "
+        "are identified by their marker rather than declared one by one. The build refuses "
+        "to write a table that file does not declare and refuses to omit one it does, and "
+        "the bundle ships its own register in the `demo_manifest` table. "
+        "REGISTERED IS NOT EXEMPTED, and here that is load-bearing rather than a formula: "
+        "rule 3 cannot read a `.duckdb`, so registering this path alone would make rule 1 "
+        "green and rule 3 SILENT over the one file most likely to be read out of context. "
+        "tests/features/test_demo_bundle_provenance.py opens the bundle and applies the "
+        "marker rule to the columns actually in it, so the check follows the file rather "
+        "than stopping at its extension.",
+    ),
 )
 
 
