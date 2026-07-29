@@ -1195,8 +1195,6 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   must not block the suite. It compares against LOCAL `main` and deliberately
 >   does not fetch: a suite that reaches the network to decide whether to run is a
 >   worse problem than the one it solves.
-- [ ] Model C: appeal success + Expected Net Recovery work-queue score
-- [ ] Slice metrics, bootstrap CIs, model card
 > CRASH + RE-SPAWN #3 2026-07-27 ~23:40Z (team-lead): qa-reviewer-p10 and
 > ml-engineer-3 hit the cap together, ~4.5h after the previous pair — the third
 > simultaneous double-crash in one day. BOTH WORKTREES WERE CLEAN, everything
@@ -1861,6 +1859,49 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   NEGATIVE CONTROLS, because a gate never shown to fail proves nothing: a savefig
   function bypassing _save_figure fails the banner gate; removing model_a/README.md
   fails the directory gate; both pass on restore.
+> CRASH #5 2026-07-28 23:00Z: qa-reviewer-p12 and ml-engineer-5 hit the cap
+> together. BOTH WORKTREES CLEAN — nothing lost. Only qa-reviewer-p13 re-spawned;
+> the remaining ml work was two edits to SHARED files, which team-lead made
+> directly (71cee4b) rather than spending a sixth spawn cycle on two lines.
+> Warehouse healthy: 9 views, 20,867 claims, 131,077 workflow events, 0 orphans,
+> reconciliation 21/21.
+> RULE EARNED THIS CYCLE — A GATE'S OUTPUT IS EVIDENCE ABOUT THE GATE TOO.
+> Both halves were learned expensively:
+>   GREEN ≠ DONE. qa's AST banner gate asserts only the banner string, so it went
+>   green on a [SHAP-BANNER] fix delivering one of the three items qa specified
+>   (no title, wrong bbox). ml-engineer-5's phrasing: "a gate is not a spec."
+>   RED ≠ BROKEN. qa's constraint-1 check fired on ml-engineer-4's removal note —
+>   the THIRD time that check confused an anchor with a statement ABOUT an anchor.
+>   ml-engineer-5 treated the red as proof of a defect and scrubbed an honest
+>   record to clear it, then retracted: "I scrubbed an honest record to satisfy a
+>   red test." Their own rewrite ALSO passed the fixed gate, which proves it was
+>   never about getting green. config/model.yaml is back to ml-engineer-4's
+>   wording verbatim; qa's fixed gate (foreign-number discriminator + 3 controls)
+>   passes on it. Team-lead had said "keep your rewrite" and was overruled by the
+>   better argument.
+> PIN-THE-SHA, THIRD AND FOURTH VARIANTS. The rule keeps finding new ways to be
+> violated, and none of them look like carelessness:
+>   ON-DISK ARTIFACT vs COMMIT — qa-reviewer-p12 opened the SHAP PNG, saw the
+>   un-clipped axis label, and credited it to 4ecc4c5, where that function has
+>   neither the title nor the tight bbox. models_artifacts/ is GITIGNORED, so it
+>   holds the last RUN, not any commit; they were looking at ml-engineer-5's
+>   output from fbd4503. An artifact with no SHA in it cannot be pinned by
+>   inspection. OPEN QUESTION for Phase 5: stamp the generating git SHA into
+>   metrics.json and the artifact READMEs at write time. Write path is ml's.
+>   ACCEPTANCE PINNED TO THE WRONG TREE — qa issued a §7 PASS measured on 4ecc4c5,
+>   team-lead's PRESERVATION commit, not ml's tip. Caught independently by both
+>   team-lead and ml-engineer-5. Had it stood, acceptance would have certified a
+>   tree still carrying three artifact defects.
+>   SEARCHED THE TESTS, NOT THE BOARD — ml-engineer-5 removed a qa determinism
+>   measurement from the model card as unpinned after searching qa's tests/. It was
+>   recorded all along in qa-reviewer-p11's tasks.md entry on feat/phase4-qa
+>   (digest 97391a34056d0c3a). Restored with digest and source. "This team writes
+>   its measurements down on the board" is now explicit.
+- [x] Slice metrics, bootstrap CIs, model card — ml-engineer-3/4/5; model card at
+  658 lines, every headline figure machine-checked against a freshly written
+  metrics.json; slice metrics by payer/facility/service line for BOTH models, each
+  with CI and beats_chance. FIREWALL-POPULATION and README-STALE closed 71cee4b.
+- [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
 - [ ] FastAPI endpoints with schemas + version metadata
