@@ -2119,6 +2119,130 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > (4,876 synthetic providers onto 2,857 real CCNs, worst 8:1, display-only,
 > forbidden as a feature). README:145 says "display-only enrichment" WITHOUT the
 > numbers. Dashboard does not exist yet. Needs to be visible in all three.
+>
+> ===== qa-reviewer-p16 REVIEW ROUND 1, 2026-07-29 =====
+>
+> [BLOCKERS-3] ml-engineer-6's three blockers: **PASS**, measured on
+> feat/phase5-blockers @ **4a87270** merged into feat/phase5-qa @ **8ea639c**.
+> Commands: `make features` / `make train` / `make train-appeal`, `uv run pytest
+> -m "not integration" -q`, `uv run ruff check . && ruff format --check .`.
+>   NO NUMBER MOVED — re-measured, not taken on trust. Model A logistic ROC
+>   **0.6254** / PR **0.2210**; xgboost − logistic **+0.0003 [−0.0173, +0.0183]**;
+>   Model C xgboost **0.5611**; queue **65.7 / 61.0 / 59.8 / 0.7**. All identical.
+>   The committed parquet is byte-identical (d11bd0df…, unchanged by bfea020 —
+>   only the .json manifest gained `null_rates`), so Model A's numbers could not
+>   have moved; Model C's were re-run and matched anyway.
+>   QUEUE-PREFIX: all five columns renamed; shipped CSV headers verified on disk
+>   (`sim_p_overturn, sim_recoverable_amt, sim_expected_recovery_amt,
+>   sim_expected_net_recovery, sim_days_to_deadline`). `assert_publishable` runs
+>   INSIDE the builder, so the guarantee is structural. The QA exposure gate
+>   (test_output_surface_provenance) went RED→GREEN on this commit and nothing
+>   else changed, which is what makes it evidence.
+>   SHA-STAMP: dirty-tree semantics probed in three states. Clean → plain commit.
+>   Tracked file modified → `describe: <sha>-dirty`, `dirty: true`, warning, and
+>   the prose says "an uncommitted working tree". UNTRACKED FILE ONLY → `git
+>   describe` alone reads clean, and the stamp still reports `dirty: true` because
+>   it cross-checks `git status --porcelain`. That second path is the one that
+>   would have produced a machine-attested falsehood; it is handled.
+>
+> [GUARD-DISARM] **NEW, ml's to fix, gate is RED and committed.**
+> `committed_manifest()` collapses four conditions to None — no git, path outside
+> the repo, `git show` failed, and MANIFEST DID NOT PARSE — and
+> `_refuse_or_report` treats None as "nothing to protect". Three of those are.
+> The fourth is not. MEASURED: with a corrupt committed manifest, and separately
+> with the manifest untracked while the PARQUET is still committed, a matrix with
+> `diagnosis_count` entirely null was written straight over the committed parquet
+> with **no exception raised** — the exact failure bfea020 exists to prevent.
+> This is the module's own principle turned on itself: `manifest_deviations`
+> already refuses to pass over a missing `null_rates` block ("NULL RATES NOT
+> COMPARED") because a check that did not run must not read like one that passed.
+> Repro: `uv run pytest tests/features/test_matrix_write_guard.py -q` (2 RED).
+> Not a blocker on merging the three — the settled shape is met — but must close
+> before Phase 5 acceptance.
+>
+> [EMITTER-HOLE] **FOUND IN MY OWN INHERITED GATE, fixed, 723a95c.** The
+> [QUEUE-PREFIX] "harder half" — the check extended so this cannot recur in Phase
+> 5's outputs — was NOT covering half of Phase 5. Measured by planting three
+> probe modules: a Streamlit page and a `df.to_dict()` helper were caught; a
+> **FastAPI route** (`@router.get` returning `[{"recoverable_amt": …}]`) was NOT.
+> It calls nothing on the emitter list and declares no `response_model`, so the
+> only evidence it is a user-facing surface is the decorator. The gate was
+> reporting a clean Phase 5 API boundary while blind to it. Added
+> route-decorator detection, `model_dump`, and `st.write`/`st.json` when the
+> first argument is not a string literal (prose stays exempt, measured). Added
+> positive AND negative controls on the DETECTOR — the registration test is green
+> on a tree with no dashboard and no API, and that green said nothing about
+> whether the detector could see anything at all.
+>
+> [FIREWALL-DOC-HOLE] **RULED (d5b8402): NOT fixable by redaction. Recorded as a
+> known limitation in docs/assumptions.md §12 and pinned by
+> tests/leakage/test_firewall_doc_hole.py.** Three classes, all measured:
+>   A. Realized label statistics. `sim_denial_flag` IS the Model A label; its mean
+>      on the committed matrix is **0.1276**, which is the doc's 12.8%. Model A
+>      prints `test base rate 0.1205` itself. Deleting the figure removes an
+>      auditable record and restores nothing.
+>   B. Generator internals + a prototype of ml's own deliverable: oracle AUC 0.68
+>      (from `sim_latent_p`, banned as a feature), the latent 8.9% / 16.7% solve,
+>      and §4.1's "+0.005–0.009 AUC" GBM-over-logistic prediction — published
+>      BEFORE ml produced +0.0003 [−0.0173, +0.0183]. Required by §1/§7; deleting
+>      them trades honesty for a wall with no other sides.
+>   C. **FOUND WHILE RULING, and worse than A and B together.**
+>      `config/simulation.yaml` (NOT firewalled from ml) publishes the latent
+>      FORMULA and every coefficient, §3 republishes the odds ratios, §2 gives the
+>      solved intercept — and all **fifteen** mechanism indicators the formula
+>      consumes are features in the committed matrix. `sim_latent_p` is therefore
+>      analytically reconstructible without opening `src/simulation/` once. Also
+>      not fixable: those are legitimate pre-submission features.
+>   THE EVIDENCE THE DISCIPLINE HELD IS IN THE NUMBER: Model A shipped **0.6254**
+>   against a reconstructible **0.68** ceiling. A pipeline exploiting A, B or C
+>   sits at the ceiling. §4.5's value is that gap, not an access control, and no
+>   surface may describe it as an information barrier.
+>   docs/simulated_forbidden_columns.md deliberately untouched.
+>   CONSEQUENT FINDING FOR ml: **docs/model_card.md:139-141 is false as written** —
+>   "The generator's realized overturn and rework rates sit behind the §4.5
+>   firewall". They do not; assumptions.md §9 publishes the realized rework figure
+>   ($29.88/denied claim) and §8 the overturn target. The threshold argument
+>   survives (both factors were fixed from published benchmarks, before the
+>   threshold) but the sentence justifying it is not true. ml to reword.
+>
+> [APP-R1] app-engineer @ **6e51e61** (demo extract): reviewed, NOT yet gateable —
+> no dashboard page, no API endpoint, no bundle built, no tests. What is there is
+> good and two things are verified rather than accepted:
+>   * `dashboard/disclosures.py` numbers CHECKED against the runs I made, all
+>     correct: 0.6254/0.2210, +0.0003 [−0.0173,+0.0183], logistic−payer_rule
+>     +0.0333 [+0.0066,+0.0571] ROC and +0.0695 [+0.0444,+0.0998] PR, Model C
+>     0.5611 and −0.0356 [−0.1325,+0.0597], 65.7/61.0/59.8, capacity point 9.6% /
+>     20.9% / 26.3% (= 2.18× the 0.1205 base rate), 50.9% concentration, 2,663
+>     denials / 967 appealed / 193 test rows. MODEL_C_HONESTY states the negative
+>     result correctly and explicitly ("the probability does not earn its place in
+>     the ordering"). NOT_A_FRAUD_SIGNAL present.
+>   * KEYING RULE verified in the WAREHOUSE, not in the prose:
+>     `vw_clean_claim_performance` is `group by e.prvdr_num`, and live it returns
+>     4,877 rows = 4,877 distinct prvdr_num over 2,857 distinct CCNs. Correct.
+>   MEASURED, AND THE DISCLOSURE UNDERSTATES IT — **grouping by facility NAME is
+>   worse than by CCN. Worst case 15:1, not 8:1**, and 1,302 distinct names carry
+>   more than one synthetic provider (vs 1,311 of 2,857 CCNs = the 45.9% already
+>   quoted). Distinct display names = **2,816** < 2,857 CCNs, because real CMS
+>   facilities share names across sites. The disclosure correctly forbids grouping
+>   on either, but quotes only the 8:1 CCN figure — and NAME is the key a
+>   dashboard is far more likely to group on, being the human-readable one. Add
+>   the 15:1 name figure wherever 8:1 appears.
+>   §5/§6 PROCESS: `src/demo/` is a new package nobody owns (app-engineer owns
+>   `src/api/`, `dashboard/`, `docker-compose.yml`); the commit does not update
+>   tasks.md (§6); and 1,417 lines of new module ship with zero tests (§6, "every
+>   new module gets tests in the matching tests/ subfolder in the same PR").
+>   tests/ is mine — coordinate, do not skip.
+>   Minor: spec.py says vw_clean_claim_performance is 4,877 rows while the
+>   disclosure says 4,876 crosswalked providers. Both are right (one provider has
+>   no crosswalk row); say so once so it does not read as a typo.
+>
+> STILL RED AND CORRECTLY SO on feat/phase5-qa @ **58574e9** (= a8dab94 + 4a87270
+> + 6e51e61 + my three commits): 4 disclosure gaps the human named — vintage skew
+> absent from README.md and docs/model_card.md, collision numbers and keying rule
+> absent from README.md ([README-FINAL]) — plus
+> `test_the_dashboard_exists_before_phase_5_is_accepted`. Repro:
+> `uv run pytest tests/contracts/test_user_facing_disclosures.py
+> tests/contracts/test_dashboard_banner.py -q`.
 - [ ] FastAPI endpoints with schemas + version metadata
 - [ ] Streamlit dashboard (5 pages, synthetic banner on all)
 - [ ] DuckDB/Parquet demo extract for hosted deployment
