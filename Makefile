@@ -59,8 +59,13 @@ views:
 # file is what the CLAUDE.md §4.1 leakage probes run against on a clean clone,
 # so it has to be regenerated (and re-committed) whenever the feature store or
 # the warehouse changes. `make train` writes it as a side effect too.
+#
+# The write REFUSES if the content deviates from the committed manifest (row
+# count, column set, per-column null rates) — a run against a degraded warehouse
+# once overwrote this file with an all-null column and only failed afterwards.
+# For an intended change: `make features ALLOW_CHANGE=1`.
 features:
-	uv run python -m src.features
+	uv run python -m src.features $(if $(ALLOW_CHANGE),--allow-change,)
 
 train:
 	uv run python -m src.models.train
