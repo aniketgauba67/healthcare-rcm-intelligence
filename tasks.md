@@ -2048,6 +2048,77 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> OPENED 2026-07-29 by human go-ahead after Phase 4 acceptance. main pushed to
+> origin at 94ce0d3.
+> REPO DIVERGENCE FOUND AT PUSH (team-lead): origin/main carried TWO commits local
+> main did not — 8f9dd13 "[docs] expand README with architecture, status, setup,
+> and validation" and 1e7898c, both authored by the human on 2026-07-26. The real
+> README is 382 lines. Local main still had the 10-line scaffold, which is why
+> qa-reviewer-p12's [README-STALE] finding read as true and why team-lead's
+> 71cee4b "fix" appended a Models section that DUPLICATED content the human had
+> already written. Resolved by keeping the human's README verbatim and dropping
+> the appended block; README work returns to Phase 5 where it belongs.
+> This is pin-the-SHA at repo scale — the fifth variant: LOCAL main vs ORIGIN
+> main. Nobody had fetched since Phase 3. STANDING RULE: `git fetch origin` before
+> treating local main as authoritative, and before filing any finding about a
+> shared file.
+> HUMAN INSTRUCTION 2026-07-29, binding on this phase:
+>   1. Resolve [QUEUE-PREFIX] BEFORE any dashboard/API work starts, and re-run the
+>      provenance/exposure check that would have caught it so it cannot recur in
+>      Phase 5's outputs.
+>   2. Resolve every other item already flagged as a Phase 5 blocker before
+>      building on top of it.
+>   3. Standard scope: FastAPI endpoints, 5-page Streamlit dashboard (banner on
+>      EVERY page), DuckDB/Parquet demo extract, clean-clone `docker compose up`,
+>      final docs.
+>   4. Honesty pass must EXPLICITLY re-verify two things, and they must be visible
+>      where a USER sees the data (README, dashboard, model card) — not only in
+>      internal docs: the VINTAGE SKEW and the CROSSWALK COLLISION / synthetic-ID
+>      keying rule.
+> BLOCKER INVENTORY, swept from the whole board by team-lead 2026-07-29. Resolve
+> before dashboard/API work:
+>   [QUEUE-PREFIX] (ml-engineer) work_queue.py:148 defaults
+>     recoverable_column="sim_denied_amount" and :175 copies it out as
+>     `recoverable_amt` — the sim_ marker stripped by a rename. Same family:
+>     p_overturn, expected_recovery_amt, expected_net_recovery, days_to_deadline.
+>     One row per claim keyed on claim_sk, which is exactly the shape §3.2 governs,
+>     and the inconsistency is INSIDE one file — sim_denial_category keeps its
+>     marker while the dollar amount loses it. Phase 5 IS the trigger ruling A
+>     named, because the dashboard work-queue page surfaces these column names as
+>     headers. HUMAN DIRECTED: rename to carry the marker (e.g. sim_recoverable_amt).
+>   [ARTIFACT-REWRITE] (ml write path, qa guard shape) a training run against a
+>     transiently degraded warehouse silently persisted a bad matrix over the
+>     committed artifact, write landing BEFORE the loud failure. Shape is settled:
+>     compare against the COMMITTED manifest read from git, NEVER the previous run
+>     (that reproduces the self-repairing-check defect), and FAIL LOUDLY.
+>   [SHA-STAMP] (ml write path) artifacts in gitignored dirs carry no SHA, so they
+>     cannot be pinned by inspection — this caused a §7 acceptance to be measured
+>     against the wrong tree. Stamp the generating git SHA into metrics.json and
+>     the artifact READMEs at write time, including dirty-tree semantics.
+>   [SPLIT-DISCOVERY] (qa) p8's discovery contract finds the split column by name
+>     from {is_train, split, fold}. Name-based discovery is what made a correct
+>     rename look dangerous. Declaration-based is the better shape.
+>   [FIREWALL-DOC-HOLE] docs/assumptions.md and tasks.md republish generator-
+>     realized values to an agent firewalled from the generator. Any §4.5
+>     discipline assuming ml cannot see realized output is false by construction.
+>   [LOG-SIM-DENIED] revisit trigger has arrived if a Model C matrix is committed
+>     or a dashboard surfaces the column.
+>   [README-FINAL] the human's 382-line README still marks Phase 4 as 🚧 and has
+>     ZERO mentions of docs/model_card.md. Update status and add the pointer —
+>     carefully, on top of the human's text, not over it.
+> VINTAGE SKEW — MEASURED by team-lead from config/sources.yaml, for the honesty
+> pass. The code sets are CORRECT and unskewed (ICD-10-CM/PCS FY2023, HCPCS 2023,
+> MS-DRG v40 FY2023 — all match the 2023-04 claims). The SKEW is in the crosswalk
+> reference files: claims are 2023-04, but Hospital General Information is vintage
+> 2026-04 (dataset xubh-q36u, ~3 years later) and Medicare Physician by Provider is
+> data year 2024 released 2026-05. Hospitals open, close and change type over three
+> years; providers change specialty and state. Currently documented NOWHERE as a
+> skew — provenance_register records the vintages and requires them for
+> reproducibility, but never states the mismatch. Gap in all user-facing surfaces.
+> CROSSWALK COLLISION — currently in docs/model_card.md:526-530 with the numbers
+> (4,876 synthetic providers onto 2,857 real CCNs, worst 8:1, display-only,
+> forbidden as a feature). README:145 says "display-only enrichment" WITHOUT the
+> numbers. Dashboard does not exist yet. Needs to be visible in all three.
 - [ ] FastAPI endpoints with schemas + version metadata
 - [ ] Streamlit dashboard (5 pages, synthetic banner on all)
 - [ ] DuckDB/Parquet demo extract for hosted deployment
