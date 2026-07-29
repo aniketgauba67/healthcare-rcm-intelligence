@@ -2048,6 +2048,74 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> CRASH #7 2026-07-29 13:20-13:48Z (team-lead): ml-engineer-7, qa-reviewer-p16,
+> ml-engineer-6 and app-engineer ALL hit the cap within 28 minutes — the largest
+> simultaneous loss on this project. ml and qa worktrees were CLEAN. app-engineer's
+> was not: 1,816 lines of unreviewed FastAPI + demo read-side preserved as 08d88cc
+> (main.py 529, scoring.py 404, schemas.py 350, tables.py 251, provenance.py 106,
+> demo/source.py 176), ruff clean, NOT verified. Re-spawned as ml-engineer-8,
+> app-engineer-2, qa-reviewer-p17. Warehouse healthy: 9 views, 20,867 claims,
+> 0 orphans, 21/21. main == origin/main == aac6cb5.
+> TEAM-LEAD CORRECTION — I OVERSTATED THE BLACKLIST COUPLING. I told app-engineer,
+> ml-engineer-7 and qa that renaming the vw_work_queue_priority columns without a
+> lockstep `forbidden_derived_features` update would make the §4 blacklist
+> "silently stop matching". ml-engineer-7 measured it and I verified against
+> `src/features/leakage.py::_offenders`: the runtime guard matches EXACT then
+> SUBSTRING (`if forbidden in lowered`), so the existing entry `dollars_at_stake`
+> ALREADY catches `sim_dollars_at_stake`. A `sim_` PREFIX rename opens no hole in
+> either commit order. I inferred the failure mode from the config text instead of
+> reading the matcher. The real rule is narrower: **add the marker, never reword** —
+> a WORD change (`sim_amount_at_stake`) is blocked by nothing, and THAT is when
+> lockstep matters.
+> TEAM RULE — MATCHER-EXPRESSIVENESS MISMATCH (from ml-engineer-7's near-miss):
+> the test suites resolve blacklist names with `fnmatch`; the RUNTIME guard has no
+> glob support. So `*dollars_at_stake` would pass every test and block nothing —
+> the Phase 2 placeholder defect returning through the one door the existing checks
+> cannot see. **Any protection whose test-time and runtime matchers differ in
+> expressiveness is a latent placeholder defect.** A glob is now rejected in code.
+> ML FINDINGS THIS ROUND (f18dfc7): `action_type` was guarded by NOTHING while
+> vw_work_queue_priority:78-82 builds it as a CASE on `sim_denial_flag` — it
+> encodes the label directly, a stronger leak than two columns already listed, and
+> invisible because no existing entry was a substring of it. Substring matching
+> protects against decoration of KNOWN names, not against unknown ones. Now
+> forbidden. `age_days` stays permitted WITH its reasoning recorded in the config
+> (a permitted column with no recorded reason is indistinguishable from an
+> oversight — how `overall_prior_denial_rate` survived four commits).
+> THE SHARPEST OBSERVATION OF THE PHASE, and it belongs in user-facing docs not
+> just a config comment: the label-bearing property of vw_work_queue_priority is
+> **MEMBERSHIP**, not any column — the where clause selects denied-or-open-AR
+> claims. No column-name blacklist can express that. A queue presented as a neutral
+> list of claims is presenting a selection that already knows the outcome.
+> QA REVIEW ROUND 1 (qa-reviewer-p16, on feat/phase5-qa; team-lead never received
+> the report — recovered from the board after the crash):
+>   [BLOCKERS-3] PASS at 4a87270.
+>   [GUARD-DISARM] NEW, ml's to fix, gate RED and committed. `committed_manifest()`
+>     collapses FOUR conditions to None — no git, path outside repo, `git show`
+>     failed, and MANIFEST DID NOT PARSE — and `_refuse_or_report` treats None as
+>     "nothing to protect". Three of those are; the fourth is not. MEASURED: with a
+>     corrupt committed manifest, and separately with the manifest untracked while
+>     the parquet is still committed, a matrix with `diagnosis_count` entirely null
+>     was written straight over the committed parquet with NO exception — the exact
+>     failure bfea020 exists to prevent. The module's own principle turned on
+>     itself: `manifest_deviations` already refuses to pass over a missing
+>     null_rates block because a check that did not run must not read like one that
+>     passed. MUST close before Phase 5 acceptance.
+>   [EMITTER-HOLE] found in qa's OWN inherited gate, fixed 723a95c. The
+>     [QUEUE-PREFIX] "harder half" was not covering half of Phase 5: probe modules
+>     showed a Streamlit page and a `to_dict()` helper caught, but a FastAPI ROUTE
+>     NOT — it calls nothing on the emitter list and declares no response_model, so
+>     the only evidence it is user-facing is the decorator. The gate was reporting a
+>     clean API boundary while blind to it. Added route-decorator detection plus
+>     positive AND negative controls ON THE DETECTOR, because green on a tree with
+>     no dashboard and no API said nothing about whether the detector could see.
+>   [FIREWALL-DOC-HOLE] RULED (d5b8402): NOT fixable by redaction. Recorded as a
+>     known limitation in docs/assumptions.md §12, pinned by a test.
+>   [APP-R1] app-engineer @ 6e51e61 reviewed, not yet gateable.
+> CROSSWALK DISCLOSURE UNDERSTATES THE COLLISION (qa-reviewer-p16, measured):
+> grouping by facility NAME collides WORSE than by CCN — worst 15:1 against the
+> 8:1 everyone has been quoting, with 2,816 distinct names for 2,857 CCNs. And
+> NAME is the key a dashboard is more likely to group on. Every user-facing
+> disclosure must carry the NAME figure, not only the CCN figure.
 > OPENED 2026-07-29 by human go-ahead after Phase 4 acceptance. main pushed to
 > origin at 94ce0d3.
 > REPO DIVERGENCE FOUND AT PUSH (team-lead): origin/main carried TWO commits local
