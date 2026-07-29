@@ -422,6 +422,86 @@ the simulation did what it was told, not that what it was told is true.
 
 ---
 
+## 12. KNOWN LIMITATION: the §4.5 firewall is a discipline, not an information barrier
+
+Recorded by qa-reviewer 2026-07-29, gating [FIREWALL-DOC-HOLE]. This document
+publishes generator-realized values, and CLAUDE.md §4.5 firewalls ml-engineer
+from `src/simulation/` but not from `docs/`. Any statement anywhere in this
+repository that ml-engineer **cannot see** realized generator output is false.
+Rather than quietly narrowing the claim, here is exactly what leaks and why the
+redaction that would close it is not worth making.
+
+**Class A — realized label statistics. Not fixable, and redaction would close
+nothing.** The realized denial rate (12.8%), the denial count (2,663), the
+appeal and overturn rates: `sim_denial_flag` is the Model A **label** and sits
+in the committed training matrix. Measured 2026-07-29 on
+`artifacts/features/model_a_training_matrix.parquet`:
+`frame["sim_denial_flag"].mean()` = **0.1276**, which is this document's 12.8%.
+Model A's own console output prints `test base rate 0.1205`. An agent that must
+train on a label necessarily knows the label's base rate. Deleting the figure
+from this document would remove an auditable record and restore no property.
+
+**Class B — generator internals, and a prototype of ml's own deliverable. Also
+not fixable, because §1 and §7 require them.** These are *not* derivable from
+the feature store, so this document really is where they leak:
+
+* the **oracle AUC ≈ 0.68** ceiling (§2), computed from `sim_latent_p` — which
+  CLAUDE.md §4 bans as a feature precisely so no model can reach it;
+* the latent-vs-observed calibration internals (§2): latent mean 8.9%, the
+  16.7% naive solve, the ε flip counts (961 / 892 / 69);
+* §4.1's prototype finding that gradient boosting beats a logistic baseline by
+  only **+0.005–0.009 AUC** — a *prediction of the result ml-engineer was asked
+  to produce*, published before they produced it. Model A shipped
+  **+0.0003 [−0.0173, +0.0183]**, which agrees with it.
+
+Deleting these would damage honesty to protect a wall with no other sides. The
+oracle AUC is what makes a shipped ROC-AUC of 0.6254 an *honest result near a
+known ceiling* rather than a weak one, and §4.1 exists so that a competitive
+linear baseline is reported as a finding rather than hidden as a failure
+(CLAUDE.md §7: "baseline vs advanced comparison **reported**").
+
+**What §4.5 does buy, stated at its true strength.** ml-engineer does not read
+generator source, so no feature, no threshold and no split boundary is written
+by copying a mechanism out of the generator; the pipeline is built to be correct
+*as if the data were real*. That is a methodological discipline and an interview
+story. It is not, and has never been, an information-theoretic guarantee, and it
+must not be described as one.
+
+**Class C — the generator's entire latent formula, which is worse than A and B
+together, and was found while writing this section.** §3 above publishes every
+odds ratio; `config/simulation.yaml` (owned by simulation-engineer, but **not**
+firewalled from ml-engineer) publishes the same coefficients *and* the formula:
+`logit(sim_latent_p) = intercept (solved) + sum of the terms below`. §2 publishes
+the solved latent mean (8.9%) and the noise rate. And measured 2026-07-29
+against the committed matrix, **all fifteen mechanism indicators the formula
+consumes are features in it** — `sim_auth_missing`, `sim_auth_required`,
+`sim_auth_obtained_late`, `sim_eligibility_failed`, `sim_eligibility_checked`,
+`sim_documentation_complete`, `sim_coding_specificity_deficit`,
+`sim_duplicate_submission_flag`, `sim_late_filing_flag` and the continuous terms.
+
+So `sim_latent_p` is analytically reconstructible from published documents plus
+the feature store, without opening `src/simulation/` even once. An agent that did
+it would score with the oracle and land at the AUC ≈ 0.68 ceiling. This is not
+fixable by redaction either: CLAUDE.md §7 requires the assumptions to be
+documented with citations, the locked decisions put the seeds and parameters in
+`config/simulation.yaml`, and the mechanism indicators are legitimate
+pre-submission features that Model A is *supposed* to have.
+
+**The evidence the discipline held is in the number.** Model A shipped
+ROC-AUC **0.6254** against a reconstructible ceiling of **0.68**. A pipeline that
+had exploited any of A, B or C would sit at the ceiling; this one sits well below
+it, alongside a logistic baseline that a gradient-booster beats by +0.0003. The
+firewall's value is demonstrated by that gap, not by an access control.
+
+**The one thing that is enforced.** The disclosed set must not grow, and in
+particular no *realized per-claim* generator output — a `sim_latent_p` column, a
+per-claim mechanism contribution — may reach a published artifact or the feature
+store, which would turn a reconstruction anyone *could* do into one already done
+for them. `tests/leakage/test_firewall_doc_hole.py` pins this and fails if it
+widens. Fixing that test by widening it is not a fix.
+
+---
+
 ## Changelog
 
 | Version | Date | Change |
