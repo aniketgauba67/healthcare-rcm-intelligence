@@ -327,3 +327,53 @@ against live PG via `notebooks/analytics_common.py`) read these views + the
 banner and frames findings as review signals, never fraud. Notebook 06
 (interrupted time series) is illustrative-only and writes nothing to the
 warehouse.
+
+## Model A training matrix (committed Parquet — Phase 4)
+
+`artifacts/features/model_a_training_matrix.parquet` + sidecar
+`model_a_training_matrix.json`. Built by `src/features/` (`make features`);
+`make train` rewrites it from the same code path as a side effect of fitting, so
+the guard always checks the object the model actually saw.
+
+**This is the only data file committed to git in this repository.** Everything
+under `data/` and `models_artifacts/` is gitignored. A reader with a clean clone
+and no database can open this file and nothing else, which is why its columns are
+classified in full in `docs/provenance_register.md` ("The committed Model A
+training matrix") rather than only summarized here.
+
+| Property | Value |
+|---|---|
+| Grain | one row per claim |
+| Rows × columns | 20,867 × 44 |
+| Composition | 39 features + 4 passthrough + `split` |
+| Label | `sim_denial_flag` (SIMULATED; forbidden as a feature) |
+| Time column | `sim_submission_date` (SIMULATED) |
+| Split | temporal, cut `2021-12-28` — 16,694 train / 4,173 test |
+| Row order | `sim_submission_date`, `claim_sk` |
+| Regenerate | `make features` |
+
+Classification summary — the authoritative per-column breakdown is in the
+provenance register:
+
+| Class | Count | Columns |
+|---|---|---|
+| SIMULATED | 34 | every `sim_`-prefixed column: 32 features + the label `sim_denial_flag` + `sim_submission_date` |
+| SOURCE | 4 | `billed_charge_amt` (= `clm_tot_chrg_amt`, renamed only), `drg_cd`, `provider_state_cd`, `prvdr_num` |
+| DERIVED | 6 | `length_of_stay_days`, `diagnosis_count`, `log_billed_charge_amt`, `patient_age_years`, `claim_sk`, `split` |
+
+34 + 4 + 6 = 44, no column unclassified.
+
+**Nothing in this file is real.** CMS *synthetic* claim facts plus this project's
+own simulated adjudication inputs; no real patient, provider, payer or
+adjudication data. No crosswalked real CCN or NPI is present — the provider
+column is the synthetic `prvdr_num` (§3.4). Column names follow §3.2: a feature
+computed from a simulated input keeps the `sim_` prefix through the engineering
+step, so `sim_overall_prior_denial_rate` is a rate over *fabricated* denials, not
+a Medicare book rate. The single exception is `split`, a modelling fold label
+whose name is fixed by the §4.1 leakage guard's discovery contract; both
+decisions are recorded in the register.
+
+The sidecar manifest carries rows, feature list, split boundary, parquet SHA-256
+and a digest of every `forbidden_*` block in `config/model.yaml`. It contains **no
+timestamp**: every field derives from content or config, so every writer produces
+byte-identical bytes and any diff on this artifact means the data changed.

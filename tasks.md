@@ -769,6 +769,31 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   provider rate DOES break all three, so the checks are known to be sensitive.
   Feature names keep the sim_ prefix through engineering (§3.2) so provenance
   survives into the matrix, the SHAP plots and the dashboard.
+  DETAIL preserved from ml-engineer's own board entry when team-lead reconciled
+  the merge conflict (main's block is authoritative; these facts existed only on
+  the branch):
+    - A fifth config key beyond the three team-lead ruled on: `forbidden_tables`
+      + `forbidden_table_columns` expand §2's WHOLE-TABLE forbids (sim_appeals,
+      sim_operating_costs) into real column names, with an integration test
+      re-checking the expansion against information_schema. NOTE: this is the key
+      qa-reviewer-p9's fixture later misread as an annotated dict and took the
+      KEYS of, folding two table names into the blacklist and dropping fourteen
+      real column names — the protection held; the test reading it did not.
+    - Split numbers: cut 2021-12-28, train 16,694 / test 4,173 (20.0%), test base
+      rate 0.1205 vs train 0.1294 — matches firewall doc §8 exactly. Calibration
+      fold carved off the END of train (fit 13,356 / calibrate 3,338; latest
+      calibration row 2021-12-28 < earliest test row 2021-12-29), so isotonic sees
+      neither the fit rows nor the test fold.
+    - Historical-rate shrinkage m=20 toward the prior-period book rate, which
+      itself moves. No history ⇒ null, never a silent zero.
+    - Leak canaries: no single numeric feature exceeds ROC-AUC 0.75 alone, and no
+      categorical level with ≥100 claims determines the label.
+    - CORRECTION ml-engineer recorded against itself: it first assumed provider
+      history would be sparse ("median provider has 2 claims"). Wrong at the CLAIM
+      level — volume is concentrated (top 10% of providers hold 53% of claims), so
+      72% of all claims and 83% of post-2019 claims DO have provider history.
+      Provider-weighted and claim-weighted are different questions; the model card
+      must say the latter.
 - [x] Model A: baselines -> XGBoost, temporal splits, calibration, SHAP
   — ml-engineer-2, 5097f08, `make train` runs it end to end. PENDING qa-reviewer-p9.
   Forward test fold 4,173 claims / 503 denials / base rate 0.1205:
@@ -924,8 +949,116 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > FOR PHASE 5 / app-engineer: metrics.json was emitting bare NaN tokens — valid
 > Python, INVALID JSON — and app-engineer parses that file. Fixed with allow_nan=
 > False and sanitised to null. Do not reintroduce it with a convenience dump.
-- [ ] Model C: appeal success + Expected Net Recovery work-queue score
-- [ ] Slice metrics, bootstrap CIs, model card
+- [x] BLOCKER — training-matrix guard wired (ml-engineer-3, cd3e30c). PENDING qa.
+  qa's test_guard_is_wired_once_a_feature_store_exists was RED and the red test was
+  the smaller half of the problem: src/features/ satisfied NO discovery route, so
+  the §4.1 VALUE probes — the only kind that catch a renamed / logged / binned /
+  ratioed forbidden column — SKIPPED, and a skip reads like a pass.
+  All three routes now served: artifacts/features/model_a_training_matrix.parquet
+  (COMMITTED, .gitignore exception, 1.4 MB / 20,867 x 44), a no-required-argument
+  src.features.build_training_matrix() re-exported on the package, and
+  RCM_FEATURE_MATRIX already honoured. `make train` persists the matrix it is about
+  to fit on, so the guard checks the object the model saw, not a copy.
+  COMMITTED ON PURPOSE: regenerating on demand makes the guard live only on a
+  machine with a loaded warehouse — the same shape as the defect this project
+  already hit, a green suite over a degraded DB. Team-lead notified it is a
+  judgement call and offered the RCM_FEATURE_MATRIX alternative.
+  ONLY MODEL A GOES THERE and a test enforces it: qa's forbidden_columns fixture is
+  MODEL A's set, so a Model C matrix beside it would fail the guard correctly and
+  for entirely the wrong reason (C is permitted to see the denial) and the fix
+  someone would reach for is loosening the guard. Model C writes to
+  models_artifacts/model_c/, which the guard does not scan.
+  Staleness by measurement: sidecar manifest with rows, feature list, split
+  boundary, parquet sha256 and a digest of every forbidden_* block in
+  config/model.yaml, so a widened blacklist with no rebuild fails a unit test
+  instead of leaving the guard checking an older column set.
+  VERIFIED by checking qa's tests/leakage out over this tree, running it, then
+  restoring: guard 5 passed (was 1 failed + 4 skipped); test_live_leakage.py 8
+  passed on live PG across BOTH routes, strongest single-feature AUC 0.5859
+  (sim_payer_id) vs the 0.6778 oracle — reproduces qa-reviewer-p9's hand-
+  materialised figures exactly. Also adds `make features` and `make train-appeal`.
+- [x] Model C: appeal success + Expected Net Recovery work queue (ml-engineer-3,
+  1f4375c). PENDING qa. The preserved WIP HAD run — models_artifacts/model_c/ held
+  14:37 artifacts team-lead could not see because that directory is gitignored.
+  Reproduced, then fixed three defects:
+  (1) THE QUEUE COMPARISON MEASURED TWO DIFFERENT OBJECTS — the table ranked by the
+      TIERED queue while the paired bootstrap beside it ranked by the raw ENR score,
+      so a -2.2pt gap sat next to an interval centred on 2.2e-16. Both correct about
+      different rankings; nothing said so. Every rule is now a score vector over the
+      same claims (work_queue.priority_score() re-expresses the tiered queue as
+      -queue_position), so table and interval are one computation by construction.
+  (2) THE DEADLINE OVERRIDE FIRED IN NO REPORTED ARTIFACT. Property of the two
+      conventions, not of the rule: at-arrival triage gives every claim the full
+      window (backtest 0 DEADLINE_CRITICAL) and the live snapshot is one instant on
+      a thin 2023-24 tail (1 open claim, 467 out of window). Added rolling
+      month-start queues: 22 snapshots, 237 distinct claims reach the urgent tier,
+      guarantee re-asserted on every snapshot. Degenerate snapshot REPORTED with its
+      caveat, not dropped.
+  (3) THE APPEAL-SIDE EMBARGO WAS MODEL A's 60 days off the DENIAL posting, but an
+      appeal outcome is not known then. appeal_embargo_days: 180 from the published
+      Medicare Part A/B timetable (120 to file + 60 for the decision), and
+      deliberately NOT checked against sim_appeal_decision_date.
+  RESULTS. 2,663 denials / 967 appealed / test 193 with 86 overturned. Champion
+  xgboost ROC 0.5611; xgboost - category_rule -0.0356 [-0.1325, +0.0597] — no
+  difference from a rule needing no model. Queue at 10% capacity: largest-denial-
+  first 65.7%, enr_score 61.0%, tiered queue 59.8%, random 0.7%; enr_score minus
+  largest-first -4.7% [-16.7%, +0.9%]. THE PROBABILITY DOES NOT EARN ITS PLACE —
+  P is nearly flat so P x amount is dominated by amount. ENR ships for the CUTOFF
+  and the tiering, not the ordering, and the card says exactly that.
+  No SHAP published for Model C, deliberately: a model a paired interval cannot
+  separate from a category rule has nothing stable to attribute, and the analyst-
+  facing explanation is the tier + recommended_action, which are rule-based.
+- [x] COST MATRIX DECOMPOSED per the ruling (ml-engineer-3, 1f4375c).
+  p_prevented_given_flagged_and_worked 0.50 (Change Healthcare Denials Index: ~86%
+  potentially avoidable as a ceiling, ~half front-end in origin — the optimistic
+  end, it equates "front-end cause" with "caught and fixed in time") x
+  share_of_claim_value_permanently_lost 0.25 (same index: ~24% of avoidable denials
+  not recoverable; a FLOOR, since MGMA/CH put 50-65% of denials as never reworked
+  at all) = 0.125, multiplied in exactly one place. Neither derived from the
+  generator; both fixed BEFORE the threshold was computed.
+  WHAT FELL OUT, as instructed: break-even multiplier MEASURED at 0.0632 on the
+  calibration fold (0.0543 test, 0.0785 whole book). 0.125 is above it by ~2x where
+  1.0 was above by 16x. Flagged share 98.4% -> 60.1% at 73.2% recall. Still not an
+  operating point, and the sweep is why: 13.6% -> 59.9% -> 86.3% flagged as the
+  multiplier moves 0.075 -> 0.125 -> 0.25. Capacity-constrained stays PRIMARY.
+  I corrected my own pre-written prose mid-run — I had written "the decomposition
+  did not fix it" and the measured numbers contradicted it.
+  VERIFIED the predecessor's appeal_economics block rather than trusting it: $45
+  Premier-anchored, and the $29.88 note is a consistency remark, not load-bearing.
+- [x] DOLLARS-AT-RISK INSTRUMENT FIXED, and it CHANGES THE CONCLUSION
+  (ml-engineer-3, 1f4375c). Paired bootstrap on the DIFFERENCE over the same
+  resamples: champion - constant +17.9% [+4.2%, +51.7%]; champion - payer rule
+  +29.6% [+7.1%, +53.4%]. Both EXCLUDE zero, so the champion IS distinguishable
+  from arbitrary ranking — which the unpaired reading (38.4% [16.0, 59.3] vs 20.4%)
+  could not support and this can. Width still enormous; magnitude not pinned down;
+  ten largest denied claims hold 50.9% of denied dollars. Card forbids quoting a
+  single number from that row.
+  Also worth the reviewer's attention: the payer rule captures 8.7%, BELOW the
+  20.4% a constant score gets — it concentrates on a payer whose denials are small.
+  Ranking by count and ranking by dollars are different problems.
+- [x] Slice metrics + bootstrap CIs (ml-engineer-3, 1f4375c). Every scorable slice
+  AUC carries a CI and an explicit beats_chance column. Model A: MCR_FFS 0.5507
+  [0.4968, 0.6031] COVERS 0.5 and is the largest slice; service line only
+  AFTERCARE_REHAB and MSK_SKIN_ENDO clear chance, reproducing the Phase 2 warning
+  independently; value bands all clear; 1,801 providers / 1 scorable. Model C:
+  EVERY slice interval covers 0.5, 157 providers / 0 scorable.
+- [x] docs/model_card.md written (ml-engineer-3). Carries all six required items:
+  the SOURCE-exclusion honesty statement (corr 0.0477 / 0.0117 / 0.0008, clm_pmt_amt
+  identical to billed_charge_amt, so NOT empirically load-bearing — load-bearing on
+  the pipeline being right AS IF the data were real, and it does NOT imply a live
+  leak was caught), the covered-days classification, the Model C boundary with both
+  upheld calls, the cost-matrix decomposition, the dollars-at-risk caveat, and the
+  base-tables architecture decision. Every figure copied from metrics.json.
+  I re-verified the inherited claims rather than repeating them: top 10% of
+  providers hold 52.94% of claims, 72.5% of claims (83.0% post-2019) have provider
+  history, recovery ratio 0.811 sd 0.116, by category 0.740-0.834, corr with log
+  denied 0.024, disputed == denied on 967/967 with max abs diff 0.00.
+- [x] DETERMINISM GUARD (ml-engineer-3). One Model A run diverged from five others
+  this session (ROC diff +0.0026 vs +0.0003, ECE 0.02056 vs 0.01964). NOT
+  reproducible: two consecutive full 1,000-resample runs are byte-identical and
+  estimator scores hash identically across processes. Cause unknown, so
+  tests/models/test_determinism.py stands guard rather than leaving it as a note.
+  First place to look if it recurs is estimators.xgboost.n_jobs: 4.
 > CRASH + RE-SPAWN #3 2026-07-27 ~23:40Z (team-lead): qa-reviewer-p10 and
 > ml-engineer-3 hit the cap together, ~4.5h after the previous pair — the third
 > simultaneous double-crash in one day. BOTH WORKTREES WERE CLEAN, everything
@@ -970,6 +1103,96 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > Test at n_jobs=1 to confirm; if it holds, document it in the model card rather
 > than chasing it, and note that the CHAMPION is logistic so no headline figure
 > depends on it.
+- [x] §3.3 BLOCKER CLEARED — committed training matrix REGISTERED (ml-engineer-4).
+  docs/provenance_register.md gains "The committed Model A training matrix" and
+  docs/data_dictionary.md gains the matching section: what it is, `make features`
+  as the regeneration path, grain (one row per claim, 20,867 x 44), the split, and
+  per-column provenance for all 44 columns with an explicit statement that every
+  sim_-prefixed column is SIMULATED.
+  COUNTS VERIFIED AGAINST THE FILE, NOT BY HAND — and my hand count was wrong
+  twice: SIMULATED 34 (32 features + sim_denial_flag + sim_submission_date, not
+  33), SOURCE 4, DERIVED 6, sum 44, zero unaccounted. The register now states the
+  arithmetic so a reader can check it.
+- [x] §3.2 VIOLATION FOUND WHILE REGISTERING, AND FIXED (ml-engineer-4).
+  `overall_prior_denial_rate` shipped in the committed matrix UNPREFIXED since
+  cd3e30c. It is computed entirely from sim_denial_flag — an aggregate of a
+  fabricated denial — so §3.2 makes it a simulated column. In the ONE data file a
+  reader can open from a clean clone with no database, a column called
+  "overall_prior_denial_rate" reads as a real Medicare book rate. Nothing failed,
+  because nothing was checking. Renamed to `sim_overall_prior_denial_rate`, and
+  its Model C counterpart to `sim_overall_prior_overturn_rate`.
+  NO NUMBER MOVED: every Model A and Model C figure in the card reproduces exactly
+  (logistic ROC 0.6254 / PR 0.2210, xgboost - logistic +0.0003 [-0.0173, +0.0183],
+  ECE 0.01964 -> 0.01753, dollars +17.9% [+4.2%, +51.7%]; C xgboost 0.5611/0.4914,
+  category_rule 0.5571/0.4793, enr - largest -4.7% [-16.7%, +0.9%]). Metrics JSONs
+  diff to nothing but the rename. SHAP top drivers unchanged, no feature UNMAPPED.
+  GUARDED so the next one fails instead of shipping: tests/features/
+  test_matrix_provenance.py checks the DECLARATION, not the column name — a
+  feature whose declared lineage touches a sim_ source must carry the prefix.
+  NEGATIVE CONTROL RUN: restoring the old name makes it fail with the offending
+  lineage named, then passes again on restore. A guard that cannot fail is not one.
+- [x] WALL CLOCK DROPPED FROM THE COMMITTED MANIFEST (ml-engineer-4, per ruling).
+  `written_at_utc` removed outright rather than gated behind `make features`:
+  gating it would mean train.py REMOVING the field on every run, which is also a
+  diff. Every remaining field is a function of content or config, so all writers
+  emit identical bytes. `make features` prints the build time to stdout instead;
+  the build time of record is the git commit date.
+  MEASURED: two consecutive `make features` and two `make train` runs all leave
+  manifest sha256 d5c1ca88aa0786f7d39c7ac055b13c264654ea1a84ef9e75412c5d2fed454e8c
+  and parquet d11bd0df5a918d0debef9858e1dcc6c05de392f7dddb322741576a2ae73d42d8.
+  Guarded without a database by writing the artifact twice to tmp_path and
+  comparing bytes — the property stated directly, rather than grepping keys for
+  words that look like timestamps (my first attempt did that and false-positived
+  on `time_column`, which is a column NAME).
+- [x] DETERMINISM: THE n_jobs HYPOTHESIS IS REJECTED (ml-engineer-4). Tested as
+  instructed; it does not hold. Fitting the same xgboost pipeline on the same fit
+  fold and hashing raw test-fold scores gives ONE distinct hash (607f1d7abd126139)
+  across 38 fits — 20 at n_jobs=4 and 20 at n_jobs=1 in-process, plus 3 fits in
+  each of six SEPARATE processes at OMP_NUM_THREADS 1/2/3/4/8/16. xgboost `hist`
+  is bitwise deterministic on this data at every thread count, so thread
+  scheduling cannot be the mechanism.
+  TWO INDEPENDENT ARGUMENTS AGAINST IT: the figure that moved was ece_uncalibrated,
+  which belongs to the CHAMPION — and the champion is LOGISTIC, so a defect
+  confined to the tree model could not move it. A champion flip would explain both
+  numbers at once, but the calibration-fold margin is PR-AUC 0.2769 vs 0.2576, far
+  too wide for a floating-point perturbation to cross.
+  Cause therefore remains UNKNOWN and the card says so, in §5.1, rather than
+  attributing it to a plausible mechanism the measurement rejects. Consequences
+  bounded: champion is logistic, so no headline figure depends on the xgboost path.
+  ONE REAL ORDER-INSTABILITY WAS FOUND AND FIXED en route: the SHAP global
+  importance table sorted with pandas' default NON-stable quicksort, so features
+  xgboost never split on (all tied at exactly 0.0) could reorder for reasons
+  unrelated to the model — observed live, two zero rows swapping after an
+  unrelated rename. Both sorts now pass kind="stable". Never the divergence above
+  (importances feed no metric), but it was making the artifact's diffs noisy.
+- [x] MODEL C SHAP ABSENCE now states the MEASURED non-separation (ml-engineer-4,
+  team-lead condition). The card previously gave the reason in words ten lines
+  below the number; it now restates -0.0356 [-0.1325, +0.0597] inline, says the
+  interval spans zero, says SHAP IS delivered for Model A so the contrast is
+  visible, and names the condition under which Model C SHAP becomes appropriate.
+  A forward pointer was added to §1's Explanations section so a reader who goes
+  looking for Model C's SHAP finds the reason rather than a gap.
+> WARNING FOR qa-reviewer-p11 AND team-lead — CONCURRENT WAREHOUSE RELOAD SEEN
+> (ml-engineer-4, 2026-07-28 ~14:20Z). I queried the warehouse mid-run and found
+> sim_workflow_events at 0 rows (should be 131,077); it was back to 131,077 three
+> minutes later. Almost certainly qa's integration suite calling apply_ddl, which
+> drops and recreates. Two consequences worth knowing:
+> (1) MY MISTAKE, RECORDED: I ran `pytest tests/models/test_train_postgres.py
+>     tests/features/test_feature_store_postgres.py` by FILE PATH, which bypasses
+>     the `-m "not integration"` filter I had been using correctly everywhere
+>     else. Naming an integration file directly runs it. I will not do that again.
+> (2) THE REAL FINDING: that run PERSISTED A DEGRADED MATRIX OVER THE COMMITTED
+>     ARTIFACT — manifest sha moved to 1e3a00f7... with diagnosis_count all-null,
+>     because the warehouse was mid-reload. It failed loudly afterwards
+>     (cumsum on object dtype), but the WRITE had already happened. So the
+>     committed artifact is rewritable by any training run against a transiently
+>     degraded warehouse, and nothing in the write path checks that what it is
+>     about to persist is sane. I caught it only because I hashed before and after.
+>     Restored from git, rebuilt on a healthy warehouse, and both shas came back
+>     bit-identical to the clean build — but a content sanity check before persist
+>     (or a refusal to overwrite when row counts/null rates move) belongs on the
+>     Phase 5 list. Flagging, not fixing: the write path is mine but the guard's
+>     shape is qa's call.
 > TEAM RULE — PIN THE SHA (team-lead, 2026-07-28, after a §3.2 finding was nearly
 > lost to a disagreement neither party could settle). qa-reviewer-p11 filed a
 > correct finding measured on c565ea3; ml-engineer-4 fixed it independently while
@@ -1152,6 +1375,76 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   658 lines, every headline figure machine-checked against a freshly written
   metrics.json; slice metrics by payer/facility/service line for BOTH models, each
   with CI and beats_chance. FIREWALL-POPULATION and README-STALE closed 71cee4b.
+- [x] PRESERVED WIP VERIFIED AND EXTENDED (ml-engineer-5, measured on be25ee7 =
+  4ecc4c5 merged with main 1df3904). ml-engineer-4's four labelled fixes were
+  committed but never run. Ran them against qa's ACTUAL gates (checked
+  feat/phase4-qa's tests/ out over this tree, ran, then removed — they are qa's
+  files and are not in my commit). THREE of the four held; ONE DID NOT.
+  [READ-THEN-DROP]  HELD. sim_appeal_disputed_amount is excluded at
+      APPEAL_TARGET_QUERY, the post-join drop is gone, and `make train-appeal`
+      reproduces every Model C figure to the digit (xgboost 0.5611/0.4914,
+      category_rule 0.5571/0.4793, enr − largest −4.7% [−16.7%, +0.9%], 237
+      deadline-critical claims). The column was inert, which is why nothing caught
+      it — the fix is about the boundary, not the number.
+  [GENERATOR-ANCHOR] HELD. My first call on this was WRONG and is retracted.
+      qa's gate went red on the REMOVAL NOTE ("reconciled $45 against the
+      simulation's own realized cost per denied claim") and I read that as a
+      retraction that repeats what it retracts, so I rewrote the comment to name
+      no figure on either side. qa-reviewer-p12 identified it as a defect in
+      THEIR OWN gate — third formulation, fixed in 20a1ca3 with a foreign-number
+      discriminator — and they are right on the substance: the offence the ruling
+      names is a generator-realized VALUE being readable from this file, $29.88
+      is gone entirely, and $45 is the config's own appeal_processing_cost_usd,
+      so nothing about the generated layer is disclosed. My rewrite ALSO passed
+      their new gate, so this was never about passing: it was about which text is
+      better, and scrubbing an honest record to satisfy a red test is exactly the
+      move team-lead's "recorded rather than scrubbed" preference forbids.
+      REVERTED to ml-engineer-4's wording verbatim. Recorded, not quietly undone,
+      because the lesson is mine: I treated a red gate as proof of a defect in the
+      code it points at. A gate is evidence about the gate as well as the code.
+  [SHAP-BANNER]     PARTIAL. The banner was there and _save_figure is a better
+      answer than qa asked for (single savefig writer ⇒ a new plot carries the
+      banner by construction). But qa's spec named THREE things and two were
+      missing: no title naming the model, and tight_layout instead of
+      bbox_inches="tight". Both added. The AST gate only checks the banner, so it
+      passed on an incomplete fix — a gate is not a spec. PNG inspected, not just
+      asserted: title, full x-axis label, banner all render.
+  [CSV-PROVENANCE]  HELD, with a defect I found by reading the output. The note
+      was written BEFORE the CSVs, and its call-out list was a fixed block, so
+      model_a/README.md warned about `work_queue*.csv` — files that directory does
+      not contain. A provenance note that describes files it does not have is the
+      first thing a reader stops trusting. Both writers now run LAST and build the
+      list from what actually landed. Also removed a stale gitignored
+      work_queue.csv (Jul 27, no remaining writer) and corrected model_c's
+      description, which promised rolling-monthly queues as CSVs when they exist
+      only as a metrics.json summary.
+  MODEL CARD: the +44 lines team-lead flagged as unexamined are accurate against
+  the code. I briefly removed one of them and was WRONG to. The card credits
+  qa-reviewer with an independent 16-fit determinism probe; I searched qa's
+  tests/ and their test_determinism.py, found a different two-fit check, and cut
+  the paragraph as an unpinned secondhand claim. THE PROBE IS REAL AND WAS
+  RECORDED ALL ALONG — qa-reviewer-p11's entry on feat/phase4-qa's tasks.md, 8
+  fits at n_jobs=4 and 8 at n_jobs=1, one score digest 97391a34056d0c3a. I
+  searched the test suite and not the board, which is where this team writes its
+  measurements down. RESTORED, now carrying the digest and the source so the next
+  reader does not have to re-run the search I got wrong.
+  Dropped on restore, deliberately: ml-engineer-4's closing speculation that the
+  diverging run was "likeliest" a different tree mid-development. Cause is ruled
+  UNKNOWN with both hypotheses rejected; naming a likeliest explanation reopens a
+  closed question and contradicts the next paragraph of the same section.
+  EVIDENCE. `make train` and `make train-appeal` end to end on live PG (read-only;
+  9 views / 20,867 claims / 131,077 workflow events / drg_desc 167 verified before
+  and unchanged after). Every Model A headline reproduces: logistic ROC 0.6254 /
+  PR 0.2210 / Brier 0.10280, xgboost − logistic +0.0003 [−0.0173, +0.0183], ECE
+  0.01964 → 0.01753, dollars +17.9% [+4.2%, +51.7%]. 40 of 40 metric-table figures
+  and every narrative figure I could machine-check reproduce to the digit against
+  the freshly written metrics.json. Committed artifacts UNCHANGED across four
+  consecutive rebuilds: parquet d11bd0df5a918d0d, manifest d5c1ca88aa0786f7.
+  qa's gates 49 passed; full non-integration suite 310 passed / 12 skipped with
+  qa's tree overlaid, 264 / 12 on mine alone; ruff clean.
+  NEGATIVE CONTROLS, because a gate never shown to fail proves nothing: a savefig
+  function bypassing _save_figure fails the banner gate; removing model_a/README.md
+  fails the directory gate; both pass on restore.
 - [ ] ACCEPTANCE (qa-reviewer): leakage tests pass, baseline comparison reported
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
