@@ -56,6 +56,27 @@ a skip is what let the original through. A genuine change — a new feature, a
 reloaded warehouse — is made through `--allow-change` / `RCM_ALLOW_MATRIX_CHANGE`,
 which still prints every deviation before proceeding. Overriding is cheap; doing
 it by accident is not possible.
+
+**"Nothing to protect" and "cannot tell" are different answers.** The first
+version of this guard collapsed four conditions into a single `None` — no git,
+the path is outside the repository, `git show` found nothing, and *the committed
+manifest did not parse* — and then read `None` as "there is no good artifact
+here, write away". Three of those really are that. The fourth is the opposite: a
+corrupt manifest at HEAD, or a manifest that stopped being tracked while the
+parquet is still committed, means the artifact this guard exists to protect is
+sitting right there and only the evidence about it is unreadable. Measured by qa
+on both paths: a matrix with `diagnosis_count` entirely null went straight over
+the committed parquet with no exception raised — the exact failure above,
+reached through the guard rather than around it. A guard that disarms when its
+own reference is damaged is worse than no guard, because the artifact still
+looks protected.
+
+So the baseline lookup is now three-valued (`committed_baseline`): ABSENT,
+READABLE, UNREADABLE. Only ABSENT is quiet. UNREADABLE refuses, and says which
+of the two it was. This is nothing more than the rule `manifest_deviations`
+already follows one level down, where a missing `null_rates` block reports
+"NULL RATES NOT COMPARED" instead of passing: **a check that did not run must
+never read like a check that passed.**
 """
 
 from __future__ import annotations
@@ -66,8 +87,9 @@ import os
 import pathlib
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 from sqlalchemy.engine import Engine
@@ -213,24 +235,74 @@ def _repo_root_for(path: pathlib.Path) -> pathlib.Path | None:
     return pathlib.Path(top) if top else None
 
 
-def committed_manifest(
-    path: pathlib.Path = MANIFEST_PATH, repo_root: pathlib.Path | None = None
-) -> dict[str, Any] | None:
-    """The manifest as committed at HEAD, or None if git is not tracking it.
+BaselineState = Literal["absent", "readable", "unreadable"]
 
-    Read with `git show HEAD:<path>` and NOT from the working tree. The working
-    copy is written by the same call that would write a bad matrix, so it is not
-    independent evidence of anything. None means there is no committed artifact
-    to protect, which is a different condition from "the committed artifact
-    agrees" and is reported as such.
+
+@dataclass(frozen=True)
+class CommittedBaseline:
+    """What git can say about the artifact a write is about to land on.
+
+    Three states, and the third is the whole reason this type exists instead of
+    a bare `dict | None`:
+
+    * `absent` — git has never seen this artifact. There is nothing to protect,
+      so the guard stands down. Writes to a `tmp_path` land here.
+    * `readable` — the committed manifest was read from HEAD and `manifest`
+      holds it. The guard compares against it.
+    * `unreadable` — something IS committed here and the baseline could not be
+      read anyway. The guard refuses, because this is the one case where being
+      quiet means overwriting a good artifact while claiming it was protected.
+
+    `reason` is written for the operator who has to act on it, and is carried on
+    all three states so a surprising `absent` can be explained too.
     """
-    root = repo_root or _repo_root_for(path)
-    if root is None:
-        return None  # not inside a git repository at all
+
+    state: BaselineState
+    manifest: dict[str, Any] | None = None
+    reason: str = ""
+
+
+def _tracked_at_head(root: pathlib.Path, path: pathlib.Path) -> bool:
+    """Whether `path` exists in the HEAD commit. False if git cannot say."""
     try:
         relative = path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
-        return None
+        return False
+    try:
+        subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", f"HEAD:{relative}"],
+            capture_output=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return False
+    return True
+
+
+def committed_baseline(
+    path: pathlib.Path = MANIFEST_PATH,
+    artifact_path: pathlib.Path | None = None,
+    repo_root: pathlib.Path | None = None,
+) -> CommittedBaseline:
+    """Look up the manifest at HEAD, distinguishing "absent" from "unreadable".
+
+    Read with `git show HEAD:<path>` and NOT from the working tree. The working
+    copy is written by the same call that would write a bad matrix, so it is not
+    independent evidence of anything.
+
+    When the manifest is not at HEAD, the question of whether there is anything
+    to protect is answered by the ARTIFACT, not by the manifest — the manifest is
+    only the evidence. So an untracked manifest beside a tracked parquet is
+    `unreadable`, not `absent`; that asymmetry is the fix for [GUARD-DISARM].
+    """
+    artifact = artifact_path if artifact_path is not None else path.with_suffix(".parquet")
+    root = repo_root or _repo_root_for(path)
+    if root is None:
+        return CommittedBaseline("absent", reason=f"{path} is not inside a git repository")
+    try:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return CommittedBaseline("absent", reason=f"{path} is outside the git repository at {root}")
     try:
         blob = subprocess.run(
             ["git", "-C", str(root), "show", f"HEAD:{relative}"],
@@ -238,12 +310,49 @@ def committed_manifest(
             text=True,
             check=True,
         ).stdout
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
-        return None
+    except subprocess.CalledProcessError:
+        # git answered, and the answer is that HEAD carries no such file. Whether
+        # that means "nothing to protect" depends on the artifact beside it.
+        if _tracked_at_head(root, artifact):
+            return CommittedBaseline(
+                "unreadable",
+                reason=(
+                    f"{artifact.name} IS committed at HEAD but its manifest "
+                    f"({relative}) is not tracked there, so there is a good artifact "
+                    "to protect and no baseline to check it against"
+                ),
+            )
+        return CommittedBaseline(
+            "absent", reason=f"neither {relative} nor {artifact.name} is committed at HEAD"
+        )
+    except (FileNotFoundError, OSError) as exc:
+        # git itself could not be run, so nothing here can be established —
+        # including whether the artifact is committed.
+        return CommittedBaseline("absent", reason=f"git could not be run ({exc})")
     try:
-        return json.loads(blob)
-    except json.JSONDecodeError:
-        return None
+        return CommittedBaseline("readable", manifest=json.loads(blob))
+    except json.JSONDecodeError as exc:
+        return CommittedBaseline(
+            "unreadable",
+            reason=(
+                f"the manifest committed at HEAD:{relative} does not parse as JSON "
+                f"({exc}), so the artifact it describes cannot be checked"
+            ),
+        )
+
+
+def committed_manifest(
+    path: pathlib.Path = MANIFEST_PATH, repo_root: pathlib.Path | None = None
+) -> dict[str, Any] | None:
+    """The manifest as committed at HEAD, or None if it could not be read.
+
+    A convenience view over `committed_baseline` for callers that only want the
+    content. **None here means "no readable manifest" and NOT "nothing to
+    protect"** — reading it as the latter is precisely the [GUARD-DISARM] defect.
+    Any caller deciding whether to guard must ask `committed_baseline` and branch
+    on `state`.
+    """
+    return committed_baseline(path, repo_root=repo_root).manifest
 
 
 def manifest_deviations(candidate: dict[str, Any], committed: dict[str, Any]) -> list[str]:
@@ -301,15 +410,46 @@ def manifest_deviations(candidate: dict[str, Any], committed: dict[str, Any]) ->
     return problems
 
 
+_OVERRIDE_HINT = (
+    "If the change is intended, say so explicitly — `make features ALLOW_CHANGE=1`, "
+    f"`python -m src.features --allow-change`, or {ALLOW_CHANGE_ENV}=1 — and commit "
+    "the new matrix and manifest together."
+)
+
+
 def _refuse_or_report(candidate: dict[str, Any], path: pathlib.Path, allow_change: bool) -> None:
     """The guard. Raises before anything is written, or explains why it did not."""
-    committed = committed_manifest(path.parent / f"{path.stem}.json")
-    if committed is None:
+    baseline = committed_baseline(path.parent / f"{path.stem}.json", artifact_path=path)
+
+    if baseline.state == "absent":
         # Nothing committed at this path, so there is no good artifact to
         # destroy. Writes to a tmp_path land here, which is why this is quiet.
         return
 
-    problems = manifest_deviations(candidate, committed)
+    if baseline.state == "unreadable":
+        # There IS something committed here and it cannot be checked. Silence
+        # would overwrite a good artifact while looking like a passed check.
+        if allow_change:
+            print(
+                f"OVERRIDE: rewriting {path} with NO baseline check — {baseline.reason}",
+                file=sys.stderr,
+            )
+            return
+        raise ArtifactRewriteRefused(
+            f"REFUSING to overwrite the committed training matrix at {path}.\n"
+            f"The baseline could not be read, so nothing was checked:\n"
+            f"  - {baseline.reason}\n\n"
+            "An unread check is not a passed one. This guard refuses here rather than "
+            "standing down, because standing down when its own reference is damaged is "
+            "how a guard silently stops guarding while the artifact still looks "
+            "protected.\n"
+            "Fix the baseline: restore the manifest at HEAD (`git checkout HEAD -- "
+            f"{path.parent}`), or regenerate it on a tree where the baseline IS readable "
+            "and commit it beside the parquet.\n" + _OVERRIDE_HINT
+        )
+
+    assert baseline.manifest is not None  # narrowed by state == "readable"
+    problems = manifest_deviations(candidate, baseline.manifest)
     if not problems:
         return
 
@@ -328,10 +468,7 @@ def _refuse_or_report(candidate: dict[str, Any], path: pathlib.Path, allow_chang
         "This guard exists because a run against a transiently degraded warehouse once "
         "persisted a matrix with diagnosis_count entirely null over this file, and the "
         "write landed before the run failed. Check the warehouse first: `make "
-        "warehouse-check`, and the view reconciliation.\n"
-        "If the change is intended, say so explicitly — `make features ALLOW_CHANGE=1`, "
-        f"`python -m src.features --allow-change`, or {ALLOW_CHANGE_ENV}=1 — and commit "
-        "the new matrix and manifest together."
+        "warehouse-check`, and the view reconciliation.\n" + _OVERRIDE_HINT
     )
 
 
