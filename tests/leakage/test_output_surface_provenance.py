@@ -83,8 +83,29 @@ _EMITTER_CALLS = (
     "table",
     "data_editor",
     "to_dict",
+    # A pydantic response object serialised by hand. `response_model=` below is the
+    # declarative route; this is the same table reaching the same reader without it.
+    "model_dump",
 )
 _EMITTER_KEYWORDS = ("response_model",)
+
+# `st.write(df)` and `st.json(payload)` render a table as surely as `st.dataframe`
+# does, but `st.write("some prose")` renders prose. Detected by ARGUMENT SHAPE: a
+# lone string literal is text, anything else is data. Registering a text-only page
+# would be a cost with no finding attached, and an exemption list that fills up
+# with such pages is how a real one gets waved through.
+_DATA_IF_NOT_LITERAL = ("write", "json")
+
+# Every FastAPI route is a user-facing emitter by construction: a decorated
+# handler exists to serve its return value to a caller. This is the shape a
+# name-based scan misses entirely — a handler that returns
+# `[{"recoverable_amt": ...}]` calls nothing on the emitter list, declares no
+# `response_model`, and is exactly the Phase 5 API surface the human's
+# instruction names. Measured with the probe below and found uncaught, which is
+# why the rule is decorator-based rather than call-based.
+_ROUTE_DECORATORS = frozenset(
+    {"get", "post", "put", "patch", "delete", "head", "options", "api_route", "websocket"}
+)
 
 
 # --------------------------------------------------------------------------
@@ -304,12 +325,32 @@ def test_the_key_column_is_not_simulated_derived(measured) -> None:
 # --------------------------------------------------------------------------
 
 
+def _is_text_literal(node: ast.expr) -> bool:
+    """A bare string constant, i.e. prose rather than data."""
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+
+def _is_route(node: ast.AST) -> bool:
+    """A FastAPI route handler: `@router.get(...)` / `@app.post(...)` and friends."""
+    if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        return False
+    for decorator in node.decorator_list:
+        call = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if isinstance(call, ast.Attribute) and call.attr in _ROUTE_DECORATORS:
+            return True
+    return False
+
+
 def _emits_a_table(tree: ast.AST) -> bool:
     for node in ast.walk(tree):
+        if _is_route(node):
+            return True
         if isinstance(node, ast.Call):
             func = node.func
             name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
             if name in _EMITTER_CALLS:
+                return True
+            if name in _DATA_IF_NOT_LITERAL and node.args and not _is_text_literal(node.args[0]):
                 return True
             if any(kw.arg in _EMITTER_KEYWORDS for kw in node.keywords):
                 return True
@@ -353,6 +394,78 @@ def test_every_user_facing_emitter_is_registered() -> None:
         "and reports emitted columns that move without carrying a `sim_` marker. If a column "
         "is genuinely process metadata — a rank, a tier, our own recommendation — declare it "
         "in `process_metadata` WITH the reason; do not widen the probe."
+    )
+
+
+_EMITTER_SHAPES = {
+    "streamlit dataframe": "import streamlit as st\ndef page(df):\n    st.dataframe(df)\n",
+    "streamlit table": "import streamlit as st\ndef page(df):\n    st.table(df)\n",
+    "streamlit data_editor": "import streamlit as st\ndef page(df):\n    st.data_editor(df)\n",
+    # st.write with data, which the first version of this detector did not list.
+    "streamlit write of a frame": "import streamlit as st\ndef page(df):\n    st.write(df)\n",
+    "download button csv": "import streamlit as st\ndef page(df):\n    st.download_button('x', df.to_csv())\n",
+    # THE HOLE THIS TEST WAS ADDED FOR. Measured 2026-07-29 against the detector
+    # inherited from 962e0eb: a route handler returning rows was NOT reported.
+    # It calls nothing on the emitter list and declares no response_model, so the
+    # only evidence it is a user-facing surface is the decorator.
+    "fastapi route returning rows": (
+        "from fastapi import APIRouter\n"
+        "router = APIRouter()\n"
+        "@router.get('/queue')\n"
+        "def queue():\n"
+        "    return [{'recoverable_amt': 1.0}]\n"
+    ),
+    "fastapi async route": (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.post('/score')\n"
+        "async def score():\n"
+        "    return {'sim_p_overturn': 0.5}\n"
+    ),
+    "declared response model": (
+        "from fastapi import APIRouter\n"
+        "router = APIRouter()\n"
+        "def register(model):\n"
+        "    router.add_api_route('/x', lambda: None, response_model=model)\n"
+    ),
+    "pydantic model_dump": "def payload(row):\n    return row.model_dump()\n",
+    "frame to_dict": "def payload(df):\n    return df.to_dict(orient='records')\n",
+}
+
+_NON_EMITTER_SHAPES = {
+    "prose only": "import streamlit as st\ndef page():\n    st.write('Synthetic data. No real claims.')\n",
+    "a scalar metric": "import streamlit as st\ndef page(n):\n    st.metric('Claims', n)\n",
+    "plain helper": "def clamp(x):\n    return max(0.0, min(1.0, x))\n",
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_EMITTER_SHAPES))
+def test_the_emitter_detector_sees_each_user_facing_shape(shape: str) -> None:
+    """Positive control on the DETECTOR, not on the repo.
+
+    `test_every_user_facing_emitter_is_registered` is green on a tree with no
+    dashboard and no API, and that green says nothing about whether the detector
+    can see anything at all. It could not see a FastAPI route until 2026-07-29 —
+    the gate was reporting a clean Phase 5 boundary while being blind to half of
+    it. These are the shapes it must not go blind to again.
+    """
+    assert _emits_a_table(ast.parse(_EMITTER_SHAPES[shape])), (
+        f"the emitter detector does not recognise `{shape}` as a user-facing surface, so a "
+        "Phase 5 module written this way would never be registered and its columns would "
+        "never be probed for simulated provenance"
+    )
+
+
+@pytest.mark.parametrize("shape", sorted(_NON_EMITTER_SHAPES))
+def test_the_emitter_detector_leaves_non_tables_alone(shape: str) -> None:
+    """Negative control. A detector that flags everything gets its list widened.
+
+    The failure mode is indirect but real: over-firing forces text-only pages
+    into the registry, the registry fills with entries nobody can write a
+    meaningful probe for, and the next genuine finding is waved through with them.
+    """
+    assert not _emits_a_table(ast.parse(_NON_EMITTER_SHAPES[shape])), (
+        f"`{shape}` puts no table in front of a user but the detector reports one"
     )
 
 
