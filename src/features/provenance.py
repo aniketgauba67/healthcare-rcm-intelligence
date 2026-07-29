@@ -59,6 +59,38 @@ Classification = Literal["SOURCE", "DERIVED", "REFERENCE", "SIMULATED"]
 
 SIMULATED_MARKER = "sim_"
 
+
+def names_simulated(name: str) -> bool:
+    """Whether a column name carries the `sim_` marker. **The only such test here.**
+
+    One predicate, used by every rule in this module, because the two that used
+    to exist disagreed and the disagreement was the hole. `carries_marker` asked
+    `"sim_" in name` — so `log_sim_denied_amount` counted as marked — while the
+    lineage walk asked `name.startswith("sim_")`, so the same name was invisible
+    to it. A column declared as `amount_in_dispute <- log_sim_denied_amount`
+    therefore had EMPTY simulated lineage, needed no marker, and published an
+    unmarked simulated dollar figure with rule 3 silent; the identical column
+    sourced from `sim_denied_amount` was correctly refused. Measured, not
+    reasoned: `assert_schema_is_marked` passed the first and raised on the second.
+
+    That is the matcher-expressiveness defect in its general form — two matchers
+    for one concept, differing in reach, and the protection stops exactly in the
+    gap between them. The same shape as a glob on the leakage blacklist, which
+    the tests expand and the runtime guard does not.
+
+    Substring is the direction that closes rather than opens: recognising MORE
+    names as simulated makes rule 3 fire more often, and a false positive costs a
+    `marker_exempt` sentence while a false negative ships a simulated dollar
+    figure under a clean name. `sim_` (with the underscore) does not appear in
+    ordinary words — `simulation` and `similar` do not match.
+
+    Position is deliberately NOT tested here. §3.2 is about the marker's ABSENCE,
+    not its placement; the stricter prefix-only rule lives at the feature layer in
+    `tests/features/test_feature_marker_position.py`.
+    """
+    return SIMULATED_MARKER in name
+
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # Directories whose contents are PUBLISHED — read by a person or served to one.
@@ -96,12 +128,12 @@ class ColumnProvenance:
     def directly_simulated(self) -> bool:
         """Simulated by its own class, or reading a `sim_` column at one hop."""
         return self.classification == "SIMULATED" or any(
-            source.startswith(SIMULATED_MARKER) for source in self.sources
+            names_simulated(source) for source in self.sources
         )
 
     @property
     def carries_marker(self) -> bool:
-        return SIMULATED_MARKER in self.name
+        return names_simulated(self.name)
 
     def __post_init__(self) -> None:
         if self.marker_exempt and self.carries_marker:
@@ -157,7 +189,7 @@ class PublishedSchema:
             # A source that is not declared here is a warehouse column, and its
             # own name is then the only evidence available.
             declared = next((c for c in self.columns if c.name == current), None)
-            simulated = current.startswith(SIMULATED_MARKER) or (
+            simulated = names_simulated(current) or (
                 declared is not None and declared.classification == "SIMULATED"
             )
             if simulated:
