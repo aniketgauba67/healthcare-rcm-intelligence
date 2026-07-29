@@ -44,6 +44,20 @@ TIMELY_FILING. The model therefore estimates P(overturn | appealed) and is
 applied to claims nobody chose to appeal. That is a real and unfixable
 limitation of observational appeal data — it is stated in the model card rather
 than papered over, and `appeal_selection_summary` below produces the numbers.
+
+**Naming: the `sim_` marker LEADS on every feature here.** `sim_log_denied_amount`
+was `log_sim_denied_amount` until Phase 5 — the marker present but infixed, which
+satisfies the property §3.2 protects (a reader can see the value is generated)
+while not satisfying §3.2 as written. It was ruled a naming preference twice while
+its measured exposure was zero. The rename is not a change of mind about that
+reasoning; the exposure argument is what changed. It was the LAST such name in
+either feature set, so prefixing it turns "a marker somewhere, plus a written
+exception" into a rule with no exceptions, one that `tests/features/
+test_feature_marker_position.py` can state literally. An exception is only free
+while someone remembers it, and Phase 5 multiplies the surfaces that would have
+to. The `log_<base>` reading is not lost: the base column `sim_denied_amount` is
+still legible, and the queue columns renamed alongside it (`sim_recoverable_amt`,
+`sim_expected_net_recovery`) put the marker first for the same reason.
 """
 
 from __future__ import annotations
@@ -92,7 +106,7 @@ def _spec_list() -> tuple[FeatureSpec, ...]:
     specs.extend(
         [
             FeatureSpec(
-                name="log_sim_denied_amount",
+                name="sim_log_denied_amount",
                 kind="numeric",
                 description="log1p of the denied dollars — the amount in dispute. Heavy-tailed "
                 "(median $395, max $306k), so the linear model needs the compressed scale.",
@@ -187,7 +201,7 @@ def _engineer(frame: pd.DataFrame, config: dict) -> pd.DataFrame:
         out[column] = pd.to_datetime(out[column])
 
     billed = out["billed_charge_amt"].astype(float).replace(0, np.nan)
-    out["log_sim_denied_amount"] = np.log1p(out["sim_denied_amount"].astype(float))
+    out["sim_log_denied_amount"] = np.log1p(out["sim_denied_amount"].astype(float))
     out["sim_denied_share_of_billed"] = out["sim_denied_amount"].astype(float) / billed
     out["sim_allowed_share_of_billed"] = out["sim_allowed_amount"].astype(float) / billed
     out["sim_denial_review_lag_days"] = (

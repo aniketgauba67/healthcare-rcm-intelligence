@@ -288,8 +288,8 @@ dropped before any estimator sees the matrix:*
 | `sim_denial_flag` | SIMULATED | the label. On `forbidden_features`; never a feature |
 | `split` | DERIVED | `train`/`test`, from `sim_submission_date` against the `split.cut` in `config/model.yaml` |
 
-Two naming decisions in that last table are deliberate and are recorded here
-rather than left to be re-derived:
+Three naming decisions here are deliberate and are recorded rather than left to
+be re-derived:
 
 - **`sim_overall_prior_denial_rate` carries the prefix** (renamed from
   `overall_prior_denial_rate`, 2026-07-28). It is computed entirely from
@@ -298,11 +298,34 @@ rather than left to be re-derived:
   would read to an outsider as a real Medicare book denial rate. Its Model C
   counterpart `sim_overall_prior_overturn_rate` was renamed with it.
 - **`split` does not carry the prefix, and is the one column here whose name
-  does not follow its input.** It is a modelling fold label, not a fact about a
-  claim, and its name is fixed by the §4.1 leakage guard's discovery contract —
-  the guard reads the first of `{is_train, split, fold}` it finds, so renaming it
-  would blind the guard's temporal check. Classified DERIVED, with its input date
-  SIMULATED, and flagged here rather than silently prefixed or silently left.
+  does not follow its input.** It is a fold assignment — metadata about OUR
+  EXPERIMENT, not an attribute of a claim and not a statement about the simulated
+  world. §3.2 governs simulated values; a partition label is not one. Classified
+  DERIVED, with its input date SIMULATED, and flagged here rather than silently
+  prefixed or silently left.
+  This page previously justified it differently — that the §4.1 guard discovers
+  the column by name from `{is_train, split, fold}`, so a rename would blind the
+  temporal check. QA ruling C (2026-07-28) upheld the outcome and **rejected that
+  reasoning**, and the correction is recorded rather than swapped in silently: a
+  guard must never be the reason a correctness-improving rename cannot happen,
+  because that turns the safety net into a constraint on the code it protects.
+  The general form "we cannot rename X because a guard looks for it by name" must
+  always lose. Name-based discovery is tracked separately as `[SPLIT-DISCOVERY]`.
+- **`sim_log_denied_amount` (Model C) leads with the marker** (renamed from
+  `log_sim_denied_amount`, 2026-07-29). It is `log1p(sim_denied_amount)`, so §3.2
+  makes it a simulated column. The marker was present but INFIXED, which satisfies
+  the property §3.2 protects — nobody reads `log_sim_denied_amount` as a real
+  Medicare quantity — and it was twice ruled a naming preference on a MEASURED
+  exposure of zero. That measurement still held at the rename: Model C's frame is
+  not committed, `models_artifacts/` is gitignored, Model C publishes no SHAP, and
+  no work-queue or slice column carries the name. It was renamed anyway because it
+  was the last infixed name in either feature set, so the cost was one feature and
+  the gain is a rule with no exception list — `tests/features/
+  test_feature_marker_position.py` now states §3.2 literally at the feature layer.
+  Phase 5 adds a dashboard, an API and a demo extract, and an exception holds only
+  while every future author remembers it. Model C's frame is not a curated table
+  and appears in no table on this page or in `docs/data_dictionary.md`, which is
+  why this rename adds a note here and no row anywhere.
 
 ### Why it is committed, and how staleness is caught
 
