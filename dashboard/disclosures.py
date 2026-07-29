@@ -95,7 +95,7 @@ VINTAGE_SKEW = (
 # ---------------------------------------------------------------------------
 
 CROSSWALK_COLLISION_TITLE = (
-    "Real facility names are display-only, and up to eight synthetic providers share one"
+    "Real facility names are display-only, and grouping on the NAME collides 15:1"
 )
 
 CROSSWALK_COLLISION = (
@@ -105,16 +105,29 @@ CROSSWALK_COLLISION = (
     "random assignment, stratified by state and type, done purely so the app shows "
     "recognisable names instead of opaque codes. That crosswalk maps **4,876** "
     "synthetic billing providers onto only **2,857** real CCNs: 45.9% of those "
-    "CCNs carry more than one synthetic provider, and the worst case is **8:1**. A "
-    "single real facility name here therefore stands for up to eight different "
-    "synthetic hospitals. A real CCN is consequently not a stable entity key and "
-    "is never used as one — every facility-level and provider-level figure in this "
-    "app is grouped on the synthetic `prvdr_num`, never on `sim_facility_ccn` or "
-    "`sim_facility_name`, because grouping on the CCN would silently merge up to "
-    "eight distinct synthetic hospitals into one row and inflate its volume. The "
-    "crosswalk is also **forbidden as a feature** in every model at every "
-    "boundary, Model A and Model C alike: it carries no information about the "
-    "claim, only a name."
+    "CCNs carry more than one synthetic provider, and the worst case is **8:1**. "
+    "**Grouping on the facility NAME is worse still, and the name is what a "
+    "dashboard is most likely to group on**, being the human-readable key: real "
+    "CMS facilities share names across sites, so those 2,857 CCNs carry only "
+    "**2,816 distinct display names**, 1,302 of which stand for more than one "
+    "synthetic provider, and the worst case by name is **15:1** rather than 8:1. A "
+    "real CCN and a real facility name are consequently not stable entity keys and "
+    "are never used as one — every facility-level and provider-level figure in this "
+    "app is grouped on the synthetic `prvdr_num`, never on `sim_facility_ccn` and "
+    "never on `sim_facility_name`, because grouping on either would silently merge "
+    "up to eight (by CCN) or fifteen (by name) distinct synthetic hospitals into "
+    "one row and inflate its volume. The crosswalk is also **forbidden as a "
+    "feature** in every model at every boundary, Model A and Model C alike: it "
+    "carries no information about the claim, only a name."
+)
+
+#: 4,877 vs 4,876 is not a typo and is asked about every time. Said once, here.
+CROSSWALK_ROW_COUNT_NOTE = (
+    "`vw_clean_claim_performance` has **4,877** rows while the crosswalk has "
+    "**4,876** entries. Both figures are right: one synthetic billing provider has "
+    "no crosswalk row and therefore no display name, and the view keeps it because "
+    "dropping a provider from a provider-level view to make two numbers agree "
+    "would be the wrong repair."
 )
 
 # ---------------------------------------------------------------------------
@@ -246,6 +259,7 @@ __all__ = [
     "BANNER_SHORT",
     "CROSSWALK_COLLISION",
     "CROSSWALK_COLLISION_TITLE",
+    "CROSSWALK_ROW_COUNT_NOTE",
     "DEMO_EXTRACT_NOTE",
     "DOLLARS_AT_RISK",
     "MODEL_A_EXPLANATION_LIMIT",

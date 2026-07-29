@@ -74,6 +74,7 @@ MODEL_CARD_ROC_UNCALIBRATED = 0.6254
 MODEL_CARD_ROC_CALIBRATED = 0.6185
 _ROC_TOLERANCE = 5e-5
 
+
 class BuildError(RuntimeError):
     """A build that cannot produce an honest bundle stops, loudly."""
 
@@ -530,9 +531,17 @@ def write_provenance_note(output: pathlib.Path, manifest: pd.DataFrame) -> pathl
         "Medicare fee-for-service has exactly ONE payer; the five payer archetypes in",
         "`vw_payer_performance` are invented and are named after no real insurer. Real facility",
         "names reached this bundle through a seeded random crosswalk and are display-only —",
-        "4,876 synthetic providers map onto 2,857 real CCNs, worst case 8:1, so a real CCN is",
-        "not a stable entity key and every provider figure is grouped on the synthetic",
-        "`prvdr_num`.",
+        "4,876 synthetic providers map onto 2,857 real CCNs (worst case 8:1) and onto only",
+        "2,816 distinct display names (worst case 15:1, because real CMS facilities share names",
+        "across sites). Neither a CCN nor a facility name is a stable entity key here, and every",
+        "provider figure is grouped on the synthetic `prvdr_num`.",
+        "",
+        "The reference files are also NOT contemporaneous with the claims. The claims are",
+        "vintage 2023-04 and their code sets match (ICD-10-CM/PCS FY2023, HCPCS 2023, MS-DRG v40",
+        "FY2023), but Hospital General Information is vintage 2026-04 and the Medicare Physician",
+        "& Other Practitioners file is data year 2024 — roughly three years newer. Facility type,",
+        "facility state and provider specialty are therefore what the reference file recorded",
+        "about three years AFTER the claim was filed.",
         "",
         f"Built from commit `{stamp['git_commit']}`"
         + (" (tree dirty)" if stamp["git_tree_dirty"] else "")
