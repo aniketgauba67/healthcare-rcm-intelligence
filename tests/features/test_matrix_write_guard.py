@@ -173,6 +173,80 @@ def test_no_committed_baseline_means_no_guard(tmp_path: pathlib.Path, matrix) ->
     assert committed_manifest(path.parent / "model_a_training_matrix.json") is None
 
 
+# --- the guard must not disarm itself -------------------------------------
+#
+# QA-ADDED 2026-07-29 (qa-reviewer-p16), gating bfea020. RED at the time of
+# writing; the fix is ml's, in src/features/store.py.
+#
+# `committed_manifest` collapses four different conditions to None — no git, path
+# outside the repo, `git show` failed, and MANIFEST DID NOT PARSE — and
+# `_refuse_or_report` treats None as "nothing to protect" and returns quietly.
+# Three of those really are "nothing to protect". The fourth is not: a committed
+# manifest that does not parse, or a manifest that stopped being tracked while the
+# PARQUET is still committed, means there IS a good artifact at HEAD and the guard
+# cannot read its baseline. It then writes the degraded matrix over it in silence.
+#
+# That is this module's own stated principle turned on itself. `manifest_deviations`
+# already refuses to pass over a missing `null_rates` block — it reports
+# "NULL RATES NOT COMPARED" — for exactly the reason that a check which did not run
+# must not read like a check that passed. One level up, the same omission is silent.
+#
+# Measured, not reasoned: both cases below were reproduced writing a matrix with
+# `diagnosis_count` entirely null over a committed parquet, and in both the parquet
+# bytes changed with no exception raised.
+
+
+def test_an_unparseable_committed_manifest_does_not_disarm_the_guard(
+    scratch_repo: pathlib.Path, matrix
+) -> None:
+    """A committed manifest that does not parse is an unreadable baseline, not an absent one.
+
+    The artifact at HEAD is real and good; only the evidence about it is
+    unreadable. Writing over it silently is the one outcome this guard exists to
+    prevent, and it is reachable by a truncated write or a botched conflict
+    resolution — neither exotic.
+    """
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    manifest = parquet.parent / "model_a_training_matrix.json"
+    manifest.write_text("{ not json\n")
+    _git(scratch_repo, "add", "-A")
+    _git(scratch_repo, "commit", "--quiet", "-m", "corrupt the manifest")
+
+    before = parquet.read_bytes()
+    degraded = matrix.copy()
+    degraded["diagnosis_count"] = pd.NA
+    with pytest.raises(ArtifactRewriteRefused):
+        _persist_into(scratch_repo, degraded)
+    assert parquet.read_bytes() == before, (
+        "the committed parquet was overwritten while the guard could not read its baseline"
+    )
+
+
+def test_an_untracked_manifest_beside_a_tracked_parquet_does_not_disarm_the_guard(
+    scratch_repo: pathlib.Path, matrix
+) -> None:
+    """The guard tests for the MANIFEST at HEAD; the thing it protects is the PARQUET.
+
+    Untrack the manifest and the parquet is still committed — there is still a good
+    artifact to protect — but the guard reads None and returns quietly. Whether the
+    right answer is to refuse or to say loudly that it could not check is ml's call;
+    writing in silence is not one of the options.
+    """
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    manifest = parquet.parent / "model_a_training_matrix.json"
+    _git(scratch_repo, "rm", "--quiet", "--cached", str(manifest.relative_to(scratch_repo)))
+    _git(scratch_repo, "commit", "--quiet", "-m", "untrack the manifest")
+
+    before = parquet.read_bytes()
+    degraded = matrix.copy()
+    degraded["diagnosis_count"] = pd.NA
+    with pytest.raises(ArtifactRewriteRefused):
+        _persist_into(scratch_repo, degraded)
+    assert parquet.read_bytes() == before, (
+        "the committed parquet was overwritten while the guard had no readable baseline"
+    )
+
+
 # --- the override is deliberate and loud ----------------------------------
 
 
