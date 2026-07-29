@@ -74,17 +74,6 @@ MODEL_CARD_ROC_UNCALIBRATED = 0.6254
 MODEL_CARD_ROC_CALIBRATED = 0.6185
 _ROC_TOLERANCE = 5e-5
 
-#: Value columns Model C's queue must carry a `sim_` marker on (commit f0a1e12).
-#: The pre-rename spellings are named explicitly so the error can say what to do.
-_QUEUE_RENAMES = {
-    "p_overturn": "sim_p_overturn",
-    "recoverable_amt": "sim_recoverable_amt",
-    "expected_recovery_amt": "sim_expected_recovery_amt",
-    "expected_net_recovery": "sim_expected_net_recovery",
-    "days_to_deadline": "sim_days_to_deadline",
-}
-
-
 class BuildError(RuntimeError):
     """A build that cannot produce an honest bundle stops, loudly."""
 
@@ -352,18 +341,16 @@ def _model_a_explanations(
 
 
 def _check_queue_columns(columns: list[str], path: pathlib.Path) -> None:
-    stripped = sorted(set(columns) & set(_QUEUE_RENAMES))
+    stripped = spec.stripped_marker_columns(columns)
     if stripped:
         raise BuildError(
-            f"{path.relative_to(REPO_ROOT)} carries pre-rename column names {stripped}. These "
-            "are SIMULATED quantities with the `sim_` provenance marker stripped, which is the "
-            "[QUEUE-PREFIX] defect the human directed be fixed — and a demo bundle is the one "
-            "surface where a reader sees the column header and nothing else (CLAUDE.md §3.2). "
-            "The rename landed in src/models/work_queue.py at commit f0a1e12; regenerate the "
-            "artifacts with `make train-appeal` on a tree that includes it. Expected: "
-            + ", ".join(f"{old} -> {new}" for old, new in sorted(_QUEUE_RENAMES.items()))
-            + ". This build will not rename them for you: coercing the header here would leave "
-            "the CSVs on disk still wrong and hide that fact."
+            f"{path.relative_to(REPO_ROOT)} carries pre-rename column names {stripped}. "
+            + spec.QUEUE_RENAME_ADVICE
+            + " Expected: "
+            + ", ".join(
+                f"{old} -> {new}" for old, new in sorted(spec.QUEUE_SIM_MARKER_RENAMES.items())
+            )
+            + "."
         )
 
 

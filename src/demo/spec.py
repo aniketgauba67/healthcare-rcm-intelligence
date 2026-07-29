@@ -22,6 +22,7 @@ spellings would call that table clean.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 Provenance = str  # one of SOURCE / DERIVED / REFERENCE / SIMULATED / MIXED
@@ -301,6 +302,35 @@ def dataset(name: str) -> Dataset:
             f"{sorted(DATASETS_BY_NAME)}. Add it to src/demo/spec.py with its "
             "provenance classification before the build step will write it."
         ) from None
+
+
+#: The work-queue value columns that must carry the `sim_` marker, and the
+#: pre-rename spellings they used to have. [QUEUE-PREFIX], closed in
+#: `src/models/work_queue.py` at commit f0a1e12 under a direct human instruction.
+#: Named here, in one place, because two surfaces have to agree about it: the
+#: demo build refuses artifacts whose headers still carry the stripped names, and
+#: the API refuses to serve a queue built by a pre-rename `build_work_queue`.
+QUEUE_SIM_MARKER_RENAMES: dict[str, str] = {
+    "p_overturn": "sim_p_overturn",
+    "recoverable_amt": "sim_recoverable_amt",
+    "expected_recovery_amt": "sim_expected_recovery_amt",
+    "expected_net_recovery": "sim_expected_net_recovery",
+    "days_to_deadline": "sim_days_to_deadline",
+}
+
+QUEUE_RENAME_ADVICE = (
+    "These are SIMULATED quantities with the `sim_` provenance marker stripped, which is "
+    "the [QUEUE-PREFIX] defect the human directed be fixed (CLAUDE.md §3.2) — and the "
+    "column header is all a reader of a worklist sees. The rename landed in "
+    "src/models/work_queue.py at commit f0a1e12; this tree predates it. Merge that commit "
+    "and regenerate with `make train-appeal`. Nothing here renames the columns for you: "
+    "coercing the header at the boundary would leave the source still wrong and hide it."
+)
+
+
+def stripped_marker_columns(columns: Iterable[str]) -> list[str]:
+    """Any work-queue column still carrying a pre-rename, unmarked spelling."""
+    return sorted(set(columns) & set(QUEUE_SIM_MARKER_RENAMES))
 
 
 def simulated_columns(columns: list[str]) -> list[str]:
