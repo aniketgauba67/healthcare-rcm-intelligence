@@ -33,6 +33,7 @@ from dashboard.components import (
     percent,
     provenance_note,
     render_page_header,
+    render_synthetic_data_banner,
     required_disclosures,
 )
 
@@ -40,6 +41,7 @@ render_page_header(
     "Executive overview",
     "Book-level revenue-cycle KPIs, 2015-03 through 2024-06.",
 )
+render_synthetic_data_banner()
 data_source_caption()
 
 try:

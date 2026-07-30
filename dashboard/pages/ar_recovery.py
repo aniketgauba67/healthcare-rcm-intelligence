@@ -37,14 +37,18 @@ from dashboard.components import (
     percent,
     provenance_note,
     render_page_header,
+    render_synthetic_data_banner,
     required_disclosures,
 )
 
 render_page_header(
     "A/R & recovery",
     "Aging of simulated open receivables, payer performance, and appeal recovery.",
-    banner_extra=disclosures.PAYER_DIMENSION_NOTE,
 )
+# §3.5 makes the payer note part of THIS page's banner rather than a separate block
+# beside it: Medicare FFS has one payer, so a reader who takes the payer comparison
+# and leaves the caveat behind has taken the one thing this page cannot survive.
+render_synthetic_data_banner(extra=disclosures.PAYER_DIMENSION_NOTE)
 data_source_caption()
 
 try:

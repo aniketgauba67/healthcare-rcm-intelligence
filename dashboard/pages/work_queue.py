@@ -44,6 +44,7 @@ from dashboard.components import (
     money,
     provenance_note,
     render_page_header,
+    render_synthetic_data_banner,
     required_disclosures,
 )
 from src.api.tables import build_heuristic_queue_table
@@ -61,8 +62,10 @@ MEMBERSHIP_WARNING = (
 render_page_header(
     "Predictive work queue",
     "Recovery worklist (Model C), prevention worklist (Model A), and what each one knows.",
-    banner_extra=MEMBERSHIP_WARNING,
 )
+# The membership warning rides INSIDE the banner, not beside it. It is the one thing
+# on this page a reader must not be able to scroll past: the selection is the label.
+render_synthetic_data_banner(extra=MEMBERSHIP_WARNING)
 data_source_caption()
 
 role = st.session_state.get("role", "Executive")
