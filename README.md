@@ -1,9 +1,10 @@
 # Healthcare RCM Intelligence Platform
 
 > **Status:** Phases 1–4 of 5 are complete and QA-accepted. Phase 5's
-> API/dashboard/demo integration is in active QA; clean-clone Docker packaging,
-> screenshots and demo instructions, clean-SHA bundle regeneration, and final
-> Phase 5 acceptance remain open.
+> API/dashboard/demo integration is in active QA. Clean-clone Docker packaging
+> is implemented and awaiting independent QA; screenshots, demo walkthrough
+> instructions, clean-SHA bundle regeneration, and final Phase 5 acceptance
+> remain open.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
@@ -77,12 +78,13 @@ Implemented and currently under QA:
 - DuckDB demo bundle, generated from a dirty tree and not a final release artifact
 - Provenance and simulated-data disclosure protections
 - Dashboard reconciliation reporting
+- Clean-clone Docker Compose stack, pending independent QA
 
 Still required before Phase 5 acceptance:
 
-- Clean-clone Docker startup
+- Independent QA acceptance of the clean-clone Docker startup
 - Screenshots
-- Demo script and instructions
+- Demo walkthrough script and instructions
 - Hosted deployment evidence
 - Final clean-SHA DuckDB bundle regeneration
 - Final Phase 5 QA acceptance
@@ -266,7 +268,68 @@ Configured dependencies are not presented as completed product features until th
 └── pyproject.toml          # Python dependencies and tooling configuration
 ```
 
-## Local setup
+## Docker demo
+
+### Prerequisites
+
+- Docker Engine with Docker Compose v2
+- Enough local memory and disk for the Python application image
+
+No host Python, PostgreSQL, `.venv`, or `.env` is required. From a fresh clone:
+
+```bash
+docker compose up --build
+```
+
+Compose builds one reproducible Python 3.11 image and starts:
+
+| Service | URL | Ready when |
+|---|---|---|
+| PostgreSQL 16 | `localhost:5432` | the empty `rcm` warehouse schema and published views exist and `pg_isready` succeeds |
+| FastAPI | <http://localhost:8000> | PostgreSQL is reachable and `/health` reports the bundled data source ready |
+| Streamlit | <http://localhost:8501> | PostgreSQL, FastAPI, and Streamlit health probes all pass |
+
+OpenAPI is available at <http://localhost:8000/docs> and as JSON at
+<http://localhost:8000/openapi.json>.
+
+The containerized API and dashboard deliberately use the committed DuckDB demo
+bundle (`RCM_DATA_SOURCE=bundle`). PostgreSQL is still a required, health-checked
+service. Its existing DDL and published views initialize deterministically on the
+first volume start, but the clean-clone path does not pretend that the empty
+container database is a loaded warehouse. The PostgreSQL-mode reconciliation
+therefore reports unavailable model inputs instead of claiming success. To
+exercise the optional live-warehouse backend, load it using the supported
+developer workflow below and explicitly set `RCM_DATA_SOURCE=postgres`.
+
+The Compose credentials are non-secret local-demo defaults. Optional overrides
+can be supplied in the shell or an untracked `.env` file:
+
+| Variable | Default |
+|---|---|
+| `POSTGRES_USER` | `rcm` |
+| `POSTGRES_PASSWORD` | `rcm_demo_only` |
+| `POSTGRES_DB` | `rcm_warehouse` |
+| `RCM_POSTGRES_PORT` | `5432` |
+| `RCM_API_PORT` | `8000` |
+| `RCM_DASHBOARD_PORT` | `8501` |
+
+Stop the stack without deleting its database volume:
+
+```bash
+docker compose down
+```
+
+For a destructive local reset, including the named PostgreSQL volume:
+
+```bash
+docker compose down -v
+```
+
+This is local demo packaging, not hosted deployment evidence or final Phase 5
+acceptance. The committed DuckDB bundle was generated from a dirty tree and
+remains non-final until it is regenerated from the final clean integration SHA.
+
+## Full warehouse developer setup
 
 ### Prerequisites
 
@@ -292,10 +355,10 @@ make setup
 
 Create a local `.env` file using the repository’s environment template when available. Secrets and local database credentials must not be committed.
 
-### 4. Start PostgreSQL
+### 4. Start PostgreSQL only
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
 ### 5. Download and stage source data
