@@ -248,6 +248,86 @@ def test_an_untracked_manifest_beside_a_tracked_parquet_does_not_disarm_the_guar
     )
 
 
+def test_git_being_unrunnable_does_not_disarm_the_guard(
+    monkeypatch: pytest.MonkeyPatch, scratch_repo: pathlib.Path, matrix
+) -> None:
+    """RED (qa-reviewer-p17, 2026-07-29). THE THIRD DOOR into the same failure.
+
+    9bcc14e split the baseline lookup into absent / readable / unreadable and
+    closed two of the four collapsed conditions. The remaining two still answer
+    `absent`: `git could not be run`, and `_repo_root_for` returning None, which
+    is the same condition seen one function earlier. The reason given is that in
+    that state "nothing can be established, including whether the artifact is
+    committed" — but that is precisely `unreadable`, and the module's own rule
+    says a check that did not run must never read like a check that passed.
+
+    MEASURED, end to end, in a scratch repo with a committed matrix:
+
+        git unrunnable -> baseline `absent` -> guard returns quietly ->
+        a matrix with `diagnosis_count` 100% null written straight over the
+        committed parquet, 1,469,982 bytes -> 1,456,629, NO exception.
+
+    Identical damage to the two cases already fixed, through a door that is not
+    exotic: Phase 5 ships `docker compose up`, and a slim Python image has no git
+    binary. Any `make features` / `make train` in such a container runs with this
+    guard silently off.
+
+    The evidence needed is available WITHOUT git: the artifact is sitting at the
+    guarded path on disk. Comparing against the manifest BESIDE it would be wrong
+    — that is the self-repairing check the shape ruling forbids — so the answer is
+    not to compare, it is to refuse: something is there and nothing about it can
+    be verified. `--allow-change` remains the way through, as it already is for
+    the other unreadable cases, and a first write (no artifact yet, `tmp_path`)
+    still sees no file and stays quiet.
+    """
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    before = parquet.read_bytes()
+    degraded = matrix.copy()
+    degraded["diagnosis_count"] = pd.NA
+
+    real_run = subprocess.run
+
+    def git_is_missing(command, *args, **kwargs):
+        if command and str(command[0]) == "git":
+            raise FileNotFoundError(2, "No such file or directory: 'git'")
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", git_is_missing)
+
+    with pytest.raises(ArtifactRewriteRefused):
+        _persist_into(scratch_repo, degraded)
+    assert parquet.read_bytes() == before, (
+        "the committed parquet was overwritten because git could not be run. Standing down "
+        "when the guard cannot consult its own reference is the [GUARD-DISARM] shape, and "
+        "this is the third path into it."
+    )
+
+
+def test_a_first_write_is_still_quiet_without_git(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path, matrix
+) -> None:
+    """Control for the test above: refusing must not swallow the legitimate case.
+
+    With no artifact at the target path there is nothing to protect, whether or
+    not git can be run, and the write must go through in silence. A fix for
+    [GUARD-DISARM]-3 that refuses here would make every fresh build require an
+    override, and an override that becomes routine protects nothing.
+    """
+    real_run = subprocess.run
+
+    def git_is_missing(command, *args, **kwargs):
+        if command and str(command[0]) == "git":
+            raise FileNotFoundError(2, "No such file or directory: 'git'")
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", git_is_missing)
+
+    path = tmp_path / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    path.parent.mkdir(parents=True)
+    persist_training_matrix(matrix, path=path)
+    assert path.exists()
+
+
 # --- the override is deliberate and loud ----------------------------------
 
 
