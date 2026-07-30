@@ -2048,6 +2048,178 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> CRASH #9 2026-07-30 02:23-03:20Z: app-engineer-3 and qa-reviewer-p18 hit the cap.
+> ml-engineer-9 survived (idle). PRESERVED: 0fb7eb2 on feat/phase5-app — 210 lines
+> of §3.3 registration for the 8 MB demo bundle across provenance_register and
+> data_dictionary, unverified. Re-spawned app-engineer-4 and qa-reviewer-p19.
+> QA ROUND 3 (qa-reviewer-p18, 521f93b) — the dashboard RAN for the first time.
+> **MEASURED ON A STALE APP TREE: 5a88d6b, my preservation commit, three commits
+> behind app's tip 17dd780.** Team-lead verified `banner_extra` is now absent from
+> all five pages, so [DASHBOARD-BLANK] is very likely already fixed. Everything
+> below must be RE-MEASURED against the current tip before being treated as open.
+> This is the SEVENTH time the stale-tree trap has bitten on this project and it is
+> now the dominant failure mode of the review loop, not a series of slips.
+>   [DASHBOARD-BLANK] all 5 pages called render_page_header(..., banner_extra=...)
+>     while components.py:83 takes (title, subtitle); ar_recovery and work_queue
+>     raised TypeError on their FIRST rendering statement and produced ZERO blocks.
+>     An interrupted refactor — components.py's docstring documents removing the
+>     banner and agrees with the qa gate about why; the five call sites were never
+>     updated. Zero of five pages rendered the §6 banner. LIKELY STALE.
+>   [RENDER-GATE] the answer to team-lead's question about why the banner gate
+>     stayed quiet: **a static gate cannot see a page that crashes ABOVE its banner
+>     call.** Each page is now RUN and checked on its OUTPUT, with controls on the
+>     harness, one subprocess per page (five pages through AppTest in one
+>     interpreter segfaults). "The page imports" and "the page renders" are
+>     different assertions and only the second is what §6 is about.
+>   [DISCLOSURE-FALSE-RED] qa's own gate falsely reported dashboard/ missing the
+>     "forbidden as a feature" disclosure — it is present but split across an
+>     implicit string concatenation that read_text() could not see. Fixed at the
+>     root: Python surfaces now read through `ast`, which merges adjacent literals
+>     at parse time; docstrings and comments excluded, three controls.
+>   [GUARD-DISARM-3] p17's preserved gate re-measured END TO END and the guard
+>     STILL does not fire: parquet 1,469,982 → 1,456,629 bytes, diagnosis_count
+>     null 0.0 → 1.0, NO EXCEPTION. The fix belongs in `_repo_root_for`
+>     (store.py:226-234), NOT the FileNotFoundError handler at :328 — control flow
+>     never reaches it, and the reason string it emits is FALSE. Third pass at the
+>     same defect. ml's to close.
+>   [TIER-DISPUTED] qa removed their own hardcoded {"priority_tier"} carve-out: the
+>     view builds it as an ntile over heuristic_priority_score, so the EXEMPTION is
+>     right and config/model.yaml:186's REASON is the inaccurate half. Red until ml
+>     rewords. (A reason that is wrong is worse than none — it launders the entry.)
+>   [RECONCILE-SILENT-SKIP] the [SKIP-BLIND] shape on a USER-FACING surface:
+>     run() drops checks whose datasets are absent and the page prints "All N" over
+>     the EVALUATED count — 17 declared, 14 evaluated, 3 vanished, and the user is
+>     told all 17 passed. Pinned red.
+>   ALSO: `docker compose config` exits 1 on a clean clone (missing .env) and
+>     starts postgres only — §7 clean-clone UNMET. The 8 MB bundle was absent from
+>     both provenance docs (app-engineer-3 was fixing exactly this when the cap hit;
+>     preserved at 0fb7eb2). The bundle ships three genuinely unmarked simulated
+>     columns.
+>   VERIFIED PASSING: API on the bundle path in all three queue modes, OpenAPI
+>     3.1.0 valid, synthetic-id keying held, Model C's negative result presented as
+>     one, no fraud framing, no firewall overclaim, ruff clean.
+> CRASH #8 2026-07-29 19:07Z: ml-engineer-8, ml-engineer-7, app-engineer-2 and
+> qa-reviewer-p17 all hit the cap together. PRESERVED by team-lead:
+> **5a88d6b** on feat/phase5-app — the ENTIRE 5-page dashboard plus the demo
+> bundle, 3,045 lines and an 8.0 MB rcm_demo.duckdb, ruff clean, verified by NOBODY:
+> no `streamlit run`, no test pass, no qa gate. Specifically UNCONFIRMED: banner on
+> every page (§6), totals reconciling to view_reconciliation.py, synthetic-id
+> keying, and whether the bundle is registered per §3.3. That registration is
+> REQUIRED — the bundle is the most exposed artifact in the repo because it ships
+> to a hosted demo. Two scratch copies of qa's gates (tests/contracts/zz_tmp_*.py)
+> were deliberately NOT committed; tests/ is qa's.
+> **5a59f42** on feat/phase5-qa — an 80-line matrix-write-guard gate update.
+> Re-spawned as app-engineer-3, ml-engineer-9, qa-reviewer-p18. Warehouse healthy,
+> reconciliation 21/21.
+> ML WORK LANDED SINCE (feat/phase5-blockers, f18dfc7 → 21fe077):
+>   9bcc14e [GUARD-DISARM] FIXED — the write guard no longer stands down when its
+>     own baseline is damaged. qa's RED gate (65de5f9) is what forced it.
+>   6b17885 [MATCHER-EXPRESSIVENESS] SWEEP — the rule generalised and a SECOND
+>     instance found in provenance.py. Instance 1 is WIDER than recorded: f18dfc7
+>     refused globs in forbidden_derived_features only, but the hole is in the
+>     MATCHER, not one block — tests/leakage/ resolves EVERY configured name with
+>     fnmatch (its own vocabulary calls them "patterns") while `_offenders` matches
+>     exact-then-substring and expands nothing. A planted `*denied_amount` in
+>     forbidden_features is green and empty: it reports coverage for names it never
+>     blocks, and every check agrees the list is fine.
+>   7c110c0 [FIREWALL-CLAIM] — an honesty defect, and the worse half SHIPS.
+>     model_card.md 139-141 justified the cost-matrix factors by asserting the
+>     generator's realized overturn and rework rates "sit behind the §4.5
+>     firewall". They do not: assumptions.md §8 states the overturn target and §9
+>     the realized rework cost, and §4.5 firewalls src/simulation/, not docs/. The
+>     SECOND surface is worse — train.py wrote the same false claim into
+>     model_a/metrics.json, a MACHINE-READABLE artifact that ships. Found by
+>     grepping `firewall` across every ml-owned surface. THE ARGUMENT SURVIVES:
+>     both factors are anchored to published benchmarks named in the card and both
+>     were fixed BEFORE the threshold was computed — so this is a rewording, not a
+>     retraction. qa's ruling stands recorded in assumptions.md §12: **the firewall
+>     is a DISCIPLINE, NOT AN INFORMATION BARRIER, and no surface may describe it
+>     as one.**
+>   21fe077 [DEMO-BUNDLE] registered the .duckdb surface.
+> QA ROUND 2 (qa-reviewer-p17): API RUNS — /metrics/executive returns
+> claims_submitted=20867 and denied_claims=2663, the control-query figures, no
+> 500s. [PASSTHROUGH-BLIND] is the phase's best structural finding: the emitter
+> probe perturbs an input and reports columns that MOVE, so it can only see columns
+> a surface COMPUTES — and the API read side is entirely pass-through. Registering
+> it would have turned the gate GREEN while proving nothing, and the same will hold
+> for every dashboard page that renders a view. Replacement gate keys on ml's own
+> `forbidden_derived_features`, and found [WIRE-UNMARKED]: 8 fields reach the wire
+> unmarked, including `ar_balance_amt` — an unmarked simulated DOLLAR figure on a
+> user-facing surface, i.e. [QUEUE-PREFIX] for the THIRD time, one layer further
+> out each time.
+> TEAM-LEAD NOTE ON THE PATTERN, for the human: three separate renames of the same
+> family is a symptom, not three bugs. CLAUDE.md §3.1 defines DERIVED as "computed
+> from SOURCE" and has no category for "computed from SIMULATED". That taxonomy gap
+> is why these keep surfacing one layer at a time. Amending §3.1 requires human
+> approval, so it is flagged rather than done.
+> CRASH #7 2026-07-29 13:20-13:48Z (team-lead): ml-engineer-7, qa-reviewer-p16,
+> ml-engineer-6 and app-engineer ALL hit the cap within 28 minutes — the largest
+> simultaneous loss on this project. ml and qa worktrees were CLEAN. app-engineer's
+> was not: 1,816 lines of unreviewed FastAPI + demo read-side preserved as 08d88cc
+> (main.py 529, scoring.py 404, schemas.py 350, tables.py 251, provenance.py 106,
+> demo/source.py 176), ruff clean, NOT verified. Re-spawned as ml-engineer-8,
+> app-engineer-2, qa-reviewer-p17. Warehouse healthy: 9 views, 20,867 claims,
+> 0 orphans, 21/21. main == origin/main == aac6cb5.
+> TEAM-LEAD CORRECTION — I OVERSTATED THE BLACKLIST COUPLING. I told app-engineer,
+> ml-engineer-7 and qa that renaming the vw_work_queue_priority columns without a
+> lockstep `forbidden_derived_features` update would make the §4 blacklist
+> "silently stop matching". ml-engineer-7 measured it and I verified against
+> `src/features/leakage.py::_offenders`: the runtime guard matches EXACT then
+> SUBSTRING (`if forbidden in lowered`), so the existing entry `dollars_at_stake`
+> ALREADY catches `sim_dollars_at_stake`. A `sim_` PREFIX rename opens no hole in
+> either commit order. I inferred the failure mode from the config text instead of
+> reading the matcher. The real rule is narrower: **add the marker, never reword** —
+> a WORD change (`sim_amount_at_stake`) is blocked by nothing, and THAT is when
+> lockstep matters.
+> TEAM RULE — MATCHER-EXPRESSIVENESS MISMATCH (from ml-engineer-7's near-miss):
+> the test suites resolve blacklist names with `fnmatch`; the RUNTIME guard has no
+> glob support. So `*dollars_at_stake` would pass every test and block nothing —
+> the Phase 2 placeholder defect returning through the one door the existing checks
+> cannot see. **Any protection whose test-time and runtime matchers differ in
+> expressiveness is a latent placeholder defect.** A glob is now rejected in code.
+> ML FINDINGS THIS ROUND (f18dfc7): `action_type` was guarded by NOTHING while
+> vw_work_queue_priority:78-82 builds it as a CASE on `sim_denial_flag` — it
+> encodes the label directly, a stronger leak than two columns already listed, and
+> invisible because no existing entry was a substring of it. Substring matching
+> protects against decoration of KNOWN names, not against unknown ones. Now
+> forbidden. `age_days` stays permitted WITH its reasoning recorded in the config
+> (a permitted column with no recorded reason is indistinguishable from an
+> oversight — how `overall_prior_denial_rate` survived four commits).
+> THE SHARPEST OBSERVATION OF THE PHASE, and it belongs in user-facing docs not
+> just a config comment: the label-bearing property of vw_work_queue_priority is
+> **MEMBERSHIP**, not any column — the where clause selects denied-or-open-AR
+> claims. No column-name blacklist can express that. A queue presented as a neutral
+> list of claims is presenting a selection that already knows the outcome.
+> QA REVIEW ROUND 1 (qa-reviewer-p16, on feat/phase5-qa; team-lead never received
+> the report — recovered from the board after the crash):
+>   [BLOCKERS-3] PASS at 4a87270.
+>   [GUARD-DISARM] NEW, ml's to fix, gate RED and committed. `committed_manifest()`
+>     collapses FOUR conditions to None — no git, path outside repo, `git show`
+>     failed, and MANIFEST DID NOT PARSE — and `_refuse_or_report` treats None as
+>     "nothing to protect". Three of those are; the fourth is not. MEASURED: with a
+>     corrupt committed manifest, and separately with the manifest untracked while
+>     the parquet is still committed, a matrix with `diagnosis_count` entirely null
+>     was written straight over the committed parquet with NO exception — the exact
+>     failure bfea020 exists to prevent. The module's own principle turned on
+>     itself: `manifest_deviations` already refuses to pass over a missing
+>     null_rates block because a check that did not run must not read like one that
+>     passed. MUST close before Phase 5 acceptance.
+>   [EMITTER-HOLE] found in qa's OWN inherited gate, fixed 723a95c. The
+>     [QUEUE-PREFIX] "harder half" was not covering half of Phase 5: probe modules
+>     showed a Streamlit page and a `to_dict()` helper caught, but a FastAPI ROUTE
+>     NOT — it calls nothing on the emitter list and declares no response_model, so
+>     the only evidence it is user-facing is the decorator. The gate was reporting a
+>     clean API boundary while blind to it. Added route-decorator detection plus
+>     positive AND negative controls ON THE DETECTOR, because green on a tree with
+>     no dashboard and no API said nothing about whether the detector could see.
+>   [FIREWALL-DOC-HOLE] RULED (d5b8402): NOT fixable by redaction. Recorded as a
+>     known limitation in docs/assumptions.md §12, pinned by a test.
+>   [APP-R1] app-engineer @ 6e51e61 reviewed, not yet gateable.
+> CROSSWALK DISCLOSURE UNDERSTATES THE COLLISION (qa-reviewer-p16, measured):
+> grouping by facility NAME collides WORSE than by CCN — worst 15:1 against the
+> 8:1 everyone has been quoting, with 2,816 distinct names for 2,857 CCNs. And
+> NAME is the key a dashboard is more likely to group on. Every user-facing
+> disclosure must carry the NAME figure, not only the CCN figure.
 > OPENED 2026-07-29 by human go-ahead after Phase 4 acceptance. main pushed to
 > origin at 94ce0d3.
 > REPO DIVERGENCE FOUND AT PUSH (team-lead): origin/main carried TWO commits local
