@@ -46,13 +46,13 @@ select
     max(e.sim_facility_state)        as sim_display_facility_state,  -- SIMULATED, display only
 
     count(*)                                            as provider_claims,
-    count(*) filter (where e.clean_claim_flag)          as clean_claims,
-    count(*) filter (where e.first_pass_paid_flag)      as first_pass_paid_claims,
+    count(*) filter (where e.sim_clean_claim_flag)      as clean_claims,
+    count(*) filter (where e.sim_first_pass_paid_flag)  as first_pass_paid_claims,
     count(*) filter (where e.sim_denial_flag)           as denied_claims,
 
     -- rates (DERIVED from SIMULATED). Read alongside provider_claims.
-    round(avg(case when e.clean_claim_flag then 1 else 0 end), 4)      as clean_claim_rate,
-    round(avg(case when e.first_pass_paid_flag then 1 else 0 end), 4)  as first_pass_paid_rate,
+    round(avg(case when e.sim_clean_claim_flag then 1 else 0 end), 4) as clean_claim_rate,
+    round(avg(case when e.sim_first_pass_paid_flag then 1 else 0 end), 4) as first_pass_paid_rate,
     round(avg(case when e.sim_denial_flag then 1 else 0 end), 4)       as denial_rate,
     round(avg(case when e.sim_late_filing_flag then 1 else 0 end), 4)  as late_filing_rate,
     -- rework rate = share of claims that incurred any denial rework cost

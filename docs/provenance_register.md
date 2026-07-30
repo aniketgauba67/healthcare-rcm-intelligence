@@ -188,7 +188,14 @@ Two honesty rules are enforced structurally, not just documented:
   `vw_work_queue_priority` as `sim_facility_name`. Rationale: `vw_claim_enriched`
   is the flattened matrix the Phase 4 feature store consumes and the §4 leakage
   blacklist matches on COLUMN NAMES, so aliasing the prefix away at the view
-  boundary would delete the provenance marker exactly where §4 depends on it.
+boundary would delete the provenance marker exactly where §4 depends on it.
+
+The same rule applies to simulated-derived outputs. `vw_claim_enriched` preserves
+`sim_adjudicated`, `sim_clean_claim_flag`, `sim_first_pass_paid_flag`,
+`sim_ar_open_flag`, and `sim_ar_balance_amt`; `vw_work_queue_priority` preserves
+`sim_action_type`, `sim_dollars_at_stake`, `sim_heuristic_priority_score`,
+`sim_priority_tier`, and `sim_appeal_levels`. The API, dashboard, and committed
+demo bundle use those same names, so no presentation layer removes the marker.
   Guarded by `tests/contracts/test_view_sim_prefix.py` (static) and
   `tests/integration/test_crosswalk_prefix_postgres.py` (live catalog).
 

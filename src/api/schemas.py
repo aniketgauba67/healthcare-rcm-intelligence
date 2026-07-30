@@ -313,6 +313,12 @@ class WorkQueueResponse(BaseModel):
     offset: int
     tier_counts: dict[str, int]
     ordering_caveat: str
+    membership: str = Field(
+        description=(
+            "Outcome-selection disclosure: rows were selected because simulated denial or open "
+            "A/R outcomes already occurred; this is not a neutral claim population."
+        )
+    )
     limitations: list[str]
     meta: ResponseMeta
 

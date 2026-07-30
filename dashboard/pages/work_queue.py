@@ -10,7 +10,7 @@ Two queues, and they answer different questions with different models.
 
 THE THING A WORK QUEUE HIDES BEST, SAID FIRST
 ----------------------------------------------
-`vw_work_queue_priority`'s where clause is `where sim_denial_flag or ar_open_flag`.
+`vw_work_queue_priority`'s where clause is `where sim_denial_flag or sim_ar_open_flag`.
 **Membership in this list is the label.** Not a column in it — the membership. A
 queue presented as a neutral roster of claims needing attention is presenting a
 selection that already knows which claims went wrong, and no blacklist entry can
@@ -51,7 +51,7 @@ from src.api.tables import build_heuristic_queue_table
 
 MEMBERSHIP_WARNING = (
     "**Membership in this queue is the label.** The view behind it selects claims "
-    "`where sim_denial_flag or ar_open_flag` — every row is here BECAUSE the simulation "
+    "`where sim_denial_flag or sim_ar_open_flag` — every row is here BECAUSE the simulation "
     "already denied it or left it unpaid. That is not a column anything can blacklist; it "
     "is the selection itself. Read this as a triage ordering over known-bad claims, never "
     "as a prediction of which claims will go bad. The prevention queue further down is the "
@@ -474,7 +474,7 @@ else:
             "sim_action_type",
             "sim_denial_category",
             "age_days",
-            "priority_tier",
+            "sim_priority_tier",
             "is_heuristic_placeholder",
         )
         if c in heuristic.columns
@@ -483,12 +483,8 @@ else:
         columns = ["claim_sk", *columns]
     dataframe(heuristic[columns])
     st.caption(
-        "Three of these column names are re-marked at this boundary and do NOT carry the "
-        "marker in the warehouse view: `dollars_at_stake`, `heuristic_priority_score` and "
-        "`action_type`. All three are derived from simulated values — `action_type` is a "
-        "CASE on `sim_denial_flag`, so it is the label wearing a process name. The view is "
-        "the thing that needs fixing; re-marking here means a reader is not shown an "
-        "unmarked simulated value while that happens."
+        "Every value derived from the simulated adjudication layer is named with `sim_` in "
+        "the view, API, dashboard, and demo bundle."
     )
     control_query(reconcile.sql_for("Work queue — Heuristic scaffold rows"))
 

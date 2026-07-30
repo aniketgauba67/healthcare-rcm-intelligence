@@ -81,7 +81,7 @@ BUNDLE_DIR = REPO_ROOT / "dashboard" / "demo_data"
 # simulated dates or the simulated denial flag, and carry no marker in the view.
 # `age_days` is deliberately absent: it is the point-in-time boundary minus a
 # global constant, the same reasoning that keeps it off forbidden_derived_features.
-UNMARKED_HEURISTIC_COLUMNS = (
+LEGACY_UNMARKED_HEURISTIC_COLUMNS = (
     "dollars_at_stake",
     "heuristic_priority_score",
     "priority_tier",
@@ -236,7 +236,7 @@ def test_the_heuristic_queue_view_does_not_ship_unmarked_simulated_columns(
             "these four columns reach a reader with none of our code in front of them.",
         )
     )
-    unmarked = sorted(column for column in UNMARKED_HEURISTIC_COLUMNS if column in present)
+    unmarked = sorted(column for column in LEGACY_UNMARKED_HEURISTIC_COLUMNS if column in present)
     assert not unmarked, (
         f"the demo bundle ships {view} with {unmarked} unmarked. Every one is computed from "
         "simulated money, a simulated date or sim_denial_flag — `action_type` is a CASE on "

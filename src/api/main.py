@@ -501,6 +501,11 @@ def work_queue(
         "offset": offset,
         "tier_counts": tables.tier_counts(full),
         "ordering_caveat": scoring.ORDERING_NOTE,
+        "membership": (
+            "This is an outcome-selected worklist: every row was selected because the "
+            "simulation denied the claim or left it with open A/R. It is not a neutral "
+            "pre-outcome claim population."
+        ),
         "limitations": MODEL_C_LIMITATIONS,
     }
     return WorkQueueResponse(**payload, meta=_meta(payload, datasets=datasets))

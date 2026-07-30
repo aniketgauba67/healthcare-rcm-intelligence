@@ -79,7 +79,7 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     (
         "ar_aging:sum_open==unpaid",
         "select case when (select sum(open_claims) from {s}vw_ar_aging) "
-        "= (select count(*) from {s}vw_claim_enriched where ar_open_flag) then 0 else 1 end",
+        "= (select count(*) from {s}vw_claim_enriched where sim_ar_open_flag) then 0 else 1 end",
     ),
     (
         "ar_aging:five_buckets",
@@ -117,7 +117,7 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     (
         "work_queue:rowcount==actionable",
         "select case when (select count(*) from {s}vw_work_queue_priority) "
-        "= (select count(*) from {s}vw_claim_enriched where sim_denial_flag or ar_open_flag) "
+        "= (select count(*) from {s}vw_claim_enriched where sim_denial_flag or sim_ar_open_flag) "
         "then 0 else 1 end",
     ),
     (

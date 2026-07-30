@@ -80,16 +80,16 @@ WORK_QUEUE_COLUMNS = [
     "prvdr_num",
     "sim_facility_name",
     "sim_payer_id",
-    "action_type",
+    "sim_action_type",
     "sim_denial_flag",
     "sim_denial_category",
     "sim_denial_type",
-    "ar_open_flag",
+    "sim_ar_open_flag",
     "age_days",
-    "dollars_at_stake",
-    "heuristic_priority_score",
-    "priority_tier",
-    "appeal_levels",
+    "sim_dollars_at_stake",
+    "sim_heuristic_priority_score",
+    "sim_priority_tier",
+    "sim_appeal_levels",
     "is_heuristic_placeholder",
 ]
 
@@ -99,15 +99,9 @@ WORK_QUEUE_COLUMNS = [
 #: carries its reason, and `test_no_wire_exemption_is_speculative` refuses any
 #: entry the measurement would not otherwise have reported.
 #:
-#: `priority_tier` is here and `action_type` is NOT, and the line between them is
-#: the whole point: an ntile over our own heuristic score is our ordering, while a
-#: `case` that emits DENIAL_REWORK when `sim_denial_flag` is true is a restatement
-#: of a simulated fact wearing a workflow name. config/model.yaml:192 says so in
-#: ml's own words — "encodes the label directly".
-PROCESS_METADATA: dict[str, str] = {
-    "priority_tier": "ntile over our own heuristic score — our ordering of the worklist, "
-    "not a measured quantity (RULING C)",
-}
+#: No view-derived field is exempt: simulated values retain their marker at the
+#: source instead of relying on an API-only carve-out.
+PROCESS_METADATA: dict[str, str] = {}
 
 
 def _model_config() -> dict[str, Any]:
@@ -243,7 +237,7 @@ def test_the_perturbation_probe_is_blind_across_a_passthrough_boundary() -> None
         f"contradicts the measurement this gate is built on: {sorted(offenders)}"
     )
     # And the columns it stays silent about are exactly the ones this file reports.
-    assert "ar_open_flag" in frame.columns
+    assert "sim_ar_open_flag" in frame.columns
 
 
 # ---------------------------------------------------------------------------

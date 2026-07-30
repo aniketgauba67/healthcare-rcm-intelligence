@@ -97,7 +97,12 @@ def test_the_work_queue_view_entries_are_the_ones_in_flight(
     """
     queue_view = "vw_work_queue_priority.sql"
     assert queue_view in view_sources
-    for column in ("dollars_at_stake", "heuristic_priority_score", "priority_tier", "action_type"):
+    for column in (
+        "sim_dollars_at_stake",
+        "sim_heuristic_priority_score",
+        "sim_priority_tier",
+        "sim_action_type",
+    ):
         assert column in derived_block, (
             f"`{column}` is a DERIVED column of {queue_view} built on simulated adjudication "
             "facts and is not on the forbidden_derived_features list. `action_type` is a CASE "

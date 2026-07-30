@@ -309,6 +309,14 @@ its provenance marker at exactly the point that marker is load-bearing.
 `vw_claim_enriched` is the shared base (all others read from it), so the join
 logic and provenance live in one place.
 
+The derived adjudication flags and A/R balance on that base retain simulated
+provenance in their names: `sim_adjudicated`, `sim_clean_claim_flag`,
+`sim_first_pass_paid_flag`, `sim_ar_open_flag`, and `sim_ar_balance_amt`.
+`vw_work_queue_priority` likewise exposes `sim_action_type`,
+`sim_dollars_at_stake`, `sim_heuristic_priority_score`, `sim_priority_tier`, and
+`sim_appeal_levels`. They are computed from simulated outcomes, money, and appeal
+history; queue membership itself is restricted to simulated denials or open A/R.
+
 | View | Grain | Provenance summary |
 |---|---|---|
 | `vw_claim_enriched` | one inpatient claim (`claim_sk`), 20,867 rows | MIXED, labeled per column in-header: SOURCE (CMS RIF fields, incl. real billed charge + the one real Medicare paid amount), DERIVED (length-of-stay, flags), REFERENCE (`drg_desc` and code descriptions, display-only), SIMULATED (all `sim_*` adjudication/timeline/money **and the `sim_facility_*` linkage columns, display-only, prefix preserved on output**). |

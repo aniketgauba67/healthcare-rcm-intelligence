@@ -7,23 +7,8 @@ emitter is probed by perturbing a simulated input and checking that no emitted
 column moves without carrying a `sim_` marker, and that is only possible when the
 frame-building step is a function you can call.
 
-WHERE THIS LAYER RE-MARKS A COLUMN, AND WHY
---------------------------------------------
-`rcm.vw_work_queue_priority` emits `dollars_at_stake`, `heuristic_priority_score`
-and `action_type` with no `sim_` marker, and all three are derived from simulated
-values. That is the [QUEUE-PREFIX] defect one layer upstream, in a view this agent
-does not own. It is reported to team-lead rather than fixed here — but it is also
-not passed through unmarked, because this module IS the last boundary before a
-reader. So the marker is restored on the way out and `RE_MARKED_COLUMNS` records
-every rename, so the disagreement between the warehouse's spelling and the wire's
-is visible rather than quietly introduced. Delete these entries the day the view
-is corrected.
-
-`action_type` was on `PROCESS_METADATA_COLUMNS` until ml-engineer-7 measured what
-builds it: `vw_work_queue_priority:78-82` is a CASE on `sim_denial_flag`, so the
-column IS the label wearing a process name, and it is now forbidden as a feature
-in `config/model.yaml`. A rank or a recommendation is a statement about our
-process; a case statement on the outcome is a statement about the outcome.
+Curated views preserve `sim_` markers for values derived from the simulation layer.
+The API, dashboard, and demo bundle therefore share one provenance contract.
 """
 
 from __future__ import annotations
@@ -32,36 +17,26 @@ from typing import Any
 
 import pandas as pd
 
-#: Columns arriving from a curated view WITHOUT the `sim_` marker that §3.2
-#: requires, re-marked here at the last boundary. Each entry is a finding against
-#: the view, not a preference: the value is derived from simulated money or, in
-#: `action_type`'s case, from the simulated denial label itself.
-RE_MARKED_COLUMNS: dict[str, str] = {
-    "dollars_at_stake": "sim_dollars_at_stake",
-    "heuristic_priority_score": "sim_heuristic_priority_score",
-    "action_type": "sim_action_type",
-}
+#: A non-empty map would mean a curated view again dropped a provenance marker.
+RE_MARKED_COLUMNS: dict[str, str] = {}
 
 #: Statements about OUR process rather than about the simulated world, in the
 #: sense the exposure probe uses: a rank, a tier, a recommendation, a query
 #: parameter. These legitimately carry no `sim_` marker. `action_type` is NOT
 #: here — see the module docstring.
-PROCESS_METADATA_COLUMNS: frozenset[str] = frozenset(
-    {
-        "tier",
-        "tier_rank",
-        "queue_position",
-        "recommended_action",
-        "priority_tier",
-        "queue_mode",
-        "as_of",
-        "is_heuristic_placeholder",
-    }
-)
+PROCESS_METADATA_COLUMNS: dict[str, str] = {
+    "tier": "Project policy bucket, not a measured claim attribute.",
+    "tier_rank": "Project policy ordering for tiers, not a measured claim attribute.",
+    "queue_position": "Position assigned by this project's ranking policy.",
+    "recommended_action": "Project workflow recommendation, not an adjudication fact.",
+    "queue_mode": "Requested queue construction mode, a response parameter.",
+    "as_of": "Snapshot timestamp selected by the queue build, not a claim attribute.",
+    "is_heuristic_placeholder": "States that this project used a non-model heuristic.",
+}
 
 
 def re_mark_simulated_columns(frame: pd.DataFrame) -> pd.DataFrame:
-    """Restore the `sim_` marker on columns a curated view dropped it from."""
+    """Apply any explicitly recorded compatibility rename at the wire boundary."""
     present = {old: new for old, new in RE_MARKED_COLUMNS.items() if old in frame.columns}
     return frame.rename(columns=present) if present else frame
 
@@ -109,7 +84,7 @@ def build_heuristic_queue_table(
 
 
 def tier_counts(queue: pd.DataFrame) -> dict[str, int]:
-    column = "tier" if "tier" in queue.columns else "priority_tier"
+    column = "tier" if "tier" in queue.columns else "sim_priority_tier"
     if column not in queue.columns:
         return {}
     counts = queue[column].astype(str).value_counts()

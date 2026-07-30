@@ -44,7 +44,7 @@
 --
 -- Control query (must reconcile):
 --   select count(*) from vw_claim_enriched;                     -- = 20867
---   select count(*) from vw_claim_enriched where adjudicated;   -- = 20867 (1:1)
+--   select count(*) from vw_claim_enriched where sim_adjudicated; -- = 20867 (1:1)
 --   select count(*) filter (where sim_denial_flag) ...          -- = 2663
 --   Row count and every claim_sk must equal rcm.fact_inpatient_claim.
 -- ============================================================================
@@ -151,17 +151,17 @@ select
     oc.sim_appeal_cost,
     oc.sim_total_cost_to_collect,
 
-    -- ---- derived RCM flags (DERIVED) ----
-    true as adjudicated,   -- 1:1 by construction; explicit for the control query
+    -- ---- derived RCM flags from simulated adjudication (SIMULATED) ----
+    true as sim_adjudicated, -- 1:1 by construction; explicit for the control query
     -- clean claim = first-pass clean: adjudicated with no denial, no late filing,
     -- no eligibility failure, no duplicate flag. (Heuristic, quality funnel.)
     (not adj.sim_denial_flag
         and not adj.sim_late_filing_flag
         and not coalesce(ae.sim_eligibility_failed, false)
-        and not coalesce(dc.sim_duplicate_submission_flag, false)) as clean_claim_flag,
-    (adj.sim_payment_date is not null and not adj.sim_denial_flag) as first_pass_paid_flag,
-    (adj.sim_payment_date is null) as ar_open_flag,   -- not yet paid = outstanding
-    greatest(adj.sim_allowed_amount - adj.sim_paid_amount, 0) as ar_balance_amt,
+        and not coalesce(dc.sim_duplicate_submission_flag, false)) as sim_clean_claim_flag,
+    (adj.sim_payment_date is not null and not adj.sim_denial_flag) as sim_first_pass_paid_flag,
+    (adj.sim_payment_date is null) as sim_ar_open_flag, -- not yet paid = outstanding
+    greatest(adj.sim_allowed_amount - adj.sim_paid_amount, 0) as sim_ar_balance_amt,
 
     -- ---- REFERENCE display text (ICD-10-CM FY2023), DISPLAY-ONLY, never a key.
     -- Appended at the end of the select so `create or replace view` only ADDS

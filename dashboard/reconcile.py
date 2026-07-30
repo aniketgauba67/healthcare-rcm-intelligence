@@ -193,10 +193,10 @@ CHECKS: tuple[Check, ...] = (
         figure="A/R & recovery — Open claims in the aging spine",
         page="A/R & recovery",
         dashboard=lambda f: float(f["vw_ar_aging"]["open_claims"].sum()),
-        control=lambda f: float(_claims(f)["ar_open_flag"].fillna(False).astype(bool).sum()),
+        control=lambda f: float(_claims(f)["sim_ar_open_flag"].fillna(False).astype(bool).sum()),
         control_sql=(
             "select (select sum(open_claims) from rcm.vw_ar_aging)\n"
-            "     = (select count(*) from rcm.vw_claim_enriched where ar_open_flag)\n"
+            "     = (select count(*) from rcm.vw_claim_enriched where sim_ar_open_flag)\n"
             "  as reconciles;"
         ),
         datasets=("vw_ar_aging", "vw_claim_enriched"),
@@ -271,7 +271,7 @@ CHECKS: tuple[Check, ...] = (
         control=lambda f: float(
             (
                 _claims(f)["sim_denial_flag"].fillna(False).astype(bool)
-                | _claims(f)["ar_open_flag"].fillna(False).astype(bool)
+                | _claims(f)["sim_ar_open_flag"].fillna(False).astype(bool)
             ).sum()
         ),
         control_sql=(
@@ -279,7 +279,7 @@ CHECKS: tuple[Check, ...] = (
             "-- the where clause selects claims that were denied or left open.\n"
             "select (select count(*) from rcm.vw_work_queue_priority)\n"
             "     = (select count(*) from rcm.vw_claim_enriched\n"
-            "         where sim_denial_flag or ar_open_flag) as reconciles;"
+            "         where sim_denial_flag or sim_ar_open_flag) as reconciles;"
         ),
         datasets=("vw_work_queue_priority", "vw_claim_enriched"),
     ),

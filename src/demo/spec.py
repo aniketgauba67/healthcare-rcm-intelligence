@@ -152,7 +152,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "is_heuristic_placeholder. Model C's Expected Net Recovery queue is a "
             "separate dataset in this bundle."
         ),
-        order_by="heuristic_priority_score desc",
+        order_by="sim_heuristic_priority_score desc",
     ),
     _view(
         "vw_data_quality_scorecard",

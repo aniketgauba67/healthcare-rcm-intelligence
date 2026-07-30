@@ -2994,6 +2994,14 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
      honesty pass.
 
 ## Done
+- [x] Phase 5 simulated-derived naming and work-queue membership disclosure —
+  app-engineer, `feat/phase5-provenance-disclosure`: renamed derived claim and
+  heuristic-queue values to `sim_*` at the SQL-view boundary; propagated the
+  names through the API, dashboard, committed demo bundle, provenance documents,
+  and leakage config. `PROCESS_METADATA_COLUMNS` is now a reasoned mapping, and
+  `/work-queue` states that membership is selected from simulated denial or open
+  A/R outcomes. Bundle regenerated from the dirty feature tree using fresh local
+  Postgres views and preserved committed model datasets.
 - [x] Test gate green on clean clone (qa-reviewer, merged to main bc2a7ab, pushed):
   smoke tests + pytest config; scope-expanded dependency fix (numpy<2.1 cap,
   [tool.uv] environments bounded to CPython 3.11–3.12, uv.lock committed,
