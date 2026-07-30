@@ -460,6 +460,26 @@ def test_no_label_bearing_column_is_exempted_as_process_metadata() -> None:
     Cross-config, so the verdict is not a QA opinion: a column `config/model.yaml`
     forbids because it is built on `sim_denial_flag` (the LABEL) cannot
     simultaneously be a statement about our process.
+
+    THE `priority_tier` CARVE-OUT IS GONE (qa-reviewer-p18, 2026-07-29), and its
+    removal is the point rather than a tightening for its own sake. This test used
+    to subtract `{"priority_tier"}` by name, which meant a reviewer's opinion
+    overrode ml's recorded reason and the two live instruments disagreed about one
+    column: `config/model.yaml:186` forbids it as "built on sim_denial_flag", while
+    `tests/features/test_demo_bundle_provenance.py` (ml's own, 21fe077) flags it
+    unmarked in the bundle and `src/api/tables.py` exempts it as a rank.
+
+    MEASURED at the source, `sql/views/vw_work_queue_priority.sql:99`:
+
+        ntile(4) over (order by heuristic_priority_score desc) as priority_tier
+
+    so the EXEMPTION is factually right and the model.yaml REASON is the inaccurate
+    one — it is a rank over our own heuristic, transitively a function of simulated
+    money, which is why forbidding it as a FEATURE is still correct. The fix is one
+    line of wording in `config/model.yaml` (ml-engineer): say it is an ntile over
+    `heuristic_priority_score`, and the `"ntile" not in reason` filter below exempts
+    it with ml's own words. Until then this is red, and red is the honest state for
+    two gates that contradict each other about a published column.
     """
     from src.api import tables
 
@@ -469,9 +489,7 @@ def test_no_label_bearing_column_is_exempted_as_process_metadata() -> None:
         for column, reason in classified.items()
         if "sim_denial_flag" in reason and "ntile" not in reason
     }
-    offenders = sorted(
-        set(tables.PROCESS_METADATA_COLUMNS) & set(label_bearing) - {"priority_tier"}
-    )
+    offenders = sorted(set(tables.PROCESS_METADATA_COLUMNS) & set(label_bearing))
     assert not offenders, (
         "src/api/tables.py exempts as process metadata column(s) that config/model.yaml "
         "forbids because they are built on the LABEL:\n  "

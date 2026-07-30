@@ -2598,6 +2598,190 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > test_derived_blacklist_tracks_views.py and test_feature_marker_position.py.
 > tests/ is qa's under §5. Both are good tests and both stay; recorded so the
 > boundary does not erode by precedent.
+>
+> ===== qa-reviewer-p18 REVIEW ROUND 3, 2026-07-29 =====
+> Measured on feat/phase5-qa @ **51cac7d** = main **0b6bd2d** + feat/phase5-blockers
+> **21fe077** + feat/phase5-app **5a88d6b** + the preserved gate **5a59f42**.
+> Repro for everything: `uv run pytest -q -p no:randomly --ignore=tests/integration`
+> Baseline at 51cac7d before my commits: **12 failed / 471 passed**.
+> After: **22 failed / 487 passed** — one red REMOVED as a false positive of my own
+> gate, eleven added, every one measured below.
+>
+> [DASHBOARD-BLANK] **THE BLOCKER OF THIS ROUND. Two of the five pages are blank
+> pages, and the whole dashboard had never been run by anyone.** All five pages call
+> `render_page_header(title, subtitle, banner_extra=...)`; components.py:83 defines
+> `render_page_header(title, subtitle)`. ar_recovery.py:43 and work_queue.py:61
+> raise `TypeError: unexpected keyword argument 'banner_extra'` on the first
+> statement that renders anything, so both produce **ZERO** blocks. The other three
+> render 16 / 16 / 41 with no exceptions. Measured with streamlit's own AppTest,
+> one interpreter per page.
+>   This is an INTERRUPTED REFACTOR, not carelessness: components.py:83-94 documents
+>   deliberately REMOVING the banner from render_page_header, agreeing with the qa
+>   banner gate that a §6 obligation discharged two frames away is one a future
+>   author can silently drop. The docstring landed; the five call sites did not.
+>   Fix (app-engineer): add `banner_extra: str | None = None` to render_page_header
+>   and have it call render_synthetic_data_banner(extra=banner_extra) — OR keep the
+>   split and put `render_synthetic_data_banner(MEMBERSHIP_WARNING)` in each page.
+>   The second matches the docstring's own argument.
+> [BANNER-ABSENT] §6, "no page ships without it": **zero of five pages render the
+>   banner**, confirmed twice by independent instruments — statically by
+>   test_dashboard_banner.py (AST call names; `banner_extra=` is a kwarg, not a
+>   call, so it correctly did not count it) and in the RENDERED OUTPUT by my new
+>   test_dashboard_renders.py. app.py:116 renders it inside `landing()`, which
+>   `st.navigation` executes for the HOME page only; the sidebar carries
+>   BANNER_SHORT as a caption, which is not the §6 block.
+> [RENDER-GATE] NEW, mine, tests/contracts/test_dashboard_renders.py. The static
+>   banner gate cannot see a page that crashes ABOVE its banner call, which is the
+>   exact failure above — a correct call on line 50 with a TypeError on line 43 is
+>   green forever. So each page is now RUN and the check is made on the output, with
+>   positive and negative controls ON THE HARNESS (a page that raises, a page that
+>   renders nothing). Subprocess per page is required, not stylistic: five pages
+>   through AppTest in one interpreter SEGFAULTS (exit 139) after the first, because
+>   the pages pull duckdb/xgboost/shap into a process AppTest is driving.
+>
+> [DISCLOSURE-FALSE-RED] **A red of MY OWN, and it was pointing at correct work.**
+> test_user_facing_disclosures.py reported that `dashboard/` never says the
+> crosswalk is forbidden as a model feature. It says exactly that, at
+> dashboard/disclosures.py:119-120, and a user reads it — but the gate ran
+> `read_text()` and the sentence is built by implicit concatenation, so the FILE
+> holds `**forbidden as a "\n    "feature**` and the regex cannot cross the quote,
+> the newline and the indent. PROVED both ways: runtime string matches, file text
+> does not. Same family as MATCHER-EXPRESSIVENESS — the instrument that ran was
+> weaker than its result implied — and this one pushes an author towards rewording
+> an honest sentence to satisfy a grep. FIXED at the root: Python surfaces are now
+> read through `ast`, which merges adjacent literals at parse time, so the gate sees
+> the value a user sees. Docstrings and comments are now EXCLUDED (a user reads
+> neither), with three controls pinning concatenation-yes / comment-no /
+> docstring-no. The dashboard surface still passes the vintage and collision checks
+> under the stricter rule, so those disclosures are in real rendered strings.
+> app-engineer's disclosure work is good: the 15:1 NAME figure, the 2,816 distinct
+> names, the 4,877-vs-4,876 note, and the keying rule are all present and correct.
+>
+> STILL RED AND CORRECT — the four the human named, all in docs (README.md ×3,
+> docs/model_card.md ×1): vintage skew absent from README and never stated as a
+> MISMATCH in the model card; collision numbers and keying rule absent from README.
+> [README-FINAL] is also still open: README:3 says "Phases 1–3 of 5 are complete",
+> Phase 4 and 5 are 🚧, and there are ZERO mentions of docs/model_card.md.
+>
+> [GUARD-DISARM-3] p17's preserved gate is RIGHT and I re-measured it end to end
+> rather than trusting the docstring: with git unrunnable, the committed parquet went
+> **1,469,982 -> 1,456,629 bytes** and `diagnosis_count` null rate **0.0 -> 1.0**
+> with NO exception. The control beside it (a first write with no artifact present)
+> correctly stays quiet, so the fix must distinguish "nothing to protect" from
+> "cannot tell".
+>   **THE FIX IS NOT WHERE IT LOOKS.** The door taken is NOT the FileNotFoundError
+>   handler at store.py:328 — control flow never reaches it. `_repo_root_for`
+>   (store.py:226-234) catches `CalledProcessError, FileNotFoundError, OSError,
+>   NotADirectoryError` together and returns None, so committed_baseline:300 answers
+>   `absent` with `reason="<path> is not inside a git repository"` — a statement that
+>   is FALSE in this state, in a diagnostic a future reader will act on. Fix
+>   `_repo_root_for` to distinguish "git answered: not a repo" from "git could not be
+>   run", and propagate the second as `unreadable`. Patching only line 328 leaves the
+>   parquet just as overwritable and the test just as red.
+>
+> [BUNDLE-UNMARKED] ml's own gate (21fe077) is RED against app's bundle, and it is
+> the [REMARK-IS-API-ONLY] prediction coming true in the most exposed artifact in
+> the repo: the committed 8,400,896-byte rcm_demo.duckdb ships
+> vw_work_queue_priority with `dollars_at_stake`, `heuristic_priority_score`,
+> `action_type` unmarked. src/api/tables.py re-marks all three on the API path
+> (`sim_action_type` now included — [WIRE-UNMARKED]'s action_type finding is CLOSED
+> at the API), so the two published surfaces disagree and the bundle is the one a
+> reader opens with none of our code in front of it. Fixable by analytics-engineer
+> in the view (better — warehouse and screen then agree) or app-engineer on the way
+> into the bundle.
+> [TIER-DISPUTED] the fourth column ml's gate flags, `priority_tier`, is where **two
+>   live instruments contradict each other**, and I removed my own hardcoded
+>   carve-out rather than keep the disagreement invisible. MEASURED at the source,
+>   sql/views/vw_work_queue_priority.sql:99:
+>       ntile(4) over (order by heuristic_priority_score desc) as priority_tier
+>   So the EXEMPTION is factually right and **config/model.yaml:186's REASON is the
+>   inaccurate one** — it says "built on sim_denial_flag". Forbidding it as a FEATURE
+>   stays correct (transitively simulated money). ONE-LINE FIX, ml-engineer: reword
+>   that reason to name the ntile over heuristic_priority_score, and the
+>   `"ntile" not in reason` filter exempts it in ml's own words with no name
+>   subtraction anywhere. test_wire_provenance.py no longer subtracts
+>   `{"priority_tier"}` by name, so it is red until that wording lands — red is the
+>   honest state for two gates that disagree about a published column.
+>
+> [BUNDLE-UNREGISTERED-§3.3] the 8 MB bundle is registered in
+> src/features/provenance.py PUBLISHED_SURFACES and in docs/model_card.md, and NOT
+> in docs/provenance_register.md or docs/data_dictionary.md — grep finds no
+> `rcm_demo`, no `demo_build_info`, no `demo_manifest` in either. §3.3 requires both
+> in the same PR that adds a table, and the bundle adds 16 datasets including two
+> NEW tables that exist nowhere else (`demo_manifest`, `demo_build_info`). This is
+> the Phase 4 unregistered-artifact hole recurring on a bigger surface.
+>   ON TEAM-LEAD'S "per-column classification" CONDITION: ml is right that
+>   src/demo/spec.py declares per-DATASET, and right to have refused the overclaim.
+>   My ruling as reviewer: per-dataset class + the `sim_` marker rule is sufficient
+>   **only while the marker rule actually holds on the bundle's columns**, and
+>   [BUNDLE-UNMARKED] is that premise failing today. Fix the three columns and the
+>   per-dataset declaration becomes honest; leave them and no amount of declaration
+>   makes it so.
+>
+> [RECONCILE-17/17] **§7 PASS on the path that ships, run rather than asserted.**
+> dashboard/reconcile.py declares 17 checks, each reaching the figure from a second
+> dataset and carrying runnable control SQL. Against the committed bundle: 17
+> evaluated, **17/17 pass**. Against Postgres: 14/14 pass.
+> [RECONCILE-SILENT-SKIP] but `run()` does `continue` on any check whose datasets
+>   are absent, and model_data_quality.py:76 prints "All {len(results)} reconciled
+>   figures match" over the EVALUATED count. MEASURED on Postgres: **17 declared, 14
+>   evaluated, 3 vanished** (the model ones) behind a green tick with nothing saying
+>   three checks never ran. Same shape as [GUARD-DISARM] but in a reporter, on the
+>   one page whose job is telling a reader the numbers can be trusted — and the repo
+>   already refuses it one layer down, where `manifest_deviations` emits "NULL RATES
+>   NOT COMPARED" rather than passing over a missing baseline. Pinned RED by
+>   tests/contracts/test_dashboard_reconciliation.py. Small fix, app-engineer's:
+>   carry the unevaluated figures through as NOT_CHECKED rows or print
+>   declared-vs-evaluated.
+>
+> [COMPOSE-CLEAN-CLONE] **§7 "docker compose up works from a clean clone" FAILS, and
+> it fails before it starts.** Cloned 51cac7d to a fresh directory and ran
+> `docker compose config` (non-destructive; the running warehouse was not touched):
+> **exit 1**, `env file .../.env not found`. `.env` is gitignored by design, and
+> docker-compose.yml:5 has `env_file: .env` with no `required: false` and no
+> default. Fix is one of: `env_file: [{path: .env, required: false}]` with
+> POSTGRES_* defaults inline, or a documented `cp .env.example .env` as step 0 of
+> the clean-clone path — but §7 says `docker compose up` works, so the first is
+> closer to the criterion.
+> [COMPOSE-NO-APP] and even fixed, `docker compose up` starts **postgres only**.
+>   There is no api service and no dashboard service in docker-compose.yml for a
+>   phase whose two deliverables are a FastAPI service and a Streamlit dashboard.
+>   app-engineer owns the file.
+>
+> WHAT I VERIFIED AS PASSING, so it is not re-litigated:
+>   * API on the BUNDLE path (nobody had run this; p17 ran Postgres only):
+>     /health 200 **"ok"**, kind=bundle — not degraded, because the bundle DOES carry
+>     model_c_work_queue. /metrics/executive, /claims/1 and /work-queue in all three
+>     declared modes (backtest, live_snapshot, heuristic) all 200. No 500s.
+>   * OpenAPI schema valid and generatable: 3.1.0, 6 paths, 15 component schemas,
+>     JSON-serialisable. §7 "API schema validated" met.
+>   * [BUNDLE-ABSENT] CLOSED: rcm_demo.duckdb is tracked, committed, not gitignored,
+>     8,400,896 bytes, and present in a fresh clone. The docstrings' present tense is
+>     now true.
+>   * SYNTHETIC-ID KEYING: no groupby on facility name or CCN anywhere in dashboard/.
+>     The only two groupbys are on sim_denial_category and (reason_code,
+>     analyst_action). The provider table is keyed on prvdr_num and says so on
+>     screen, with the 15:1 name figure in the column help.
+>   * MODEL C AS A NEGATIVE RESULT: work_queue.py:85 renders MODEL_C_HONESTY as
+>     st.error, and the capacity chart plots "largest denial first (no model)" at
+>     0.657 against the score at 0.610. Nothing implies otherwise.
+>   * MEMBERSHIP: work_queue.py:51-59 carries a correct, strongly-worded
+>     MEMBERSHIP_WARNING — which is passed as `banner_extra` and therefore currently
+>     renders NOTHING. It lands the moment [DASHBOARD-BLANK] is fixed.
+>     [MEMBERSHIP-UNDISCLOSED] stays open at the API: still no membership statement
+>     in the /work-queue payload, both modes.
+>   * [FIREWALL-CLAIM]: no surface describes §4.5 as an information barrier. Zero
+>     hits for firewall/information-barrier/"cannot see" in dashboard/ or src/api/.
+>     ml fixed the model-card sentence at 7c110c0.
+>   * No anomaly is called fraud anywhere; NOT_A_FRAUD_SIGNAL renders on both risky
+>     pages, and src/api/main.py:85 says "never a fraud signal".
+>   * ruff clean across the whole merged tree (161 files) after my commits.
+>
+> A CHECK I WROTE, RAN AND DELETED, recorded so it is not re-added: "every control
+> total must come from a DIFFERENT dataset". It reported two of the 17 — full +
+> partial = total denials, and denied + non-denied = open per bucket. Both are
+> additivity identities WITHIN one view, which is a real check. My rule was wrong,
+> so it is gone rather than weakened; the reasoning is in the file.
 - [ ] FastAPI endpoints with schemas + version metadata
 - [ ] Streamlit dashboard (5 pages, synthetic banner on all)
 - [ ] DuckDB/Parquet demo extract for hosted deployment

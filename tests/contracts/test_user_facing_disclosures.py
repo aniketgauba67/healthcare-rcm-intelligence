@@ -46,6 +46,7 @@ one passage a reader will read as one thought.
 
 from __future__ import annotations
 
+import ast
 import pathlib
 import re
 
@@ -100,16 +101,62 @@ def _paragraphs(text: str) -> list[str]:
     return [block for block in re.split(r"\n\s*\n", text) if block.strip()]
 
 
+def rendered_strings(source: str) -> list[str]:
+    """Every string a module can put on screen, as the VALUE not as the source text.
+
+    MEASURED FALSE RED, qa-reviewer-p18 2026-07-29. This gate read dashboard/*.py
+    with `read_text()` and reported that `dashboard/` never says the crosswalk is
+    forbidden as a feature. It says exactly that, at
+    `dashboard/disclosures.py:119-120`, and a user reads it — but the sentence is
+    built by implicit concatenation, so the FILE contains
+
+        ...is also **forbidden as a "\\n    "feature** in every model...
+
+    and `re.search("forbidden as a feature")` cannot cross the quote, the newline
+    and the indent. The disclosure was present, correct, and reported missing, which
+    on this project is the shape that pushes an author towards rewording an honest
+    sentence to satisfy an instrument.
+
+    Parsing fixes it at the root rather than by widening the pattern: CPython merges
+    adjacent string literals into ONE `ast.Constant` at parse time, so the value in
+    the tree is the value at runtime. This is the same lesson as
+    MATCHER-EXPRESSIVENESS and [PASSTHROUGH-BLIND] — the instrument that ran was
+    weaker than the claim its result implied.
+
+    Docstrings are deliberately EXCLUDED. A user never reads one, so prose that
+    lives only in a docstring is not a disclosure to anybody; counting it would let
+    this gate go green on a page whose screen says nothing. Comments were never
+    included, and are not now, for the same reason.
+    """
+    tree = ast.parse(source)
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef)
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+        and isinstance(node.body[0].value.value, str)
+    }
+    return [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+    ]
+
+
 def _surfaces() -> list[tuple[str, str]]:
     """(name, text) for every surface a user reads. The dashboard joins when built."""
     found = [("README.md", README.read_text()), ("docs/model_card.md", MODEL_CARD.read_text())]
     if DASHBOARD.is_dir():
-        pages = sorted(p for p in DASHBOARD.rglob("*.py") if p.name != "__init__.py")
-        pages += sorted(DASHBOARD.rglob("*.md"))
-        if pages:
-            found.append(
-                ("dashboard/", "\n\n".join(p.read_text() for p in pages)),
-            )
+        modules = sorted(p for p in DASHBOARD.rglob("*.py") if p.name != "__init__.py")
+        markdown = sorted(DASHBOARD.rglob("*.md"))
+        if modules or markdown:
+            rendered = [text for path in modules for text in rendered_strings(path.read_text())]
+            rendered += [path.read_text() for path in markdown]
+            found.append(("dashboard/", "\n\n".join(rendered)))
     return found
 
 
@@ -262,4 +309,60 @@ def test_the_documented_collision_still_matches_the_warehouse() -> None:
         f"the facility crosswalk now measures {measured} (synthetic providers, distinct real "
         f"CCNs, worst collision) but README, the model card and this file all state {documented}. "
         "Update the constants here and every user-facing surface in the same commit."
+    )
+
+
+# --------------------------------------------------------------------------
+# Controls on the extractor. A green disclosure gate is a claim about the
+# extractor before it is a claim about the docs, and this one has already been
+# wrong once in the permissive direction (it reported a present disclosure
+# missing). These pin both directions on text the gate does not otherwise read.
+# --------------------------------------------------------------------------
+
+_CONCATENATED = """
+NOTE = (
+    "The crosswalk is also **forbidden as a "
+    "feature** in every model at every boundary."
+)
+"""
+
+_ONLY_IN_A_COMMENT = """
+# The crosswalk is forbidden as a feature in every model.
+NOTE = "Facility names are attached by a seeded random assignment."
+"""
+
+_ONLY_IN_A_DOCSTRING = '''
+"""The crosswalk is forbidden as a feature in every model."""
+
+NOTE = "Facility names are attached by a seeded random assignment."
+'''
+
+
+def test_the_extractor_reads_across_an_implicit_concatenation() -> None:
+    """The measured false red. `dashboard/disclosures.py` splits this exact phrase."""
+    assert _FORBIDDEN_AS_FEATURE.search("\n".join(rendered_strings(_CONCATENATED)))
+
+
+def test_a_disclosure_only_in_a_comment_does_not_count() -> None:
+    """Nobody reading the screen reads a comment, so it cannot discharge §3/§6."""
+    assert not _FORBIDDEN_AS_FEATURE.search("\n".join(rendered_strings(_ONLY_IN_A_COMMENT)))
+
+
+def test_a_disclosure_only_in_a_docstring_does_not_count() -> None:
+    """Same reason, and the likelier mistake: these files carry long docstrings."""
+    assert not _FORBIDDEN_AS_FEATURE.search("\n".join(rendered_strings(_ONLY_IN_A_DOCSTRING)))
+
+
+def test_the_live_dashboard_disclosure_is_what_makes_that_surface_green() -> None:
+    """Anchors the fix to the real file, so a future edit that re-splits it stays green
+    and a future edit that DELETES it goes red — which grepping the source could not
+    distinguish."""
+    disclosures = DASHBOARD / "disclosures.py"
+    if not disclosures.is_file():
+        pytest.skip("dashboard/disclosures.py does not exist")
+    rendered = "\n".join(rendered_strings(disclosures.read_text()))
+    assert _FORBIDDEN_AS_FEATURE.search(rendered), (
+        "dashboard/disclosures.py no longer states that the crosswalk is forbidden as a model "
+        "feature. That sentence is what makes the `dashboard/` surface satisfy "
+        "test_the_surface_states_the_keying_rule."
     )
