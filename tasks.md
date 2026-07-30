@@ -2048,6 +2048,56 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> CRASH #9 2026-07-30 02:23-03:20Z: app-engineer-3 and qa-reviewer-p18 hit the cap.
+> ml-engineer-9 survived (idle). PRESERVED: 0fb7eb2 on feat/phase5-app — 210 lines
+> of §3.3 registration for the 8 MB demo bundle across provenance_register and
+> data_dictionary, unverified. Re-spawned app-engineer-4 and qa-reviewer-p19.
+> QA ROUND 3 (qa-reviewer-p18, 521f93b) — the dashboard RAN for the first time.
+> **MEASURED ON A STALE APP TREE: 5a88d6b, my preservation commit, three commits
+> behind app's tip 17dd780.** Team-lead verified `banner_extra` is now absent from
+> all five pages, so [DASHBOARD-BLANK] is very likely already fixed. Everything
+> below must be RE-MEASURED against the current tip before being treated as open.
+> This is the SEVENTH time the stale-tree trap has bitten on this project and it is
+> now the dominant failure mode of the review loop, not a series of slips.
+>   [DASHBOARD-BLANK] all 5 pages called render_page_header(..., banner_extra=...)
+>     while components.py:83 takes (title, subtitle); ar_recovery and work_queue
+>     raised TypeError on their FIRST rendering statement and produced ZERO blocks.
+>     An interrupted refactor — components.py's docstring documents removing the
+>     banner and agrees with the qa gate about why; the five call sites were never
+>     updated. Zero of five pages rendered the §6 banner. LIKELY STALE.
+>   [RENDER-GATE] the answer to team-lead's question about why the banner gate
+>     stayed quiet: **a static gate cannot see a page that crashes ABOVE its banner
+>     call.** Each page is now RUN and checked on its OUTPUT, with controls on the
+>     harness, one subprocess per page (five pages through AppTest in one
+>     interpreter segfaults). "The page imports" and "the page renders" are
+>     different assertions and only the second is what §6 is about.
+>   [DISCLOSURE-FALSE-RED] qa's own gate falsely reported dashboard/ missing the
+>     "forbidden as a feature" disclosure — it is present but split across an
+>     implicit string concatenation that read_text() could not see. Fixed at the
+>     root: Python surfaces now read through `ast`, which merges adjacent literals
+>     at parse time; docstrings and comments excluded, three controls.
+>   [GUARD-DISARM-3] p17's preserved gate re-measured END TO END and the guard
+>     STILL does not fire: parquet 1,469,982 → 1,456,629 bytes, diagnosis_count
+>     null 0.0 → 1.0, NO EXCEPTION. The fix belongs in `_repo_root_for`
+>     (store.py:226-234), NOT the FileNotFoundError handler at :328 — control flow
+>     never reaches it, and the reason string it emits is FALSE. Third pass at the
+>     same defect. ml's to close.
+>   [TIER-DISPUTED] qa removed their own hardcoded {"priority_tier"} carve-out: the
+>     view builds it as an ntile over heuristic_priority_score, so the EXEMPTION is
+>     right and config/model.yaml:186's REASON is the inaccurate half. Red until ml
+>     rewords. (A reason that is wrong is worse than none — it launders the entry.)
+>   [RECONCILE-SILENT-SKIP] the [SKIP-BLIND] shape on a USER-FACING surface:
+>     run() drops checks whose datasets are absent and the page prints "All N" over
+>     the EVALUATED count — 17 declared, 14 evaluated, 3 vanished, and the user is
+>     told all 17 passed. Pinned red.
+>   ALSO: `docker compose config` exits 1 on a clean clone (missing .env) and
+>     starts postgres only — §7 clean-clone UNMET. The 8 MB bundle was absent from
+>     both provenance docs (app-engineer-3 was fixing exactly this when the cap hit;
+>     preserved at 0fb7eb2). The bundle ships three genuinely unmarked simulated
+>     columns.
+>   VERIFIED PASSING: API on the bundle path in all three queue modes, OpenAPI
+>     3.1.0 valid, synthetic-id keying held, Model C's negative result presented as
+>     one, no fraud framing, no firewall overclaim, ruff clean.
 > CRASH #8 2026-07-29 19:07Z: ml-engineer-8, ml-engineer-7, app-engineer-2 and
 > qa-reviewer-p17 all hit the cap together. PRESERVED by team-lead:
 > **5a88d6b** on feat/phase5-app — the ENTIRE 5-page dashboard plus the demo
