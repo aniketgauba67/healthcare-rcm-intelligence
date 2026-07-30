@@ -2048,6 +2048,60 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> CRASH #8 2026-07-29 19:07Z: ml-engineer-8, ml-engineer-7, app-engineer-2 and
+> qa-reviewer-p17 all hit the cap together. PRESERVED by team-lead:
+> **5a88d6b** on feat/phase5-app — the ENTIRE 5-page dashboard plus the demo
+> bundle, 3,045 lines and an 8.0 MB rcm_demo.duckdb, ruff clean, verified by NOBODY:
+> no `streamlit run`, no test pass, no qa gate. Specifically UNCONFIRMED: banner on
+> every page (§6), totals reconciling to view_reconciliation.py, synthetic-id
+> keying, and whether the bundle is registered per §3.3. That registration is
+> REQUIRED — the bundle is the most exposed artifact in the repo because it ships
+> to a hosted demo. Two scratch copies of qa's gates (tests/contracts/zz_tmp_*.py)
+> were deliberately NOT committed; tests/ is qa's.
+> **5a59f42** on feat/phase5-qa — an 80-line matrix-write-guard gate update.
+> Re-spawned as app-engineer-3, ml-engineer-9, qa-reviewer-p18. Warehouse healthy,
+> reconciliation 21/21.
+> ML WORK LANDED SINCE (feat/phase5-blockers, f18dfc7 → 21fe077):
+>   9bcc14e [GUARD-DISARM] FIXED — the write guard no longer stands down when its
+>     own baseline is damaged. qa's RED gate (65de5f9) is what forced it.
+>   6b17885 [MATCHER-EXPRESSIVENESS] SWEEP — the rule generalised and a SECOND
+>     instance found in provenance.py. Instance 1 is WIDER than recorded: f18dfc7
+>     refused globs in forbidden_derived_features only, but the hole is in the
+>     MATCHER, not one block — tests/leakage/ resolves EVERY configured name with
+>     fnmatch (its own vocabulary calls them "patterns") while `_offenders` matches
+>     exact-then-substring and expands nothing. A planted `*denied_amount` in
+>     forbidden_features is green and empty: it reports coverage for names it never
+>     blocks, and every check agrees the list is fine.
+>   7c110c0 [FIREWALL-CLAIM] — an honesty defect, and the worse half SHIPS.
+>     model_card.md 139-141 justified the cost-matrix factors by asserting the
+>     generator's realized overturn and rework rates "sit behind the §4.5
+>     firewall". They do not: assumptions.md §8 states the overturn target and §9
+>     the realized rework cost, and §4.5 firewalls src/simulation/, not docs/. The
+>     SECOND surface is worse — train.py wrote the same false claim into
+>     model_a/metrics.json, a MACHINE-READABLE artifact that ships. Found by
+>     grepping `firewall` across every ml-owned surface. THE ARGUMENT SURVIVES:
+>     both factors are anchored to published benchmarks named in the card and both
+>     were fixed BEFORE the threshold was computed — so this is a rewording, not a
+>     retraction. qa's ruling stands recorded in assumptions.md §12: **the firewall
+>     is a DISCIPLINE, NOT AN INFORMATION BARRIER, and no surface may describe it
+>     as one.**
+>   21fe077 [DEMO-BUNDLE] registered the .duckdb surface.
+> QA ROUND 2 (qa-reviewer-p17): API RUNS — /metrics/executive returns
+> claims_submitted=20867 and denied_claims=2663, the control-query figures, no
+> 500s. [PASSTHROUGH-BLIND] is the phase's best structural finding: the emitter
+> probe perturbs an input and reports columns that MOVE, so it can only see columns
+> a surface COMPUTES — and the API read side is entirely pass-through. Registering
+> it would have turned the gate GREEN while proving nothing, and the same will hold
+> for every dashboard page that renders a view. Replacement gate keys on ml's own
+> `forbidden_derived_features`, and found [WIRE-UNMARKED]: 8 fields reach the wire
+> unmarked, including `ar_balance_amt` — an unmarked simulated DOLLAR figure on a
+> user-facing surface, i.e. [QUEUE-PREFIX] for the THIRD time, one layer further
+> out each time.
+> TEAM-LEAD NOTE ON THE PATTERN, for the human: three separate renames of the same
+> family is a symptom, not three bugs. CLAUDE.md §3.1 defines DERIVED as "computed
+> from SOURCE" and has no category for "computed from SIMULATED". That taxonomy gap
+> is why these keep surfacing one layer at a time. Amending §3.1 requires human
+> approval, so it is flagged rather than done.
 > CRASH #7 2026-07-29 13:20-13:48Z (team-lead): ml-engineer-7, qa-reviewer-p16,
 > ml-engineer-6 and app-engineer ALL hit the cap within 28 minutes — the largest
 > simultaneous loss on this project. ml and qa worktrees were CLEAN. app-engineer's
