@@ -328,6 +328,63 @@ def test_a_first_write_is_still_quiet_without_git(
     assert path.exists()
 
 
+def test_an_existing_artifact_outside_a_repository_is_not_treated_as_a_first_write(
+    tmp_path: pathlib.Path, matrix
+) -> None:
+    """No repository is not permission to overwrite an artifact already on disk."""
+    path = tmp_path / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    path.parent.mkdir(parents=True)
+    original = b"existing artifact with no verifiable committed baseline"
+    path.write_bytes(original)
+
+    with pytest.raises(ArtifactRewriteRefused, match="already exists"):
+        persist_training_matrix(matrix, path=path)
+
+    assert path.read_bytes() == original
+
+
+def test_unreadable_head_metadata_does_not_disarm_the_guard(
+    monkeypatch: pytest.MonkeyPatch, scratch_repo: pathlib.Path, matrix
+) -> None:
+    """Root discovery can succeed while the commit supplying the baseline is unreadable."""
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    before = parquet.read_bytes()
+    real_run = subprocess.run
+
+    def head_is_unreadable(command, *args, **kwargs):
+        if command and "rev-parse" in command and "--verify" in command:
+            raise subprocess.CalledProcessError(128, command)
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", head_is_unreadable)
+
+    with pytest.raises(ArtifactRewriteRefused, match="could not read HEAD metadata"):
+        _persist_into(scratch_repo, matrix)
+
+    assert parquet.read_bytes() == before
+
+
+def test_unreadable_path_metadata_does_not_disarm_the_guard(
+    monkeypatch: pytest.MonkeyPatch, scratch_repo: pathlib.Path, matrix
+) -> None:
+    """A readable HEAD is insufficient when Git cannot inspect its paths."""
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    before = parquet.read_bytes()
+    real_run = subprocess.run
+
+    def tree_is_unreadable(command, *args, **kwargs):
+        if command and "ls-tree" in command:
+            raise subprocess.CalledProcessError(128, command)
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", tree_is_unreadable)
+
+    with pytest.raises(ArtifactRewriteRefused, match="could not inspect HEAD"):
+        _persist_into(scratch_repo, matrix)
+
+    assert parquet.read_bytes() == before
+
+
 # --- the override is deliberate and loud ----------------------------------
 
 
@@ -373,6 +430,28 @@ def test_an_uncomparable_baseline_is_reported_not_passed_over() -> None:
     legacy = {"rows": 10, "features": ["a"], "passthrough": [], "split_column": "split"}
     problems = manifest_deviations(candidate, legacy)
     assert any("NULL RATES NOT COMPARED" in problem for problem in problems)
+
+
+def test_malformed_required_manifest_fields_refuse_before_writing(
+    scratch_repo: pathlib.Path, matrix
+) -> None:
+    """Valid JSON is not necessarily a usable committed baseline."""
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    manifest = parquet.parent / "model_a_training_matrix.json"
+    before = parquet.read_bytes()
+    manifest.write_text(
+        json.dumps({"rows": "unknown", "null_rates": ["not", "a", "mapping"]}) + "\n"
+    )
+    _git(scratch_repo, "add", "-A")
+    _git(scratch_repo, "commit", "--quiet", "-m", "malform required manifest fields")
+
+    with pytest.raises(ArtifactRewriteRefused) as raised:
+        _persist_into(scratch_repo, matrix)
+
+    message = str(raised.value)
+    assert "REQUIRED MANIFEST INFORMATION UNAVAILABLE" in message
+    assert "NULL RATES NOT COMPARED" in message
+    assert parquet.read_bytes() == before
 
 
 # --- the three states, named -----------------------------------------------

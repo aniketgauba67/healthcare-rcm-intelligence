@@ -61,28 +61,31 @@ it by accident is not possible.
 version of this guard collapsed four conditions into a single `None` — no git,
 the path is outside the repository, `git show` found nothing, and *the committed
 manifest did not parse* — and then read `None` as "there is no good artifact
-here, write away". Three of those really are that. The fourth is the opposite: a
-corrupt manifest at HEAD, or a manifest that stopped being tracked while the
-parquet is still committed, means the artifact this guard exists to protect is
-sitting right there and only the evidence about it is unreadable. Measured by qa
-on both paths: a matrix with `diagnosis_count` entirely null went straight over
-the committed parquet with no exception raised — the exact failure above,
-reached through the guard rather than around it. A guard that disarms when its
-own reference is damaged is worse than no guard, because the artifact still
-looks protected.
+here, write away". None of those conditions proves absence once an artifact
+already exists. A corrupt manifest at HEAD, a manifest that stopped being tracked
+while the parquet is still committed, or Git becoming unavailable means the
+artifact this guard exists to protect is sitting right there and only the evidence
+about it is unreadable. Measured by qa on these paths: a matrix with
+`diagnosis_count` entirely null went straight over the committed parquet with no
+exception raised — the exact failure above, reached through the guard rather than
+around it. A guard that disarms when its own reference is damaged is worse than no
+guard, because the artifact still looks protected.
 
 So the baseline lookup is now three-valued (`committed_baseline`): ABSENT,
 READABLE, UNREADABLE. Only ABSENT is quiet. UNREADABLE refuses, and says which
-of the two it was. This is nothing more than the rule `manifest_deviations`
-already follows one level down, where a missing `null_rates` block reports
-"NULL RATES NOT COMPARED" instead of passing: **a check that did not run must
-never read like a check that passed.**
+condition prevented the comparison. When repository state cannot be established,
+ABSENT is available only for a genuine first write with no artifact at the target
+path. This is nothing more than the rule `manifest_deviations` already follows one
+level down, where a missing `null_rates` block reports "NULL RATES NOT COMPARED"
+instead of passing: **a check that did not run must never read like a check that
+passed.**
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import pathlib
 import subprocess
@@ -137,6 +140,10 @@ ALLOW_CHANGE_ENV = "RCM_ALLOW_MATRIX_CHANGE"
 
 class ArtifactRewriteRefused(RuntimeError):
     """The matrix about to be written disagrees with the committed one."""
+
+
+class _GitMetadataUnavailable(RuntimeError):
+    """Git cannot establish the committed baseline for an existing artifact."""
 
 
 def leakage_config_digest(config: dict) -> str:
@@ -230,8 +237,12 @@ def _repo_root_for(path: pathlib.Path) -> pathlib.Path | None:
             text=True,
             check=True,
         ).stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError, NotADirectoryError):
+    except subprocess.CalledProcessError:
         return None
+    except (FileNotFoundError, OSError, NotADirectoryError) as exc:
+        raise _GitMetadataUnavailable(
+            f"git could not discover the repository containing {path} ({exc})"
+        ) from exc
     return pathlib.Path(top) if top else None
 
 
@@ -245,8 +256,9 @@ class CommittedBaseline:
     Three states, and the third is the whole reason this type exists instead of
     a bare `dict | None`:
 
-    * `absent` — git has never seen this artifact. There is nothing to protect,
-      so the guard stands down. Writes to a `tmp_path` land here.
+    * `absent` — Git confirms neither file is committed, or repository state is
+      unavailable and no artifact exists at the target. There is nothing to
+      overwrite, so genuine first writes land here.
     * `readable` — the committed manifest was read from HEAD and `manifest`
       holds it. The guard compares against it.
     * `unreadable` — something IS committed here and the baseline could not be
@@ -262,21 +274,57 @@ class CommittedBaseline:
     reason: str = ""
 
 
-def _tracked_at_head(root: pathlib.Path, path: pathlib.Path) -> bool:
-    """Whether `path` exists in the HEAD commit. False if git cannot say."""
-    try:
-        relative = path.resolve().relative_to(root.resolve()).as_posix()
-    except ValueError:
-        return False
+def _unknown_or_absent(artifact: pathlib.Path, reason: str) -> CommittedBaseline:
+    """Refuse an unverifiable overwrite while preserving a genuinely new write."""
+    if artifact.exists():
+        return CommittedBaseline(
+            "unreadable",
+            reason=(
+                f"{reason}; {artifact} already exists, so the guard cannot establish "
+                "whether it is the committed artifact and will not overwrite it"
+            ),
+        )
+    return CommittedBaseline(
+        "absent",
+        reason=f"{reason}; no artifact exists yet at {artifact}",
+    )
+
+
+def _verify_head(root: pathlib.Path) -> None:
+    """Raise when Git cannot identify the commit that supplies the baseline."""
     try:
         subprocess.run(
-            ["git", "-C", str(root), "cat-file", "-e", f"HEAD:{relative}"],
+            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{commit}"],
             capture_output=True,
+            text=True,
             check=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
-        return False
-    return True
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        raise _GitMetadataUnavailable(
+            f"git could not read HEAD metadata in {root} ({exc})"
+        ) from exc
+
+
+def _tracked_at_head(root: pathlib.Path, path: pathlib.Path) -> bool:
+    """Whether `path` exists in the verified HEAD commit."""
+    try:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError as exc:
+        raise _GitMetadataUnavailable(
+            f"{path} is outside the expected git repository at {root}"
+        ) from exc
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-tree", "--name-only", "HEAD", "--", relative],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        raise _GitMetadataUnavailable(
+            f"git could not inspect HEAD:{relative} in {root} ({exc})"
+        ) from exc
+    return bool(result.stdout.strip())
 
 
 def committed_baseline(
@@ -296,24 +344,29 @@ def committed_baseline(
     `unreadable`, not `absent`; that asymmetry is the fix for [GUARD-DISARM].
     """
     artifact = artifact_path if artifact_path is not None else path.with_suffix(".parquet")
-    root = repo_root or _repo_root_for(path)
+    try:
+        root = repo_root or _repo_root_for(path)
+    except _GitMetadataUnavailable as exc:
+        return _unknown_or_absent(artifact, str(exc))
     if root is None:
-        return CommittedBaseline("absent", reason=f"{path} is not inside a git repository")
+        return _unknown_or_absent(artifact, f"git did not identify a repository containing {path}")
     try:
         relative = path.resolve().relative_to(root.resolve()).as_posix()
+        artifact.resolve().relative_to(root.resolve())
     except ValueError:
-        return CommittedBaseline("absent", reason=f"{path} is outside the git repository at {root}")
+        return _unknown_or_absent(
+            artifact, f"{path} or {artifact} is outside the expected git repository at {root}"
+        )
+
     try:
-        blob = subprocess.run(
-            ["git", "-C", str(root), "show", f"HEAD:{relative}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-    except subprocess.CalledProcessError:
-        # git answered, and the answer is that HEAD carries no such file. Whether
-        # that means "nothing to protect" depends on the artifact beside it.
-        if _tracked_at_head(root, artifact):
+        _verify_head(root)
+        manifest_tracked = _tracked_at_head(root, path)
+        artifact_tracked = _tracked_at_head(root, artifact)
+    except _GitMetadataUnavailable as exc:
+        return _unknown_or_absent(artifact, str(exc))
+
+    if not manifest_tracked:
+        if artifact_tracked:
             return CommittedBaseline(
                 "unreadable",
                 reason=(
@@ -323,14 +376,24 @@ def committed_baseline(
                 ),
             )
         return CommittedBaseline(
-            "absent", reason=f"neither {relative} nor {artifact.name} is committed at HEAD"
+            "absent",
+            reason=f"neither {relative} nor {artifact.name} is committed at HEAD",
         )
-    except (FileNotFoundError, OSError) as exc:
-        # git itself could not be run, so nothing here can be established —
-        # including whether the artifact is committed.
-        return CommittedBaseline("absent", reason=f"git could not be run ({exc})")
+
     try:
-        return CommittedBaseline("readable", manifest=json.loads(blob))
+        blob = subprocess.run(
+            ["git", "-C", str(root), "show", f"HEAD:{relative}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        return CommittedBaseline(
+            "unreadable",
+            reason=f"git could not read the committed manifest at HEAD:{relative} ({exc})",
+        )
+    try:
+        manifest = json.loads(blob)
     except json.JSONDecodeError as exc:
         return CommittedBaseline(
             "unreadable",
@@ -339,6 +402,15 @@ def committed_baseline(
                 f"({exc}), so the artifact it describes cannot be checked"
             ),
         )
+    if not isinstance(manifest, dict):
+        return CommittedBaseline(
+            "unreadable",
+            reason=(
+                f"the manifest committed at HEAD:{relative} is "
+                f"{type(manifest).__name__}, not a JSON object"
+            ),
+        )
+    return CommittedBaseline("readable", manifest=manifest)
 
 
 def committed_manifest(
@@ -364,8 +436,17 @@ def manifest_deviations(candidate: dict[str, Any], committed: dict[str, Any]) ->
     """
     problems: list[str] = []
 
-    if int(candidate["rows"]) != int(committed.get("rows", -1)):
-        problems.append(f"row count {committed.get('rows')} -> {candidate['rows']}")
+    try:
+        candidate_rows = int(candidate["rows"])
+        committed_rows = int(committed["rows"])
+    except (KeyError, TypeError, ValueError):
+        problems.append(
+            "REQUIRED MANIFEST INFORMATION UNAVAILABLE — the committed and candidate "
+            "manifests must both carry an integer `rows` value."
+        )
+    else:
+        if candidate_rows != committed_rows:
+            problems.append(f"row count {committed_rows} -> {candidate_rows}")
 
     def column_set(manifest: dict[str, Any]) -> set[str]:
         """The columns actually IN the file, which is not the same as the declared ones.
@@ -376,7 +457,7 @@ def manifest_deviations(candidate: dict[str, Any], committed: dict[str, Any]) ->
         incapable of ever firing, which is worse than not having it.
         """
         rates = manifest.get("null_rates")
-        if rates:
+        if isinstance(rates, dict) and rates:
             return set(rates)
         return (
             set(manifest.get("features", ()))
@@ -392,21 +473,47 @@ def manifest_deviations(candidate: dict[str, Any], committed: dict[str, Any]) ->
         problems.append(f"columns removed: {removed}")
 
     baseline_nulls = committed.get("null_rates")
-    if baseline_nulls is None:
+    candidate_nulls = candidate.get("null_rates")
+    if not isinstance(baseline_nulls, dict) or not baseline_nulls:
         # Genuinely not comparable: the committed manifest predates this field.
         # Said out loud rather than passed over — the whole point of this guard is
         # that a check which did not run must never read like a check that passed.
         problems.append(
-            "NULL RATES NOT COMPARED — the committed manifest carries no `null_rates` "
-            "block. Re-commit the manifest to close this gap."
+            "NULL RATES NOT COMPARED — the committed manifest carries no non-empty "
+            "`null_rates` object. Re-commit the manifest to close this gap."
+        )
+    elif not isinstance(candidate_nulls, dict) or not candidate_nulls:
+        problems.append(
+            "NULL RATES NOT COMPARED — the candidate manifest carries no non-empty "
+            "`null_rates` object."
         )
     else:
-        for name, rate in candidate.get("null_rates", {}).items():
+        for name, rate in candidate_nulls.items():
             before = baseline_nulls.get(name)
             if before is None:
                 continue  # a new column; already reported as an addition
-            if abs(float(rate) - float(before)) > NULL_RATE_TOLERANCE:
-                problems.append(f"null rate for {name}: {before:.4f} -> {float(rate):.4f}")
+            try:
+                before_rate = float(before)
+                candidate_rate = float(rate)
+            except (TypeError, ValueError):
+                problems.append(
+                    f"REQUIRED MANIFEST INFORMATION UNAVAILABLE — null rate for {name} "
+                    "is not numeric."
+                )
+                continue
+            if not (
+                math.isfinite(before_rate)
+                and math.isfinite(candidate_rate)
+                and 0.0 <= before_rate <= 1.0
+                and 0.0 <= candidate_rate <= 1.0
+            ):
+                problems.append(
+                    f"REQUIRED MANIFEST INFORMATION UNAVAILABLE — null rate for {name} "
+                    "must be finite and between 0 and 1."
+                )
+                continue
+            if abs(candidate_rate - before_rate) > NULL_RATE_TOLERANCE:
+                problems.append(f"null rate for {name}: {before_rate:.4f} -> {candidate_rate:.4f}")
     return problems
 
 

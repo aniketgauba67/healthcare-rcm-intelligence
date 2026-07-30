@@ -2048,6 +2048,18 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> FIRST BLOCKER GROUP CLOSED by ml-engineer on `feat/phase5-matrix-guard`,
+> pending independent QA. The matrix writer now distinguishes a genuine first
+> write from an existing artifact whose repository, HEAD, committed manifest, or
+> expected path cannot be verified; only the first case is quiet. All comparisons
+> remain against `git show HEAD:<manifest>`, never the working-tree sidecar.
+> Missing/malformed comparison fields, row/column drift, and material null-rate
+> drift refuse before either artifact file is touched. `priority_tier` remains
+> forbidden as a feature and exempt as process metadata; its reason now correctly
+> states that it is an ntile over `heuristic_priority_score`, not a direct
+> computation from `sim_denial_flag`. Focused guard, manifest, matcher, blacklist,
+> and QA tier tests: 56 passed / 1 skipped (the live-Postgres staleness rebuild;
+> no database configured). Repository-wide ruff check and format check clean.
 > CRASH #9 2026-07-30 02:23-03:20Z: app-engineer-3 and qa-reviewer-p18 hit the cap.
 > ml-engineer-9 survived (idle). PRESERVED: 0fb7eb2 on feat/phase5-app — 210 lines
 > of §3.3 registration for the 8 MB demo bundle across provenance_register and

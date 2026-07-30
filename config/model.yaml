@@ -183,7 +183,7 @@ forbidden_derived_features:
   ar_open_flag: derived from sim_payment_date
   ar_balance_amt: derived from sim_allowed_amount and sim_paid_amount
   heuristic_priority_score: vw_work_queue_priority, built on sim_denial_flag
-  priority_tier: vw_work_queue_priority, built on sim_denial_flag
+  priority_tier: vw_work_queue_priority, an ntile over heuristic_priority_score; the score is derived from simulated money
   dollars_at_stake: vw_work_queue_priority, built on sim_denied_amount
   # Added 2026-07-29 (ml-engineer-7). It was missing, and nothing else here was a
   # substring of it, so it was blocked by nothing: vw_work_queue_priority:78-82
