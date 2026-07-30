@@ -23,6 +23,15 @@ the work queue:
   surface covers is a failure. That is the rule that generalises to Phase 5 —
   a dashboard extract or an API response table cannot appear undeclared, which
   is the condition that let this run for four commits.
+
+Rule 1's scan is INVERTED, and the tests at the bottom of this file are the ones
+that hold it that way. The first version enumerated the roots it would look in, so
+it caught a new FILE in a known directory and missed a new DIRECTORY entirely —
+a guarantee the module docstring claimed and the code did not deliver. The
+evidence it never self-extended is that `dashboard/demo_data` had to be hand-added
+when app-engineer asked; nothing failed in the meantime. The scan now walks the
+repository and requires our outputs to sit under a DECLARED root, so the exclusion
+list is the thing that must be argued rather than the inclusion list.
 """
 
 from __future__ import annotations
@@ -34,6 +43,7 @@ import pandas as pd
 import pytest
 
 from src.features.provenance import (
+    NON_OUTPUT_TREES,
     PUBLISHED_SURFACES,
     REPO_ROOT,
     WORK_QUEUE_SCHEMA,
@@ -45,6 +55,8 @@ from src.features.provenance import (
     assert_every_published_file_is_covered,
     assert_publishable,
     assert_schema_is_marked,
+    excluded_because,
+    our_tabular_files,
     published_files,
     read_columns,
     surface_for,
@@ -236,9 +248,19 @@ def test_a_new_published_table_must_be_declared(tmp_path) -> None:
 
 
 def test_the_files_actually_on_disk_are_all_covered() -> None:
-    files = published_files()
-    if not files:
-        pytest.skip("no artifacts generated; run `make train` / `make train-appeal`")
+    """Runs UNCONDITIONALLY, and the skip that used to guard it had to go.
+
+    It read `if not published_files(): pytest.skip("no artifacts generated")`, which
+    was a defensible precondition while the scan only looked inside
+    `PUBLISHED_ROOTS` — empty roots really did mean nothing to check. The inversion
+    changes what the assertion covers: it now walks the repository, so an
+    undeclared output tree is exactly the thing it can find when the roots are
+    empty, and the old guard would have skipped the only case that needed it.
+
+    That is [SKIP-BLIND] again, in the commit that made it possible — a skip whose
+    precondition is a plausible neighbour of the thing actually absent rather than
+    the thing itself.
+    """
     assert_every_published_file_is_covered()
 
 
@@ -261,6 +283,93 @@ def test_the_work_queue_csvs_on_disk_match_the_declaration() -> None:
         columns = read_columns(REPO_ROOT / path)
         assert columns is not None
         assert_columns_match_schema(columns, WORK_QUEUE_SCHEMA)
+
+
+def test_a_new_output_DIRECTORY_fails_not_just_a_new_file(tmp_path) -> None:
+    """The inversion, stated as the case the old scan could not see.
+
+    A whole output tree appears somewhere nobody enumerated. Under the old
+    root-first scan this was green — it never looked outside `PUBLISHED_ROOTS`, so
+    there was nothing to report. This is the guarantee rule 1's docstring claims.
+    """
+    reports = tmp_path / "reports" / "weekly"
+    reports.mkdir(parents=True)
+    (reports / "denial_summary.csv").write_text("claim_sk,recoverable_amt\n1,100.0\n")
+
+    with pytest.raises(ProvenanceError) as raised:
+        assert_every_published_file_is_covered(tmp_path)
+    message = str(raised.value)
+    assert "reports/weekly/denial_summary.csv" in message
+    assert "NEW OUTPUT DIRECTORY" in message
+    assert "PUBLISHED_ROOTS" in message and "NON_OUTPUT_TREES" in message, (
+        "the failure must name both ways out, or the next author picks one by guessing"
+    )
+
+
+def test_an_excluded_tree_does_not_fail_and_a_nested_worktree_is_one(tmp_path) -> None:
+    """Exclusions are honoured, and the load-bearing one is checked by name.
+
+    `.claude/worktrees/` holds full checkouts of this repository. Without that
+    exclusion a scan from the primary checkout reports every OTHER worktree's
+    artifacts as living outside a published root — six worktrees' worth of
+    failures, none of them a real defect, which is how a guard gets switched off.
+    """
+    vendored = tmp_path / ".venv" / "lib" / "lifelines" / "datasets"
+    vendored.mkdir(parents=True)
+    (vendored / "waltons_dataset.csv").write_text("T,E\n1,1\n")
+
+    sibling = tmp_path / ".claude" / "worktrees" / "feat+other" / "artifacts" / "features"
+    sibling.mkdir(parents=True)
+    (sibling / "model_a_training_matrix.parquet").write_bytes(b"not really a parquet")
+
+    staging = tmp_path / "data" / "simulated"
+    staging.mkdir(parents=True)
+    (staging / "sim_claim_adjudication.parquet").write_bytes(b"not really a parquet")
+
+    assert our_tabular_files(tmp_path) == [], (
+        "an excluded tree leaked into the scan; every one of these is either "
+        "third-party, another worktree, or an input tier"
+    )
+    assert_every_published_file_is_covered(tmp_path)
+
+
+def test_a_declared_root_is_still_checked_for_coverage(tmp_path) -> None:
+    """The inversion must not have replaced the original rule, only preceded it."""
+    extract = tmp_path / "dashboard" / "demo_data"
+    extract.mkdir(parents=True)
+    (extract / "unregistered.csv").write_text("a\n1\n")
+
+    with pytest.raises(ProvenanceError) as raised:
+        assert_every_published_file_is_covered(tmp_path)
+    message = str(raised.value)
+    assert "covered by no registered surface" in message, (
+        "a file inside a DECLARED root must fail the coverage check, not the root check"
+    )
+
+
+def test_every_exclusion_carries_a_written_reason() -> None:
+    """An exclusion is a claim we do not author the file, and it costs a sentence."""
+    for tree, reason in NON_OUTPUT_TREES.items():
+        assert reason.strip().endswith("."), f"NON_OUTPUT_TREES[{tree!r}] is not a sentence"
+        assert len(reason.split()) >= 3, (
+            f"NON_OUTPUT_TREES[{tree!r}] is too short to be a reason. A bare path is the "
+            "reasonless frozenset that let `action_type` through."
+        )
+
+
+def test_the_data_tiers_are_excluded_individually_not_as_a_parent() -> None:
+    """`data/` must not be excluded wholesale, or a published extract escapes under it.
+
+    Naming the four tiers means a new `data/<something>/` carrying tabular output
+    FAILS, which is the behaviour being bought. Excluding the parent would hand it
+    straight back.
+    """
+    assert "data" not in NON_OUTPUT_TREES
+    assert excluded_because("data/raw/claims.csv") is not None
+    assert excluded_because("data/simulated/x.parquet") is not None
+    assert excluded_because("data/demo/hosted_extract.parquet") is None, (
+        "a new tier under data/ must not inherit an exclusion from its siblings"
+    )
 
 
 def test_a_surface_must_carry_a_schema_or_a_reason_never_both() -> None:
