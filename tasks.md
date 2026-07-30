@@ -2439,6 +2439,31 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   CLEAN elsewhere, which is the useful half of the result. Every other skip in
 >   tests/features/ and tests/models/ is absence of a gitignored artifact or of a
 >   Postgres URL — the surface genuinely is not there — and each already says so.
+>   SWEEP SCOPE, written down so the next ml session RE-RUNS it instead of
+>   re-deriving what it covered (team-lead directed; a clean sweep is only durable
+>   if its scope is recorded). The command, verbatim:
+>     `grep -rn "pytest.skip\|importorskip\|skipif" tests/features tests/models
+>      src/features src/models`
+>   plus `grep -rn "exists()\|return None\|except \|is None" src/features/*.py
+>   src/models/*.py` for the non-test guards. Directories: tests/features/,
+>   tests/models/, src/features/, src/models/ — i.e. ml-owned only. NOT swept:
+>   tests/leakage/ and tests/integration/ (qa's files), src/api/, dashboard/,
+>   src/demo/ (app-engineer's), sql/ (analytics').
+>   At 7866630 that command returns 12 live skip sites, and the TEST APPLIED to each
+>   is: *is the skip's precondition the thing that is actually absent, or a plausible
+>   neighbour of it?* Classification — 5 no-Postgres (test_feature_store_postgres x2,
+>   test_determinism, test_train_postgres x2: the database itself is absent);
+>   4 gitignored-artifact-absent (test_matrix_provenance x3, test_dollars_at_risk_
+>   ruling, test_published_provenance work-queue CSVs, test_matrix_write_guard
+>   matrix); 2 manifest-not-tracked-at-HEAD (test_matrix_write_guard — the ABSENT
+>   leg of store.py's three-valued baseline, the one legitimately quiet case, since
+>   UNREADABLE refuses); 1 bundle-absent + 1 duckdb-not-installed
+>   (test_demo_bundle_provenance). All 12 pass the test. The two that FAILED it are
+>   the two now fixed: table-absent-while-bundle-present (555b77e) and
+>   published_files-empty-while-the-repo-holds-an-undeclared-tree (7866630).
+>   Non-test guards: the one instrument that returns None rather than a verdict is
+>   `provenance.read_columns` on a `.duckdb`, which is honest about the limit and is
+>   covered by tests/features/test_demo_bundle_provenance.py opening the file itself.
 >   The three-valued ABSENT/READABLE/UNREADABLE baseline in src/features/store.py
 >   is the pattern the rest of them follow. ONE STRUCTURAL LIMIT recorded rather
 >   than fixed: provenance rule 1's coverage scans a hardcoded PUBLISHED_ROOTS, so
@@ -2448,6 +2473,50 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   request. Not currently exploited — measured: every tabular file Phase 5 writes
 >   lands under an existing root — so this is a note for whoever adds the next
 >   output root, not a defect.
+>   CLOSED by [ROOTS-INVERTED] below on team-lead authorisation, so the docstring
+>   no longer claims a guarantee the code does not provide.
+>   `queue_mode` RULED PERMITTED UNMARKED by team-lead 2026-07-29 — a build label is
+>   metadata about which of OUR runs produced the row (the `split`/`as_of` class,
+>   QA ruling C) and §3.2 governs simulated VALUES, which a build label is not. Two
+>   conditions attached: the reason is recorded where the column is declared (it is,
+>   in BUNDLE_ONLY_COLUMNS — a bare exemption list is how `action_type` got
+>   through), and app-engineer-3 keeps the call as owner. Also flagged by team-lead
+>   FOR app-engineer-3, not an ml item: the 1-row `live_snapshot` against 468
+>   `backtest` rows is the Phase 4 degenerate-queue finding resurfacing in the
+>   bundle, and the dashboard should carry the model card's caveat rather than let
+>   one row read as a queue. Relayed.
+> [ROOTS-INVERTED] (ml-engineer-9, team-lead AUTHORISED) provenance rule 1's
+>   coverage scan inverted rather than widened. It asked "is every file under these
+>   three hardcoded roots declared?", which catches a new FILE and misses a new
+>   DIRECTORY — a whole output tree could appear and rule 1 stayed green having
+>   never looked. Now: walk the repo, and every tabular file that is OURS must live
+>   under a DECLARED root. Default-deny, so the next output directory fails the
+>   build the day it appears, which is what the docstring already promised.
+>   `NON_OUTPUT_TREES` holds the exclusions and each carries a sentence, enforced by
+>   a test — which caught SEVEN of my own entries as too thin to be reasons on the
+>   first run, so the bar is real and not decorative.
+>   THE `data/` DECISION, because it is the one that could have given the purchase
+>   away: excluded as the FOUR TIERS (raw / validated / curated / simulated) and NOT
+>   as the parent. Excluding `data/` would let a published extract escape under a
+>   new `data/<something>/`; naming the tiers means such a directory fails. A test
+>   asserts `data/demo/hosted_extract.parquet` is NOT excluded. `mlruns/` is
+>   deliberately NOT pre-excluded: if anyone turns MLflow on, rule 1 fires and
+>   someone decides whether that tree is published, which is the behaviour being
+>   bought.
+>   `.claude/` exclusion is load-bearing, not hygiene: `.claude/worktrees/` holds
+>   full checkouts, so without it a scan from the primary checkout reports six other
+>   worktrees' artifacts as uncovered — a guard that cries wolf gets switched off.
+>   MEASURED both ways: primary checkout 1 tabular file ours, this worktree 16, rule
+>   1 GREEN from both, scan under 0.01s (excluded trees are pruned during the walk,
+>   so `.venv` is never descended into).
+>   AND IT IMMEDIATELY EXPOSED ONE MORE [SKIP-BLIND], in the commit that made it
+>   possible: `test_the_files_actually_on_disk_are_all_covered` was guarded by
+>   `if not published_files(): skip("no artifacts generated")`. Defensible while the
+>   scan only looked inside the roots — empty roots did mean nothing to check — but
+>   after the inversion an undeclared output tree is exactly what it can find when
+>   the roots are empty, so the guard would have skipped the only case needing it.
+>   Now unconditional. Same lesson as 555b77e: a skip's precondition must be the
+>   thing actually absent, not a plausible neighbour of it.
 > [BLACKLIST-LIMIT] (team-lead directed) the MEMBERSHIP caveat is now in
 >   docs/model_card.md beside the leakage guards, not only on this board: a
 >   column-name blacklist cannot express that a table's POPULATION is conditioned

@@ -107,9 +107,12 @@ BUNDLE_ONLY_COLUMNS: dict[str, str] = {
         "it cannot be misread as a claim about real money. It is absent from the per-run "
         "CSVs, which is why WORK_QUEUE_SCHEMA does not declare it: the CSVs are written one "
         "queue at a time and `assert_publishable` holds them to the declaration exactly. "
-        "FLAGGED for app-engineer and qa rather than settled by me — the column is theirs, "
-        "and this allowance is a written record that the check now SEES it, not a ruling "
-        "that it is fine."
+        "RULED PERMITTED UNMARKED by team-lead, 2026-07-29, on the grounds that a build "
+        "label is metadata about which of OUR pipeline's runs produced the row — the `split` "
+        "and `as_of` class under QA ruling C — and that §3.2 governs simulated VALUES, which "
+        "a build label is not. app-engineer-3 keeps the call as the column's owner; this is a "
+        "default to disagree with, not a decision to obey. Recorded here rather than in a "
+        "bare exemption list because a reasonless frozenset is how `action_type` got through."
     ),
 }
 
