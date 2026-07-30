@@ -287,11 +287,17 @@ else:
                     width="large",
                 ),
                 "sim_recoverable_amt": st.column_config.NumberColumn(
-                    "Recoverable", format="dollar"
+                    "Simulated recoverable amount", format="dollar"
                 ),
-                "sim_p_overturn": st.column_config.NumberColumn("p(overturn)", format="%.3f"),
-                "sim_expected_net_recovery": st.column_config.NumberColumn("ENR", format="dollar"),
-                "sim_days_to_deadline": st.column_config.NumberColumn("Days left", format="%d"),
+                "sim_p_overturn": st.column_config.NumberColumn(
+                    "Simulated p(overturn)", format="%.3f"
+                ),
+                "sim_expected_net_recovery": st.column_config.NumberColumn(
+                    "Simulated expected net recovery", format="dollar"
+                ),
+                "sim_days_to_deadline": st.column_config.NumberColumn(
+                    "Simulated days to deadline", format="%d"
+                ),
             },
         )
         st.caption(

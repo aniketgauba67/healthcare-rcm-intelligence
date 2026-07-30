@@ -206,7 +206,7 @@ dataframe(
         "first_pass_paid_rate": st.column_config.NumberColumn("First-pass paid", format="percent"),
         "late_filing_rate": st.column_config.NumberColumn("Late filing", format="percent"),
         "rework_rate": st.column_config.NumberColumn("Rework", format="percent"),
-        "sim_rework_cost": st.column_config.NumberColumn("Rework $", format="dollar"),
+        "sim_rework_cost": st.column_config.NumberColumn("Simulated rework cost", format="dollar"),
         "sim_display_facility_name": st.column_config.TextColumn(
             "Facility name (DISPLAY ONLY)",
             help=(
