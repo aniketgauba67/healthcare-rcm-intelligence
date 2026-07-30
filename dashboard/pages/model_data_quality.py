@@ -70,23 +70,48 @@ except data.DashboardDataError as error:
 
 results = reconcile.run(frames)
 failures = reconcile.failures(results)
+summary = reconcile.summarize(results)
 
-if failures:
-    st.error(
-        f"**{len(failures)} of {len(results)} figures do not reconcile.** A dashboard whose "
-        "totals disagree with the warehouse is reporting something nobody can check. The "
-        "failing rows are marked below.",
-        icon=":material/error:",
-    )
-else:
+st.markdown(
+    "**Reconciliation status:** "
+    f"{summary.declared} declared | {summary.evaluated} evaluated | {summary.passed} passed | "
+    f"{summary.failed} failed | {summary.not_evaluated} not evaluated."
+)
+
+if summary.all_passed:
     st.success(
-        f"**All {len(results)} reconciled figures match their control totals exactly.** Each "
-        "control value is derived from a DIFFERENT dataset than the figure — the executive "
+        f"**All {summary.declared}/{summary.declared} reconciled figures match their control totals exactly.** "
+        "Each control value is derived from a DIFFERENT dataset than the figure — the executive "
         "view's claim count against the enriched claim view, the aging spine's open claims "
         "against `sim_ar_open_flag`, and so on — so this is a second path to the number, not a "
         "second run of the same code.",
         icon=":material/check_circle:",
     )
+else:
+    if failures:
+        st.error(
+            f"**{summary.failed} of {summary.evaluated} evaluated figures do not reconcile.** "
+            "A dashboard whose totals disagree with the warehouse is reporting something nobody "
+            "can check. The failing rows are marked below.",
+            icon=":material/error:",
+        )
+    incomplete = [result for result in results if not result.evaluated]
+    if incomplete:
+        missing = [result for result in incomplete if result.status == "MISSING_INPUT"]
+        errors = [result for result in incomplete if result.status == "ERROR"]
+        details = [
+            f"- **{result.figure}**: unavailable dataset(s) `{', '.join(result.missing_inputs)}`."
+            for result in missing
+        ]
+        details.extend(
+            f"- **{result.figure}**: evaluation error: {result.detail}." for result in errors
+        )
+        st.warning(
+            "**Reconciliation is incomplete.** "
+            f"{summary.not_evaluated} of {summary.declared} declared checks were not evaluated "
+            "and none are counted as passing:\n\n" + "\n".join(details),
+            icon=":material/warning:",
+        )
 
 results_frame = reconcile.to_frame(results)
 dataframe(
@@ -97,7 +122,10 @@ dataframe(
         "dashboard_value": st.column_config.NumberColumn("Dashboard", format="%.4f"),
         "control_value": st.column_config.NumberColumn("Control total", format="%.4f"),
         "difference": st.column_config.NumberColumn("Difference", format="%.6f"),
-        "reconciles": st.column_config.CheckboxColumn("Reconciles"),
+        "status": st.column_config.TextColumn("Status"),
+        "missing_inputs": st.column_config.TextColumn("Unavailable dataset(s)", width="medium"),
+        "detail": st.column_config.TextColumn("Evaluation detail", width="large"),
+        "reconciles": st.column_config.CheckboxColumn("Passes"),
     },
 )
 

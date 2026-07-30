@@ -35,10 +35,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import Literal
 
 import pandas as pd
 
 Frames = Mapping[str, pd.DataFrame]
+ResultStatus = Literal["PASS", "FAIL", "MISSING_INPUT", "ERROR"]
 
 #: Datasets any check might read. A caller loads these once and passes them in.
 REQUIRED_DATASETS: tuple[str, ...] = (
@@ -76,12 +78,42 @@ class Check:
 class Result:
     figure: str
     page: str
-    dashboard_value: float
-    control_value: float
-    difference: float
+    dashboard_value: float | None
+    control_value: float | None
+    difference: float | None
     tolerance: float
-    passed: bool
     control_sql: str
+    status: ResultStatus
+    missing_inputs: tuple[str, ...] = field(default_factory=tuple)
+    detail: str | None = None
+
+    @property
+    def passed(self) -> bool:
+        """Compatibility for callers that need only evaluated failures."""
+        return self.status == "PASS"
+
+    @property
+    def evaluated(self) -> bool:
+        return self.status in {"PASS", "FAIL"}
+
+
+@dataclass(frozen=True)
+class Summary:
+    """Declared versus evaluated reconciliation state for the dashboard surface."""
+
+    declared: int
+    evaluated: int
+    passed: int
+    failed: int
+    not_evaluated: int
+    missing_input: int
+    errors: int
+
+    @property
+    def all_passed(self) -> bool:
+        return (
+            self.declared > 0 and self.evaluated == self.declared and self.passed == self.declared
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -333,13 +365,45 @@ ALL_CHECKS: tuple[Check, ...] = CHECKS + MODEL_CHECKS
 
 
 def run(frames: Frames, checks: tuple[Check, ...] = ALL_CHECKS) -> list[Result]:
-    """Evaluate every check whose datasets are present. Pure; no I/O."""
+    """Return one explicit result for every declared check. Pure; no I/O."""
     results: list[Result] = []
     for check in checks:
-        if any(name not in frames for name in check.datasets):
+        missing_inputs = tuple(name for name in check.datasets if name not in frames)
+        if missing_inputs:
+            results.append(
+                Result(
+                    figure=check.figure,
+                    page=check.page,
+                    dashboard_value=None,
+                    control_value=None,
+                    difference=None,
+                    tolerance=check.tolerance,
+                    control_sql=check.control_sql,
+                    status="MISSING_INPUT",
+                    missing_inputs=missing_inputs,
+                    detail="Required dataset unavailable.",
+                )
+            )
             continue
-        dashboard_value = float(check.dashboard(frames))
-        control_value = float(check.control(frames))
+        try:
+            dashboard_value = float(check.dashboard(frames))
+            control_value = float(check.control(frames))
+        except Exception as error:
+            results.append(
+                Result(
+                    figure=check.figure,
+                    page=check.page,
+                    dashboard_value=None,
+                    control_value=None,
+                    difference=None,
+                    tolerance=check.tolerance,
+                    control_sql=check.control_sql,
+                    status="ERROR",
+                    detail=f"{type(error).__name__}: {error}",
+                )
+            )
+            continue
+
         difference = dashboard_value - control_value
         results.append(
             Result(
@@ -349,8 +413,8 @@ def run(frames: Frames, checks: tuple[Check, ...] = ALL_CHECKS) -> list[Result]:
                 control_value=control_value,
                 difference=difference,
                 tolerance=check.tolerance,
-                passed=abs(difference) <= check.tolerance,
                 control_sql=check.control_sql,
+                status="PASS" if abs(difference) <= check.tolerance else "FAIL",
             )
         )
     return results
@@ -366,6 +430,9 @@ def to_frame(results: list[Result]) -> pd.DataFrame:
                 "dashboard_value": result.dashboard_value,
                 "control_value": result.control_value,
                 "difference": result.difference,
+                "status": result.status,
+                "missing_inputs": ", ".join(result.missing_inputs),
+                "detail": result.detail or "",
                 "reconciles": result.passed,
             }
             for result in results
@@ -374,7 +441,25 @@ def to_frame(results: list[Result]) -> pd.DataFrame:
 
 
 def failures(results: list[Result]) -> list[Result]:
-    return [result for result in results if not result.passed]
+    return [result for result in results if result.status == "FAIL"]
+
+
+def summarize(results: list[Result]) -> Summary:
+    """Count explicit outcomes without treating missing checks as successful."""
+    status_counts = {
+        status: sum(result.status == status for result in results)
+        for status in ResultStatus.__args__
+    }
+    evaluated = status_counts["PASS"] + status_counts["FAIL"]
+    return Summary(
+        declared=len(results),
+        evaluated=evaluated,
+        passed=status_counts["PASS"],
+        failed=status_counts["FAIL"],
+        not_evaluated=len(results) - evaluated,
+        missing_input=status_counts["MISSING_INPUT"],
+        errors=status_counts["ERROR"],
+    )
 
 
 def sql_for(figure: str) -> str:

@@ -143,26 +143,20 @@ def test_a_check_that_could_not_run_is_reported_rather_than_dropped() -> None:
     frames = _frames(every - {withheld})
 
     results = reconcile.run(frames, reconcile.ALL_CHECKS)
-    dropped = [
-        check.figure
-        for check in reconcile.ALL_CHECKS
-        if withheld in check.datasets and check.figure not in {r.figure for r in results}
-    ]
-    assert dropped, f"withholding {withheld!r} dropped no check; pick a dataset a check needs"
+    affected = [check.figure for check in reconcile.ALL_CHECKS if withheld in check.datasets]
+    assert affected, f"withholding {withheld!r} affects no check; pick a dataset a check needs"
+    assert len(results) == len(reconcile.ALL_CHECKS)
 
     frame = reconcile.to_frame(results)
     reported = set(frame["figure"]) if not frame.empty else set()
-    assert set(dropped) <= reported, (
-        f"withholding the dataset {withheld!r} silently removed {len(dropped)} check(s) from the "
-        "reconciliation result:\n  " + "\n  ".join(dropped) + "\n\n"
-        f"`reconcile.run()` evaluated {len(results)} of {len(reconcile.ALL_CHECKS)} declared "
-        "checks and the result set carries no record of the difference, so "
-        "dashboard/pages/model_data_quality.py renders 'All N reconciled figures match' over a "
-        "smaller N. MEASURED on the Postgres path: 17 declared, 14 evaluated, and the three "
-        "model checks vanish behind a green tick.\n"
-        "The repo already refuses this shape one layer down — "
-        "src/features/store.py::manifest_deviations emits 'NULL RATES NOT COMPARED' rather than "
-        "passing over a missing baseline, because a check that did not run must never read like "
-        "a check that passed. Carry the unevaluated figures through (a NOT_CHECKED row, or a "
-        "declared-vs-evaluated count the page prints) instead of dropping them."
-    )
+    assert set(affected) <= reported
+
+    missing = [result for result in results if result.figure in affected]
+    assert all(result.status == "MISSING_INPUT" for result in missing)
+    assert all(withheld in result.missing_inputs for result in missing)
+    assert all(not result.passed and not result.evaluated for result in missing)
+    assert set(frame.loc[frame["figure"].isin(affected), "status"]) == {"MISSING_INPUT"}
+
+    summary = reconcile.summarize(results)
+    assert summary.not_evaluated == len(affected)
+    assert not summary.all_passed
