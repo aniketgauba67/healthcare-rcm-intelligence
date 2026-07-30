@@ -3,12 +3,12 @@
 --
 -- ***  HEURISTIC SCAFFOLD — NOT A MODEL  ***
 --      Phase 4 has not run. This view ranks work with a TRANSPARENT, RULE-BASED
---      heuristic (dollars at stake weighted by age). heuristic_priority_score is
+--      heuristic (dollars at stake weighted by age). sim_heuristic_priority_score is
 --      NOT a model score, NOT a probability, and NOT an Expected Net Recovery.
 --      Model A (denial risk) and Model C (appeal success / Expected Net Recovery)
 --      replace this ranking in Phase 4; this view exists only so the dashboard
 --      work-queue page has a defensible ordering until then. Every score column
---      is named heuristic_* and is_heuristic_placeholder is always true.
+--      is named sim_heuristic_* and is_heuristic_placeholder is always true.
 --
 -- Grain:        one row per ACTIONABLE claim (claim_sk). Actionable =
 --               denied (sim_denial_flag) OR open AR (sim_ar_open_flag / unpaid).

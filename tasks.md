@@ -3001,7 +3001,9 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   and leakage config. `PROCESS_METADATA_COLUMNS` is now a reasoned mapping, and
   `/work-queue` states that membership is selected from simulated denial or open
   A/R outcomes. Bundle regenerated from the dirty feature tree using fresh local
-  Postgres views and preserved committed model datasets.
+  Postgres views and preserved committed model datasets. QA follow-up corrected
+  the stale public field names in the model-quality page, model card, and SQL
+  headers; the bundle remains explicitly non-final until clean-SHA regeneration.
 - [x] Test gate green on clean clone (qa-reviewer, merged to main bc2a7ab, pushed):
   smoke tests + pytest config; scope-expanded dependency fix (numpy<2.1 cap,
   [tool.uv] environments bounded to CPython 3.11–3.12, uv.lock committed,

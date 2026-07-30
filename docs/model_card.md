@@ -157,7 +157,7 @@ about access, and one that does not weaken because the figure turns out to be
 readable.
 
 **What fell out — reported as measured, not as hoped.** A claim is worth reviewing
-when `multiplier × P(denial) × dollars_at_stake > review_cost`. On the calibration
+when `multiplier × P(denial) × sim_dollars_at_stake > review_cost`. On the calibration
 fold, where the threshold is chosen, that is `25 / (0.1306 × 3,029.75)` =
 **0.0632**; the same figure is 0.0543 on the test fold and 0.0785 across the whole
 book, so the break-even sits near 0.05–0.08 however it is measured. The decomposed

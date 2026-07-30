@@ -79,7 +79,7 @@ else:
         f"**All {len(results)} reconciled figures match their control totals exactly.** Each "
         "control value is derived from a DIFFERENT dataset than the figure — the executive "
         "view's claim count against the enriched claim view, the aging spine's open claims "
-        "against `ar_open_flag`, and so on — so this is a second path to the number, not a "
+        "against `sim_ar_open_flag`, and so on — so this is a second path to the number, not a "
         "second run of the same code.",
         icon=":material/check_circle:",
     )

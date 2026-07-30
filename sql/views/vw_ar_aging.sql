@@ -8,7 +8,7 @@
 --               latest activity date observed anywhere in the sim adjudication
 --               timeline (so the newest claims age from "today" in the data).
 --
--- Sources:      rcm.vw_claim_enriched (ar_open_flag, ar_balance_amt).
+-- Sources:      rcm.vw_claim_enriched (sim_ar_open_flag, sim_ar_balance_amt).
 -- Provenance:   SIMULATED timeline + money. Columns:
 --                 aging_bucket, bucket_sort            = DERIVED
 --                 open_claims, denied_open, nondenied_open = DERIVED from SIMULATED
@@ -31,7 +31,7 @@
 --
 -- Control query (must reconcile):
 --   select sum(open_claims) from rcm.vw_ar_aging;      -- = 1911 (all unpaid claims)
---   equals: select count(*) from rcm.vw_claim_enriched where ar_open_flag;
+--   equals: select count(*) from rcm.vw_claim_enriched where sim_ar_open_flag;
 --   select count(*) from rcm.vw_ar_aging;              -- = 5 (spine: all buckets)
 -- ============================================================================
 

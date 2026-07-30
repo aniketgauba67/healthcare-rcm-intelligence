@@ -16,8 +16,7 @@
 --     medicare_source_paid_amt (clm_pmt_amt), ncvrd_charge_amt, bene_deductible_amt
 --     (*length_of_stay_days is DERIVED in the fact but originates from SOURCE dates)
 --   DERIVED    (computed here from SOURCE/SIMULATED inputs):
---     claim_sk (warehouse surrogate), diagnosis_count, clean_claim_flag,
---     first_pass_paid_flag, ar_open_flag, ar_balance_amt, submission_year_month
+--     claim_sk (warehouse surrogate), diagnosis_count, submission_year_month
 --   REFERENCE  (official code-set display text, FY2023 vintage §2; DISPLAY-ONLY,
 --              never a grouping key — join on SOURCE codes, misses stay NULL):
 --     drg_desc (MS-DRG v40 title), prncpal_dgns_desc + admtg_dgns_desc (ICD-10-CM)
@@ -26,7 +25,9 @@
 --     sim_payer_id, sim_payer_name, sim_service_line_id/name, all denial fields,
 --     all sim money (allowed/paid/patient-resp/contractual/denied), all sim
 --     timeline dates + day-count intervals, late-filing flag, all pre-submission
---     auth/eligibility + documentation/coding facts, all operating-cost fields.
+--     auth/eligibility + documentation/coding facts, all operating-cost fields,
+--     sim_adjudicated, sim_clean_claim_flag, sim_first_pass_paid_flag,
+--     sim_ar_open_flag and sim_ar_balance_amt.
 --   SIMULATED-LINKAGE / DISPLAY-ONLY (CLAUDE.md §3.4, tasks.md crosswalk ruling):
 --     sim_facility_ccn, sim_facility_name, sim_facility_state, sim_facility_type.
 --     These come from sim_facility_crosswalk (a SEEDED RANDOM assignment, NOT a
