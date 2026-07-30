@@ -2267,6 +2267,31 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   CLEAN elsewhere, which is the useful half of the result. Every other skip in
 >   tests/features/ and tests/models/ is absence of a gitignored artifact or of a
 >   Postgres URL — the surface genuinely is not there — and each already says so.
+>   SWEEP SCOPE, written down so the next ml session RE-RUNS it instead of
+>   re-deriving what it covered (team-lead directed; a clean sweep is only durable
+>   if its scope is recorded). The command, verbatim:
+>     `grep -rn "pytest.skip\|importorskip\|skipif" tests/features tests/models
+>      src/features src/models`
+>   plus `grep -rn "exists()\|return None\|except \|is None" src/features/*.py
+>   src/models/*.py` for the non-test guards. Directories: tests/features/,
+>   tests/models/, src/features/, src/models/ — i.e. ml-owned only. NOT swept:
+>   tests/leakage/ and tests/integration/ (qa's files), src/api/, dashboard/,
+>   src/demo/ (app-engineer's), sql/ (analytics').
+>   At 7866630 that command returns 12 live skip sites, and the TEST APPLIED to each
+>   is: *is the skip's precondition the thing that is actually absent, or a plausible
+>   neighbour of it?* Classification — 5 no-Postgres (test_feature_store_postgres x2,
+>   test_determinism, test_train_postgres x2: the database itself is absent);
+>   4 gitignored-artifact-absent (test_matrix_provenance x3, test_dollars_at_risk_
+>   ruling, test_published_provenance work-queue CSVs, test_matrix_write_guard
+>   matrix); 2 manifest-not-tracked-at-HEAD (test_matrix_write_guard — the ABSENT
+>   leg of store.py's three-valued baseline, the one legitimately quiet case, since
+>   UNREADABLE refuses); 1 bundle-absent + 1 duckdb-not-installed
+>   (test_demo_bundle_provenance). All 12 pass the test. The two that FAILED it are
+>   the two now fixed: table-absent-while-bundle-present (555b77e) and
+>   published_files-empty-while-the-repo-holds-an-undeclared-tree (7866630).
+>   Non-test guards: the one instrument that returns None rather than a verdict is
+>   `provenance.read_columns` on a `.duckdb`, which is honest about the limit and is
+>   covered by tests/features/test_demo_bundle_provenance.py opening the file itself.
 >   The three-valued ABSENT/READABLE/UNREADABLE baseline in src/features/store.py
 >   is the pattern the rest of them follow. ONE STRUCTURAL LIMIT recorded rather
 >   than fixed: provenance rule 1's coverage scans a hardcoded PUBLISHED_ROOTS, so

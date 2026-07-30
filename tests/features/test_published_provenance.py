@@ -306,6 +306,40 @@ def test_a_new_output_DIRECTORY_fails_not_just_a_new_file(tmp_path) -> None:
     )
 
 
+def test_the_inversion_round_trips_plant_then_remove(tmp_path) -> None:
+    """Plant a file outside every declared root, watch it FAIL; remove it, watch it PASS.
+
+    The round trip is the control that matters, and one half of it is not enough.
+    A guard asserted only in its failing direction can be failing for an unrelated
+    reason — a typo in the walk, an exclusion that swallows the tree — and a guard
+    asserted only in its passing direction is the [SKIP-BLIND] shape itself, green
+    because it never looked. Both directions on the same tree, in one test, is what
+    says the assertion tracks the planted file and nothing else.
+    """
+    declared = tmp_path / "artifacts" / "features"
+    declared.mkdir(parents=True)
+    baseline = declared / "model_a_training_matrix.parquet"
+    baseline.write_bytes(b"not really a parquet")
+
+    # Clean before: the declared root is populated and registered.
+    assert_every_published_file_is_covered(tmp_path)
+
+    intruder = tmp_path / "exports" / "for_the_deck.csv"
+    intruder.parent.mkdir(parents=True)
+    intruder.write_text("claim_sk,recoverable_amt\n1,100.0\n")
+
+    with pytest.raises(ProvenanceError) as raised:
+        assert_every_published_file_is_covered(tmp_path)
+    assert "exports/for_the_deck.csv" in str(raised.value)
+
+    intruder.unlink()
+
+    # Clean after, and the baseline is still there — so the failure above was the
+    # planted file and not the tree it was planted in.
+    assert_every_published_file_is_covered(tmp_path)
+    assert our_tabular_files(tmp_path) == ["artifacts/features/model_a_training_matrix.parquet"]
+
+
 def test_an_excluded_tree_does_not_fail_and_a_nested_worktree_is_one(tmp_path) -> None:
     """Exclusions are honoured, and the load-bearing one is checked by name.
 
