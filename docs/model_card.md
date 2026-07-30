@@ -137,11 +137,24 @@ multiplied in exactly one place in the code:
 | share of claim value permanently lost | **0.25** | Same index: ~24% of avoidable denials are **not** recoverable. Premier Inc.'s 2024 survey points the same way, with a majority of contested denials ultimately overturned and paid. This is a **floor**, deliberately — it describes a shop that works its queue. MGMA and Change Healthcare both report 50–65% of denied claims are never reworked at all, where the permanent loss is far higher. Taking the floor keeps the threshold from being flattered by an assumption of institutional neglect. |
 | product used | **0.125** | |
 
-**Neither factor is derived from the simulation.** The generator's realized
-overturn and rework rates sit behind the §4.5 firewall, and reading them to set a
-business parameter would make the operating point a function of exactly what the
-firewall exists to hide. Both were fixed *before* the resulting threshold was
-computed.
+**Neither factor is derived from the simulation — and the reason is not that they
+could not have been.** An earlier version of this paragraph said the generator's
+realized overturn and rework rates "sit behind the §4.5 firewall". **That was
+false and is corrected here.** `docs/assumptions.md` §8 states the overturn
+target and §9 the realized rework cost per denied claim; §4.5 firewalls the
+ml-engineer from `src/simulation/`, not from `docs/`. The full accounting of what
+leaks and why redaction would not close it is `docs/assumptions.md` §12: the
+firewall is a **discipline, not an information barrier**, and no statement in
+this repository should describe it as one.
+
+What holds without that sentence is the part that was ever load-bearing. Each
+factor is anchored to a published industry benchmark, named in the table above,
+and both were fixed *before* the resulting threshold was computed. The objection
+to reading a realized figure is that it fits the business parameter to this
+simulation's particular draw, which is what makes an operating point
+untransferable to a real book of business — an objection about **anchoring**, not
+about access, and one that does not weaken because the figure turns out to be
+readable.
 
 **What fell out — reported as measured, not as hoped.** A claim is worth reviewing
 when `multiplier × P(denial) × dollars_at_stake > review_cost`. On the calibration
@@ -469,6 +482,22 @@ two headline queues.
   past must not move; flip a claim's own outcome and its own features must not move
   — with a **control test** asserting that a naive whole-dataset provider rate *does*
   break all three, so the checks are known to be sensitive.
+* **A column-name blacklist cannot express MEMBERSHIP, and this is its hard
+  limit.** Most of the machinery on this page guards column NAMES: a blacklist of
+  forbidden columns, a substring matcher that catches a forbidden column renamed,
+  a declaration of every feature's sources, a marking rule on every published
+  table. All of it operates on columns, and a filtered table leaks through none of
+  them. `rcm.vw_work_queue_priority` is the standing example: its `where` clause
+  selects claims that are denied or have open AR, so **which rows are present is
+  itself the label**, whatever the columns are called. Build a Model A feature by
+  joining to that view and every guard on this page stays green while the label
+  walks in through the row filter. No entry on `forbidden_derived_features` can
+  express "this table's population is conditioned on the outcome", because
+  membership is not a column. The rule that follows is a rule about JOINS, not
+  about names: **Model A features are built from base tables, never from a view
+  whose filter reads a post-submission fact.** It is enforced by
+  `src/features/extract.py` reading base tables directly, and by nothing else —
+  which is precisely why it is written here rather than left implicit.
 * **The training matrix is discoverable, and the guard runs on it.** Before this
   was closed, `src/features/` held six modules and no matrix any discovery route
   could find, so the §4.1 *value* probes — the ones that catch a renamed, logged,

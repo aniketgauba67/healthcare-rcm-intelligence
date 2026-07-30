@@ -35,6 +35,7 @@ from src.features.store import (
     MANIFEST_PATH,
     MATRIX_PATH,
     ArtifactRewriteRefused,
+    committed_baseline,
     committed_manifest,
     manifest_deviations,
     persist_training_matrix,
@@ -173,6 +174,80 @@ def test_no_committed_baseline_means_no_guard(tmp_path: pathlib.Path, matrix) ->
     assert committed_manifest(path.parent / "model_a_training_matrix.json") is None
 
 
+# --- the guard must not disarm itself -------------------------------------
+#
+# QA-ADDED 2026-07-29 (qa-reviewer-p16), gating bfea020. RED at the time of
+# writing; the fix is ml's, in src/features/store.py.
+#
+# `committed_manifest` collapses four different conditions to None — no git, path
+# outside the repo, `git show` failed, and MANIFEST DID NOT PARSE — and
+# `_refuse_or_report` treats None as "nothing to protect" and returns quietly.
+# Three of those really are "nothing to protect". The fourth is not: a committed
+# manifest that does not parse, or a manifest that stopped being tracked while the
+# PARQUET is still committed, means there IS a good artifact at HEAD and the guard
+# cannot read its baseline. It then writes the degraded matrix over it in silence.
+#
+# That is this module's own stated principle turned on itself. `manifest_deviations`
+# already refuses to pass over a missing `null_rates` block — it reports
+# "NULL RATES NOT COMPARED" — for exactly the reason that a check which did not run
+# must not read like a check that passed. One level up, the same omission is silent.
+#
+# Measured, not reasoned: both cases below were reproduced writing a matrix with
+# `diagnosis_count` entirely null over a committed parquet, and in both the parquet
+# bytes changed with no exception raised.
+
+
+def test_an_unparseable_committed_manifest_does_not_disarm_the_guard(
+    scratch_repo: pathlib.Path, matrix
+) -> None:
+    """A committed manifest that does not parse is an unreadable baseline, not an absent one.
+
+    The artifact at HEAD is real and good; only the evidence about it is
+    unreadable. Writing over it silently is the one outcome this guard exists to
+    prevent, and it is reachable by a truncated write or a botched conflict
+    resolution — neither exotic.
+    """
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    manifest = parquet.parent / "model_a_training_matrix.json"
+    manifest.write_text("{ not json\n")
+    _git(scratch_repo, "add", "-A")
+    _git(scratch_repo, "commit", "--quiet", "-m", "corrupt the manifest")
+
+    before = parquet.read_bytes()
+    degraded = matrix.copy()
+    degraded["diagnosis_count"] = pd.NA
+    with pytest.raises(ArtifactRewriteRefused):
+        _persist_into(scratch_repo, degraded)
+    assert parquet.read_bytes() == before, (
+        "the committed parquet was overwritten while the guard could not read its baseline"
+    )
+
+
+def test_an_untracked_manifest_beside_a_tracked_parquet_does_not_disarm_the_guard(
+    scratch_repo: pathlib.Path, matrix
+) -> None:
+    """The guard tests for the MANIFEST at HEAD; the thing it protects is the PARQUET.
+
+    Untrack the manifest and the parquet is still committed — there is still a good
+    artifact to protect — but the guard reads None and returns quietly. Whether the
+    right answer is to refuse or to say loudly that it could not check is ml's call;
+    writing in silence is not one of the options.
+    """
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    manifest = parquet.parent / "model_a_training_matrix.json"
+    _git(scratch_repo, "rm", "--quiet", "--cached", str(manifest.relative_to(scratch_repo)))
+    _git(scratch_repo, "commit", "--quiet", "-m", "untrack the manifest")
+
+    before = parquet.read_bytes()
+    degraded = matrix.copy()
+    degraded["diagnosis_count"] = pd.NA
+    with pytest.raises(ArtifactRewriteRefused):
+        _persist_into(scratch_repo, degraded)
+    assert parquet.read_bytes() == before, (
+        "the committed parquet was overwritten while the guard had no readable baseline"
+    )
+
+
 # --- the override is deliberate and loud ----------------------------------
 
 
@@ -218,3 +293,98 @@ def test_an_uncomparable_baseline_is_reported_not_passed_over() -> None:
     legacy = {"rows": 10, "features": ["a"], "passthrough": [], "split_column": "split"}
     problems = manifest_deviations(candidate, legacy)
     assert any("NULL RATES NOT COMPARED" in problem for problem in problems)
+
+
+# --- the three states, named -----------------------------------------------
+#
+# ML-ADDED 2026-07-29 (ml-engineer-8), closing [GUARD-DISARM]. qa's two tests
+# above fix the BEHAVIOUR — the parquet survives — and these fix the DISTINCTION
+# underneath it, because the behaviour is satisfiable by a guard that has stopped
+# telling the three cases apart. A `committed_baseline` hardwired to "unreadable"
+# passes both of qa's tests and refuses every legitimate write; one hardwired to
+# "readable" would pass neither. The states are therefore asserted by name, and
+# `test_the_real_committed_baseline_is_readable` is the control that keeps the
+# quiet path reachable.
+
+
+def test_a_corrupt_committed_manifest_is_unreadable_not_absent(
+    scratch_repo: pathlib.Path,
+) -> None:
+    """The state, not just the refusal: "cannot tell" must not be spelled "nothing here"."""
+    manifest = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.json"
+    manifest.write_text("{ not json\n")
+    _git(scratch_repo, "add", "-A")
+    _git(scratch_repo, "commit", "--quiet", "-m", "corrupt the manifest")
+
+    baseline = committed_baseline(manifest, repo_root=scratch_repo)
+    assert baseline.state == "unreadable"
+    assert baseline.manifest is None
+    assert "does not parse" in baseline.reason
+    # And the convenience view still answers None — which is exactly why callers
+    # deciding whether to guard must not use it.
+    assert committed_manifest(manifest, repo_root=scratch_repo) is None
+
+
+def test_an_untracked_manifest_beside_a_tracked_parquet_is_unreadable(
+    scratch_repo: pathlib.Path,
+) -> None:
+    manifest = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.json"
+    _git(scratch_repo, "rm", "--quiet", "--cached", str(manifest.relative_to(scratch_repo)))
+    _git(scratch_repo, "commit", "--quiet", "-m", "untrack the manifest")
+
+    baseline = committed_baseline(manifest, repo_root=scratch_repo)
+    assert baseline.state == "unreadable"
+    assert "IS committed at HEAD" in baseline.reason
+
+
+def test_nothing_committed_at_all_is_absent(scratch_repo: pathlib.Path) -> None:
+    """Both files gone from HEAD: genuinely nothing to protect, and the guard stands down."""
+    features = scratch_repo / "artifacts" / "features"
+    _git(scratch_repo, "rm", "--quiet", "--cached", "-r", str(features.relative_to(scratch_repo)))
+    _git(scratch_repo, "commit", "--quiet", "-m", "untrack the artifact")
+
+    baseline = committed_baseline(features / "model_a_training_matrix.json", repo_root=scratch_repo)
+    assert baseline.state == "absent"
+
+
+def test_a_path_outside_any_repository_is_absent(tmp_path: pathlib.Path) -> None:
+    baseline = committed_baseline(tmp_path / "model_a_training_matrix.json")
+    assert baseline.state == "absent"
+    assert baseline.manifest is None
+
+
+def test_the_real_committed_baseline_is_readable() -> None:
+    """The control on the other three: the normal path must still be the quiet one.
+
+    Without this, a guard that answered "unreadable" to everything would satisfy
+    every test above while refusing every honest `make features`.
+    """
+    baseline = committed_baseline()
+    if baseline.state == "absent":
+        pytest.skip("manifest not tracked at HEAD in this checkout")
+    assert baseline.state == "readable", baseline.reason
+    assert baseline.manifest is not None
+
+
+def test_the_override_covers_an_unreadable_baseline_too(
+    scratch_repo: pathlib.Path, matrix, capsys
+) -> None:
+    """A refusal with no way out would strand the operator with a corrupt HEAD.
+
+    The remedy in that state is to commit a good manifest, which needs a write.
+    So `--allow-change` must reach this case as well — loudly, naming the reason,
+    and never inferred.
+    """
+    parquet = scratch_repo / "artifacts" / "features" / "model_a_training_matrix.parquet"
+    manifest = parquet.parent / "model_a_training_matrix.json"
+    manifest.write_text("{ not json\n")
+    _git(scratch_repo, "add", "-A")
+    _git(scratch_repo, "commit", "--quiet", "-m", "corrupt the manifest")
+
+    _persist_into(scratch_repo, matrix, allow_change=True)
+
+    printed = capsys.readouterr().err
+    assert "OVERRIDE" in printed
+    assert "NO baseline check" in printed
+    assert "does not parse" in printed
+    assert json.loads(manifest.read_text())["rows"] == len(matrix)

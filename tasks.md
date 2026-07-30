@@ -2192,6 +2192,100 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   BYTE-IDENTICAL (d11bd0df5a918d0d, p10/p11/p12's digest across four sessions),
 >   manifest diff exactly one line. That was [ARTIFACT-REWRITE]'s second live use
 >   and it correctly did NOT refuse a legitimate digest-only update.
+> [BLACKLIST-LOCKSTEP] part 2 — **RESOLVED: NO CONFIG CHANGE REQUIRED.**
+>   app-engineer-2 confirmed the final spellings and NOT ONE WORD CHANGED. The
+>   VIEW is unrenamed (analytics-engineer's to fix); they re-mark
+>   dollars_at_stake / heuristic_priority_score / action_type at the API boundary
+>   in src/api/tables.py. Every re-marked name is a SUPERSTRING of its blacklist
+>   entry, so the substring guard covers all three — measured, not assumed. The
+>   entries stay accurate because the view they name is unchanged, and
+>   tests/features/test_derived_blacklist_tracks_views.py stays green for the
+>   same reason. It fires the day analytics-engineer renames the view, which is
+>   the outcome it was built for.
+>   FLAG FOR TEAM-LEAD, not mine to decide: this is the presentation-layer
+>   re-marking the [QUEUE-PREFIX] delegation explicitly wanted to AVOID ("a
+>   warehouse and a screen disagreeing on a column name is the worse outcome").
+>   The view and the API now disagree by design, and the disagreement has a
+>   consequence — see below.
+> [DEMO-BUNDLE-PROVENANCE] (ml-engineer-7) registered
+>   `dashboard/demo_data/*.duckdb` in PUBLISHED_SURFACES at app-engineer's
+>   request, and found a defect while verifying their proposed text rather than
+>   transcribing it. TWO CORRECTIONS to the justification they drafted:
+>     - "14 datasets" is 16 declared (9 warehouse `select *` views, 5 model
+>       output, 2 self-describing meta tables). Measured off src/demo/spec.py.
+>     - "per-column classification" is per-DATASET: a provenance class, grain,
+>       contains_simulated flag and note. Simulated COLUMNS are found by marker,
+>       not declared one by one. Writing the stronger claim into a declaration a
+>       reviewer relies on would be the overclaim this module exists to prevent.
+>   THE DEFECT, and it is on the most exposed surface we have: the bundle copies
+>   `vw_work_queue_priority` UNMODIFIED (src/demo/build.py: read_warehouse_datasets
+>   — deliberately, so a dashboard figure cannot diverge from its SQL control
+>   query). So `dollars_at_stake`, `heuristic_priority_score`, `priority_tier` and
+>   `action_type` ship UNMARKED in a committed .duckdb that opens on a clean clone
+>   with no database. The API's re-marking does not reach it. `action_type` is a
+>   CASE on sim_denial_flag — the LABEL under a process name.
+>   Registering the path alone would have made rule 1 green and rule 3 SILENT
+>   (read_columns returns None for .duckdb), i.e. my registration would have
+>   BLESSED it. So the registration is paired with
+>   tests/features/test_demo_bundle_provenance.py, which opens the bundle and
+>   applies the marker rule to the columns actually in it. Skips where no bundle
+>   exists; the bundle is committed, so it runs everywhere once it lands.
+>   FIXABLE BY EITHER OWNER: analytics-engineer marks the view (better — warehouse
+>   and screen then agree) or app-engineer re-marks into the bundle as the API
+>   already does. Not ml's to choose.
+> [SKIP-BLIND] (ml-engineer-9) the [PASSTHROUGH-BLIND] shape swept across every
+>   ml-owned guard, as directed. **ONE real instance, and it is in the file written
+>   to close the previous one** — tests/features/test_demo_bundle_provenance.py.
+>   Both column checks looked their table up by name and `pytest.skip`ped when it
+>   was absent, so a bundle that is PRESENT, openable and holding sixteen tables
+>   reported nothing to check the moment one was RENAMED. MEASURED on a scratchpad
+>   copy of the committed bundle with `vw_work_queue_priority` renamed and nothing
+>   else touched: the unmarked-column check goes from a correct RED naming all four
+>   columns to SKIPPED, and in a suite summary a skip is indistinguishable from a
+>   pass. The docstring's defence ("SKIPS when the bundle is absent... not a silent
+>   pass") was true and covered the wrong condition: a missing TABLE is not a
+>   missing bundle.
+>   This is why it mattered now rather than later — a view rename is in flight for
+>   [BLACKLIST-LOCKSTEP], so the exact condition that disarms the check is the one
+>   being planned. Closed by `_require_table`, which FAILS on absence, names the
+>   tables the bundle really holds, and tells the author which of the two cases
+>   they are in (rename: re-point the constant in the same commit; drop: write a
+>   sentence). Discovery moves to the commit that causes the drift. Negative
+>   control included so the check cannot regress to a skip unnoticed.
+>   SECOND, SMALLER FINDING in the same file, same family: rule 2 in
+>   src/features/provenance.py is two-directional ("an undeclared column is one
+>   that skipped rule 3") but the bundle check compared one direction only —
+>   declared-minus-present. One column was slipping through it, measured not
+>   supposed: `queue_mode` (1 `live_snapshot` row / 468 `backtest`), which the demo
+>   build adds when it unions the two queue builds into one table and which the
+>   per-run CSVs do not carry. Both directions are now checked, with a written
+>   BUNDLE_ONLY_COLUMNS allowance that costs a sentence the way `marker_exempt`
+>   does. FLAGGED FOR app-engineer AND qa, NOT RULED ON BY ME: the column is
+>   app-engineer's, the allowance records that the check now SEES it rather than
+>   that it is fine. My read is that it is the `as_of`/`split` class (a parameter
+>   of our build, no dollar/rate/date reading) but that call is not mine.
+>   CLEAN elsewhere, which is the useful half of the result. Every other skip in
+>   tests/features/ and tests/models/ is absence of a gitignored artifact or of a
+>   Postgres URL — the surface genuinely is not there — and each already says so.
+>   The three-valued ABSENT/READABLE/UNREADABLE baseline in src/features/store.py
+>   is the pattern the rest of them follow. ONE STRUCTURAL LIMIT recorded rather
+>   than fixed: provenance rule 1's coverage scans a hardcoded PUBLISHED_ROOTS, so
+>   its docstring claim that a new Phase 5 output "fails the build until it is
+>   declared here" holds for a new FILE, not a new DIRECTORY. Evidence it does not
+>   self-extend: `dashboard/demo_data` had to be hand-added at app-engineer's
+>   request. Not currently exploited — measured: every tabular file Phase 5 writes
+>   lands under an existing root — so this is a note for whoever adds the next
+>   output root, not a defect.
+> [BLACKLIST-LIMIT] (team-lead directed) the MEMBERSHIP caveat is now in
+>   docs/model_card.md beside the leakage guards, not only on this board: a
+>   column-name blacklist cannot express that a table's POPULATION is conditioned
+>   on the outcome. vw_work_queue_priority's where clause selects denied-or-open-AR
+>   claims, so which ROWS are present is itself the label whatever the columns are
+>   called, and every guard stays green while the label enters through the row
+>   filter. The rule it implies is about JOINS, not names: Model A features come
+>   from base tables, never from a view whose filter reads a post-submission fact.
+>   VERIFIED rather than asserted — src/features/ contains zero `vw_` references;
+>   extract.py reads sim_*/fact_*/dim_* only.
 > VINTAGE SKEW — MEASURED by team-lead from config/sources.yaml, for the honesty
 > pass. The code sets are CORRECT and unskewed (ICD-10-CM/PCS FY2023, HCPCS 2023,
 > MS-DRG v40 FY2023 — all match the 2023-04 claims). The SKEW is in the crosswalk

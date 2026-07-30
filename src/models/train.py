@@ -595,8 +595,12 @@ def run_model_a(
             "decomposition": "P(prevented | flagged and worked) x share of claim value "
             "permanently lost. Both factors are DESIGN CHOICES set from published "
             "benchmarks (Change Healthcare Denials Index; MGMA; Premier 2024) and NOT "
-            "from the generator's realized rates, which are behind the CLAUDE.md §4.5 "
-            "firewall.",
+            "from the generator's realized rates. Those rates are READABLE — "
+            "docs/assumptions.md publishes them, and CLAUDE.md §4.5 firewalls "
+            "src/simulation/ rather than docs/ (see docs/assumptions.md §12). The rule "
+            "is against ANCHORING a business parameter to a realized figure, which "
+            "would fit the operating point to this simulation's draw; it is not a "
+            "claim that the figure could not be seen.",
         },
     }
 
