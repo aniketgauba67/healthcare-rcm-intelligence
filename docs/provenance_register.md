@@ -208,12 +208,16 @@ clearly-labeled hypothetical intervention, and persists no intervention field.
 ## The committed Model A training matrix (Phase 4)
 
 `artifacts/features/model_a_training_matrix.parquet` (1.4 MB) with its sidecar
-`model_a_training_matrix.json`. **This is the only data file in the repository
-that is committed to git, and therefore the only one a reader can open from a
-clean clone with no database.** Everything else under `data/` and
-`models_artifacts/` is gitignored. It is registered here for that reason: it is
-the artifact most likely to be inspected out of context, so it is the one that
-can least afford to be unlabelled.
+`model_a_training_matrix.json`. **This is one of exactly two data files in the
+repository that are committed to git, and therefore openable from a clean clone
+with no database** — the other is the Phase 5 hosted-demo bundle registered in the
+next section. Until Phase 5 this sentence read "the only data file", which was
+true when written and false as soon as an 8.0 MB `.duckdb` was committed; a
+register that keeps a stale exclusivity claim is asserting something it no longer
+checks. Everything else under `data/` and `models_artifacts/` is gitignored. Both
+are registered for the same reason: they are the artifacts most likely to be
+inspected out of context, so they are the ones that can least afford to be
+unlabelled.
 
 | Property | Value |
 |---|---|
@@ -350,3 +354,109 @@ runs produced manifest SHA-256 `d5c1ca88aa0786f7d39c7ac055b13c264654ea1a84ef9e75
 unchanged). A committed artifact that changed on every test run would train
 reviewers to ignore its diff, which is how a real content change slips through.
 The build time of record is the git commit date.
+
+## The committed hosted-demo bundle (Phase 5)
+
+`dashboard/demo_data/rcm_demo.duckdb` — **8,400,896 bytes (8.0 MB), 16 tables,
+71,813 rows**, committed to git via the `!dashboard/demo_data/*.duckdb` exception
+in `.gitignore`. CLAUDE.md §2 locks the hosted demo to a bundled Parquet/DuckDB
+extract rather than live Postgres, and this is that extract: it opens with no
+database, no network, no credentials and no environment variables.
+
+**It is the most exposed artifact in this repository.** The training matrix is a
+feature file that a reader has to go looking for; this is the file the deployed
+demo *is*. Anyone who clones the repo or visits the hosted app is reading it,
+usually without reading anything else — so it is the artifact least able to rely on
+context supplied elsewhere, and §3.3 is registered here in full rather than by
+pointing at code.
+
+| Property | Value |
+|---|---|
+| Path | `dashboard/demo_data/rcm_demo.duckdb` |
+| Size | 8,400,896 bytes (8.0 MB) |
+| Tables | 16 — 9 curated-view copies, 5 model outputs, 2 self-describing meta tables |
+| Rows | 71,813 across all tables |
+| Declaration | `src/demo/spec.py` — the single authority; the build refuses to write an undeclared table and refuses to omit a declared one |
+| Regeneration | `make demo-extract` (needs the PostgreSQL warehouse **and** the model artifacts) |
+| Opened | read-only, one cursor per thread (a hosted demo shares one process between viewers) |
+| Published-surface entry | `src/features/provenance.py`, glob `dashboard/demo_data/*.duckdb` |
+| Bundle's own register | the `demo_manifest` table, 14 rows — one per *data* dataset |
+| Build stamp | the `demo_build_info` table: git commit, branch, dirty-tree flag, UTC build time, source vintages |
+
+### Per-table classification
+
+Every table carries a §3.1 class and a declared `contains_simulated` flag. The
+flag is **declared, not inferred from column names**, because a table can be
+entirely simulated in substance while carrying no `sim_` column of its own — the
+three marked `sim: 0` below with `contains_simulated = True` are exactly that case,
+and a spelling-based rule would call them clean.
+
+| Table | Class | Rows | Cols | `sim_` cols | Contains simulated |
+|---|---|---|---|---|---|
+| `vw_claim_enriched` | MIXED | 20,867 | 77 | 48 | yes |
+| `vw_executive_rcm_summary` | MIXED | 109 | 24 | 7 | yes |
+| `vw_denial_root_cause` | SIMULATED | 34 | 16 | 7 | yes |
+| `vw_ar_aging` | SIMULATED | 5 | 10 | 1 | yes |
+| `vw_payer_performance` | SIMULATED | 5 | 22 | 10 | yes |
+| `vw_clean_claim_performance` | MIXED | 4,877 | 18 | 5 | yes |
+| `vw_work_queue_priority` | MIXED | 2,663 | 16 | 5 | yes |
+| `vw_data_quality_scorecard` | DERIVED | 15 | 10 | 0 | no |
+| `vw_model_monitoring` | SIMULATED | 981 | 6 | 0 | **yes** — drift here is drift in the simulation |
+| `model_a_scores` | DERIVED | 20,867 | 7 | 4 | yes |
+| `model_a_reason_codes` | DERIVED | 20,865 | 7 | 1 | yes |
+| `model_a_shap_global` | DERIVED | 39 | 5 | 2 | yes |
+| `model_c_work_queue` | DERIVED | 469 | 13 | 6 | yes |
+| `model_metrics` | DERIVED | 2 | 4 | 0 | **yes** — every metric scores a SIMULATED label |
+| `demo_manifest` | DERIVED | 14 | 8 | 0 | no |
+| `demo_build_info` | DERIVED | 1 | 8 | 0 | no |
+
+The nine `vw_` tables are `select * from rcm.vw_...` copies — **verbatim, never
+recomputed**. That is what makes §7's "dashboard totals reconcile to SQL control
+queries" a property of the pipeline instead of a claim somebody checked once: a
+page cannot hold a second definition of a KPI, because it never computes one.
+
+### What is real in this file, and what is not
+
+**Nothing downstream of claim submission is real.** The claim facts are official
+CMS *synthetic* Medicare records (SOURCE) containing no real patients. Every
+denial, appeal, payment, payment date, workflow event, operating cost and the
+entire multi-payer dimension is generated by this project's simulation layer
+(SIMULATED, §3.5 — Medicare FFS has exactly one payer, and the five archetypes in
+`vw_payer_performance` are invented and named after no real insurer).
+
+The real facility and provider names in `vw_claim_enriched` and
+`vw_clean_claim_performance` are **display-only** and **forbidden as a model
+feature** (§3.4). They arrive through a seeded crosswalk that maps 4,876 synthetic
+billing providers onto 2,857 real CCNs — 8:1 at worst by CCN, and **15:1 at worst
+by NAME**, since those CCNs carry only 2,816 distinct display names. The name is
+the key a dashboard is likelier to group on and it is the worse one, so every
+provider-level table here is keyed on the synthetic `prvdr_num`, never on
+`sim_facility_ccn` and never on `sim_facility_name`.
+
+**Reference-vintage skew.** The claims are vintage 2023-04 and their code sets
+match (ICD-10-CM/PCS FY2023, HCPCS 2023, MS-DRG v40 FY2023). The two crosswalk
+reference files do not: Hospital General Information is vintage 2026-04 and the
+Medicare Physician & Other Practitioners file is data year 2024 — roughly three
+years newer than the claims they decorate. A facility type or a provider specialty
+in this bundle is what a reference file recorded about three years *after* the
+claim was filed.
+
+### Known limitations of this artifact, recorded rather than resolved
+
+1. **The shipped bundle was built from a dirty working tree.** Its
+   `demo_build_info` row carries `git_tree_dirty = true` against commit
+   `e8f122f` (an ancestor of the branch, so the commit itself is pinnable — the
+   uncommitted deltas on top of it are not). The dashboard says so on screen
+   ("built from an UNCOMMITTED working tree") rather than showing a commit and
+   implying reproducibility. This is [SHA-STAMP] applied to the bundle: the stamp
+   exists and is honest about its own limits.
+2. **`demo_manifest` describes 14 of the 16 tables, not all 16.** It omits itself
+   and `demo_build_info`. That is a deliberate stop to the self-reference, and it
+   is stated here because "the bundle ships its own register" is otherwise read as
+   total coverage. The two omitted tables are classified in the table above.
+3. **A `.duckdb` is opaque to the repository's text-based provenance checks.**
+   Rule 3 cannot read a binary, so registering the path alone would make rule 1
+   green while leaving rule 3 silent over the one file most likely to be read out
+   of context. `tests/features/test_demo_bundle_provenance.py` closes that by
+   opening the bundle and applying the §3.2 marker rule to the columns actually
+   in it — the check follows the file rather than stopping at its extension.
