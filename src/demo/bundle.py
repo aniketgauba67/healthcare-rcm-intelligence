@@ -20,6 +20,27 @@ CACHING
 5-second load budget for free-tier hosting is not, and Streamlit re-executes the
 whole script on every interaction — so a fresh connection per rerun would pay the
 open cost on every click.
+
+ONE HANDLE, ONE CURSOR PER THREAD — AND WHY THIS IS NOT A MICRO-OPTIMISATION
+---------------------------------------------------------------------------
+A memoised handle is shared, and Streamlit runs every script run on a ScriptRunner
+thread — so on the hosted demo, where several viewers share one process (the
+sentence three paragraphs up), concurrent reads land on ONE connection. A
+`DuckDBPyConnection` holds the result set of its last `execute` ON THE CONNECTION,
+so two threads interleaving `execute` / `fetch_df` do not queue: they overwrite
+each other. Measured on this bundle, an 8-thread read produced all three of
+`fetch_df()` returning **None**, `show tables` missing a table that IS present —
+surfacing to a user as the flatly wrong diagnosis "the bundle predates the
+declaration; rebuild with make demo-extract" — and a hard **SIGSEGV** under
+Streamlit's own test runner.
+
+So every read goes through `_cursor()`, which hands each thread its own cursor via
+`DuckDBPyConnection.cursor()` (DuckDB's documented pattern for concurrent reads of
+one database). Cursors inherit the read-only mode, cost roughly nothing to make,
+and are cached per thread so the 5-second budget is unaffected. The failure this
+prevents is the worst kind for this project: not a crash but a page that renders
+another query's result under its own heading, with the banner correctly displayed
+above it.
 """
 
 from __future__ import annotations
@@ -28,6 +49,7 @@ import functools
 import json
 import os
 import pathlib
+import threading
 from typing import Any
 
 import pandas as pd
@@ -75,11 +97,24 @@ class Bundle:
 
         self.path = path
         self._connection = duckdb.connect(str(path), read_only=True)
+        self._local = threading.local()
+
+    def _cursor(self):  # noqa: ANN202 - duckdb.DuckDBPyConnection
+        """This thread's own cursor on the bundle. See the module docstring.
+
+        Never read through `self._connection` directly: it is the one object whose
+        result set concurrent readers overwrite.
+        """
+        cursor = getattr(self._local, "cursor", None)
+        if cursor is None:
+            cursor = self._connection.cursor()
+            self._local.cursor = cursor
+        return cursor
 
     # -- introspection ------------------------------------------------------
 
     def table_names(self) -> list[str]:
-        rows = self._connection.execute("show tables").fetchall()
+        rows = self._cursor().execute("show tables").fetchall()
         return sorted(row[0] for row in rows)
 
     def has_table(self, name: str) -> bool:
@@ -89,17 +124,14 @@ class Bundle:
         return list(self.query(f'select * from "{name}" limit 0').columns)
 
     def row_count(self, name: str) -> int:
-        return int(self._connection.execute(f'select count(*) from "{name}"').fetchone()[0])
+        return int(self._cursor().execute(f'select count(*) from "{name}"').fetchone()[0])
 
     # -- reading ------------------------------------------------------------
 
     def query(self, sql: str, parameters: object = None) -> pd.DataFrame:
         """Run read-only SQL against the bundle."""
-        cursor = (
-            self._connection.execute(sql, parameters)
-            if parameters
-            else self._connection.execute(sql)
-        )
+        connection = self._cursor()
+        cursor = connection.execute(sql, parameters) if parameters else connection.execute(sql)
         return cursor.fetch_df()
 
     def table(self, name: str) -> pd.DataFrame:

@@ -36,6 +36,7 @@ from dashboard.components import (
     kpi_row,
     provenance_note,
     render_page_header,
+    render_synthetic_data_banner,
     required_disclosures,
 )
 
@@ -44,6 +45,7 @@ render_page_header(
     "Warehouse checks, input drift, model cards, bundle provenance, and the "
     "figure-by-figure reconciliation to the SQL control queries.",
 )
+render_synthetic_data_banner()
 data_source_caption()
 
 

@@ -101,7 +101,11 @@ CROSSWALK_COLLISION_TITLE = (
 CROSSWALK_COLLISION = (
     "CMS synthetic claims carry synthetic provider and facility identifiers. They "
     "do not correspond to any real NPI or CCN and cannot be joined to one "
-    "(CLAUDE.md §3.4), so real facility names reach this screen through a seeded "
+    "(CLAUDE.md §3.4), so every real facility name in this app is "
+    # "display-only" belongs in the PARAGRAPH, not only in the heading above it.
+    # The heading is one line a reader can skim past, and it is also the one piece
+    # of a Streamlit expander that no render test can currently read back.
+    "**display-only**: it reaches this screen through a seeded "
     "random assignment, stratified by state and type, done purely so the app shows "
     "recognisable names instead of opaque codes. That crosswalk maps **4,876** "
     "synthetic billing providers onto only **2,857** real CCNs: 45.9% of those "
@@ -116,9 +120,12 @@ CROSSWALK_COLLISION = (
     "app is grouped on the synthetic `prvdr_num`, never on `sim_facility_ccn` and "
     "never on `sim_facility_name`, because grouping on either would silently merge "
     "up to eight (by CCN) or fifteen (by name) distinct synthetic hospitals into "
-    "one row and inflate its volume. The crosswalk is also **forbidden as a "
-    "feature** in every model at every boundary, Model A and Model C alike: it "
-    "carries no information about the claim, only a name."
+    "one row and inflate its volume. The crosswalk is also "
+    # Kept on ONE source line deliberately. qa's disclosure gate greps the Python
+    # SOURCE of dashboard/ for this phrase, so a literal split across two adjacent
+    # string fragments reads as absent even though the rendered paragraph says it.
+    "**forbidden as a feature** in every model at every boundary, "
+    "Model A and Model C alike: it carries no information about the claim, only a name."
 )
 
 #: 4,877 vs 4,876 is not a typo and is asked about every time. Said once, here.
