@@ -2233,6 +2233,49 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   FIXABLE BY EITHER OWNER: analytics-engineer marks the view (better — warehouse
 >   and screen then agree) or app-engineer re-marks into the bundle as the API
 >   already does. Not ml's to choose.
+> [SKIP-BLIND] (ml-engineer-9) the [PASSTHROUGH-BLIND] shape swept across every
+>   ml-owned guard, as directed. **ONE real instance, and it is in the file written
+>   to close the previous one** — tests/features/test_demo_bundle_provenance.py.
+>   Both column checks looked their table up by name and `pytest.skip`ped when it
+>   was absent, so a bundle that is PRESENT, openable and holding sixteen tables
+>   reported nothing to check the moment one was RENAMED. MEASURED on a scratchpad
+>   copy of the committed bundle with `vw_work_queue_priority` renamed and nothing
+>   else touched: the unmarked-column check goes from a correct RED naming all four
+>   columns to SKIPPED, and in a suite summary a skip is indistinguishable from a
+>   pass. The docstring's defence ("SKIPS when the bundle is absent... not a silent
+>   pass") was true and covered the wrong condition: a missing TABLE is not a
+>   missing bundle.
+>   This is why it mattered now rather than later — a view rename is in flight for
+>   [BLACKLIST-LOCKSTEP], so the exact condition that disarms the check is the one
+>   being planned. Closed by `_require_table`, which FAILS on absence, names the
+>   tables the bundle really holds, and tells the author which of the two cases
+>   they are in (rename: re-point the constant in the same commit; drop: write a
+>   sentence). Discovery moves to the commit that causes the drift. Negative
+>   control included so the check cannot regress to a skip unnoticed.
+>   SECOND, SMALLER FINDING in the same file, same family: rule 2 in
+>   src/features/provenance.py is two-directional ("an undeclared column is one
+>   that skipped rule 3") but the bundle check compared one direction only —
+>   declared-minus-present. One column was slipping through it, measured not
+>   supposed: `queue_mode` (1 `live_snapshot` row / 468 `backtest`), which the demo
+>   build adds when it unions the two queue builds into one table and which the
+>   per-run CSVs do not carry. Both directions are now checked, with a written
+>   BUNDLE_ONLY_COLUMNS allowance that costs a sentence the way `marker_exempt`
+>   does. FLAGGED FOR app-engineer AND qa, NOT RULED ON BY ME: the column is
+>   app-engineer's, the allowance records that the check now SEES it rather than
+>   that it is fine. My read is that it is the `as_of`/`split` class (a parameter
+>   of our build, no dollar/rate/date reading) but that call is not mine.
+>   CLEAN elsewhere, which is the useful half of the result. Every other skip in
+>   tests/features/ and tests/models/ is absence of a gitignored artifact or of a
+>   Postgres URL — the surface genuinely is not there — and each already says so.
+>   The three-valued ABSENT/READABLE/UNREADABLE baseline in src/features/store.py
+>   is the pattern the rest of them follow. ONE STRUCTURAL LIMIT recorded rather
+>   than fixed: provenance rule 1's coverage scans a hardcoded PUBLISHED_ROOTS, so
+>   its docstring claim that a new Phase 5 output "fails the build until it is
+>   declared here" holds for a new FILE, not a new DIRECTORY. Evidence it does not
+>   self-extend: `dashboard/demo_data` had to be hand-added at app-engineer's
+>   request. Not currently exploited — measured: every tabular file Phase 5 writes
+>   lands under an existing root — so this is a note for whoever adds the next
+>   output root, not a defect.
 > [BLACKLIST-LIMIT] (team-lead directed) the MEMBERSHIP caveat is now in
 >   docs/model_card.md beside the leakage guards, not only on this board: a
 >   column-name blacklist cannot express that a table's POPULATION is conditioned
