@@ -47,7 +47,10 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
+from dashboard.provenance import emitter_for
 from src.api.tables import build_heuristic_queue_table
+
+PAGE_EMITTER = emitter_for("dashboard/pages/work_queue.py")
 
 MEMBERSHIP_WARNING = (
     "**Membership in this queue is the label.** The view behind it selects claims "
@@ -62,6 +65,7 @@ MEMBERSHIP_WARNING = (
 render_page_header(
     "Predictive work queue",
     "Recovery worklist (Model C), prevention worklist (Model A), and what each one knows.",
+    emitter=PAGE_EMITTER,
 )
 # The membership warning rides INSIDE the banner, not beside it. It is the one thing
 # on this page a reader must not be able to scroll past: the selection is the label.
@@ -273,6 +277,7 @@ else:
                     "sim_days_to_deadline",
                 ]
             ],
+            emitter=PAGE_EMITTER,
             column_config={
                 "queue_position": st.column_config.NumberColumn("#", format="%d"),
                 "recommended_action": st.column_config.TextColumn(
@@ -404,6 +409,7 @@ else:
         if not drivers.empty:
             dataframe(
                 drivers[["driver_rank", "reason_code", "feature", "direction", "analyst_action"]],
+                emitter=PAGE_EMITTER,
                 column_config={
                     "driver_rank": st.column_config.NumberColumn("#", format="%d"),
                     "analyst_action": st.column_config.TextColumn(
@@ -481,7 +487,7 @@ else:
     ]
     if role == "Analyst":
         columns = ["claim_sk", *columns]
-    dataframe(heuristic[columns])
+    dataframe(heuristic[columns], emitter=PAGE_EMITTER)
     st.caption(
         "Every value derived from the simulated adjudication layer is named with `sim_` in "
         "the view, API, dashboard, and demo bundle."

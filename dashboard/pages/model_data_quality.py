@@ -39,11 +39,15 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
+from dashboard.provenance import emitter_for
+
+PAGE_EMITTER = emitter_for("dashboard/pages/model_data_quality.py")
 
 render_page_header(
     "Model & data quality",
     "Warehouse checks, input drift, model cards, bundle provenance, and the "
     "figure-by-figure reconciliation to the SQL control queries.",
+    emitter=PAGE_EMITTER,
 )
 render_synthetic_data_banner()
 data_source_caption()
@@ -87,6 +91,7 @@ else:
 results_frame = reconcile.to_frame(results)
 dataframe(
     results_frame,
+    emitter=PAGE_EMITTER,
     column_config={
         "figure": st.column_config.TextColumn("Figure on the dashboard", width="large"),
         "dashboard_value": st.column_config.NumberColumn("Dashboard", format="%.4f"),
@@ -145,6 +150,7 @@ kpi_row(
 )
 dataframe(
     scorecard,
+    emitter=PAGE_EMITTER,
     column_config={
         "description": st.column_config.TextColumn("Check", width="large"),
         "metric_value": st.column_config.NumberColumn("Value", format="%.4f"),
@@ -394,6 +400,7 @@ if vintages:
     st.markdown("**Source vintages, read from `config/sources.yaml` rather than restated.**")
     dataframe(
         pd.DataFrame(sorted(vintages.items()), columns=["source", "vintage"]),
+        emitter=PAGE_EMITTER,
     )
     st.warning(disclosures.VINTAGE_SKEW, icon=":material/schedule:")
 
@@ -402,6 +409,7 @@ if not register.empty:
     st.markdown("**The bundle's own provenance register.**")
     dataframe(
         register,
+        emitter=PAGE_EMITTER,
         column_config={
             "note": st.column_config.TextColumn("Note", width="large"),
             "grain": st.column_config.TextColumn("Grain", width="medium"),

@@ -40,10 +40,14 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
+from dashboard.provenance import emitter_for
+
+PAGE_EMITTER = emitter_for("dashboard/pages/ar_recovery.py")
 
 render_page_header(
     "A/R & recovery",
     "Aging of simulated open receivables, payer performance, and appeal recovery.",
+    emitter=PAGE_EMITTER,
 )
 # §3.5 makes the payer note part of THIS page's banner rather than a separate block
 # beside it: Medicare FFS has one payer, so a reader who takes the payer comparison
@@ -130,7 +134,7 @@ control_query(
     + "\n\n"
     + reconcile.sql_for("A/R & recovery — Denied + non-denied = open, every bucket")
 )
-dataframe(aging)
+dataframe(aging, emitter=PAGE_EMITTER)
 
 # ---------------------------------------------------------------------------
 # Payer performance — §3.5
@@ -189,7 +193,7 @@ provenance_note(
     "a market comparison.",
 )
 control_query(reconcile.sql_for("A/R & recovery — Claims across the five simulated payers"))
-dataframe(payers)
+dataframe(payers, emitter=PAGE_EMITTER)
 
 # ---------------------------------------------------------------------------
 # Appeal recovery over time

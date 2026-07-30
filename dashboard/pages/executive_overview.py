@@ -36,10 +36,14 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
+from dashboard.provenance import emitter_for
+
+PAGE_EMITTER = emitter_for("dashboard/pages/executive_overview.py")
 
 render_page_header(
     "Executive overview",
     "Book-level revenue-cycle KPIs, 2015-03 through 2024-06.",
+    emitter=PAGE_EMITTER,
 )
 render_synthetic_data_banner()
 data_source_caption()
@@ -196,7 +200,7 @@ provenance_note(
 )
 
 with st.expander("The monthly view as a table", icon=":material/table:"):
-    dataframe(monthly)
+    dataframe(monthly, emitter=PAGE_EMITTER)
 
 # ---------------------------------------------------------------------------
 # Cost to collect and appeals

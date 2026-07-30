@@ -67,6 +67,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from dashboard.provenance import DASHBOARD_EMITTERS, DashboardEmitter
 from tests.leakage import exposure
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -191,6 +192,24 @@ def _work_queue_surface(as_of: pd.Timestamp | None) -> exposure.Surface:
     )
 
 
+def _dashboard_dataframe_surface() -> exposure.Surface:
+    """The shared Streamlit table boundary used by every registered page.
+
+    Pages route each table through ``dashboard.components.dataframe`` with their
+    declared emitter. The component owns the last dataframe copy before Streamlit
+    renders it, so this probe catches a marker stripped at that shared boundary.
+    """
+    from dashboard.components import prepare_dataframe
+    from dashboard.provenance import emitter_for
+
+    emitter = emitter_for("dashboard/components.py")
+    return exposure.Surface(
+        name="dashboard/components.py::prepare_dataframe",
+        build=lambda frame: prepare_dataframe(frame, emitter=emitter),
+        frame=_denial_frame(),
+    )
+
+
 def _surfaces() -> list[exposure.Surface]:
     """Every registered user-facing tabular surface.
 
@@ -200,10 +219,11 @@ def _surfaces() -> list[exposure.Surface]:
     return [
         _work_queue_surface(pd.Timestamp("2024-06-01")),
         _work_queue_surface(None),
+        _dashboard_dataframe_surface(),
     ]
 
 
-SURFACE_MODULES = frozenset({"src/models/work_queue.py"})
+SURFACE_MODULES = frozenset({"dashboard/components.py", "src/models/work_queue.py"})
 
 #: Modules that emit a table but COMPUTE none of its columns — every column
 #: arrives already built by a curated view and is copied to the wire. The
@@ -384,6 +404,62 @@ def _swept_modules() -> list[pathlib.Path]:
     return found
 
 
+def _page_binds_declared_emitter(tree: ast.AST, module: str) -> bool:
+    """Whether a page names the registry entry that governs all of its output."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        if not isinstance(node.targets[0], ast.Name) or node.targets[0].id != "PAGE_EMITTER":
+            continue
+        if not isinstance(node.value, ast.Call):
+            continue
+        function = node.value.func
+        if not isinstance(function, ast.Name) or function.id != "emitter_for":
+            continue
+        if len(node.value.args) != 1:
+            continue
+        argument = node.value.args[0]
+        if isinstance(argument, ast.Constant) and argument.value == module:
+            return True
+    return False
+
+
+def _registered_dashboard_page(
+    module: str, tree: ast.AST, registry: dict[str, DashboardEmitter] = DASHBOARD_EMITTERS
+) -> bool:
+    """A dashboard page is registered only when its real render calls bind that entry."""
+    emitter = registry.get(module)
+    if (
+        emitter is None
+        or emitter.module != module
+        or not _page_binds_declared_emitter(tree, module)
+    ):
+        return False
+
+    headers = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (node.func.id if isinstance(node.func, ast.Name) else "") == "render_page_header"
+    ]
+    tables = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (node.func.id if isinstance(node.func, ast.Name) else "") == "dataframe"
+    ]
+
+    def uses_emitter(call: ast.Call) -> bool:
+        return any(
+            keyword.arg == "emitter"
+            and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "PAGE_EMITTER"
+            for keyword in call.keywords
+        )
+
+    return bool(headers and tables) and all(uses_emitter(call) for call in [*headers, *tables])
+
+
 def test_every_user_facing_emitter_is_registered() -> None:
     """The day a dashboard page or an API response ships, it gets probed.
 
@@ -395,9 +471,12 @@ def test_every_user_facing_emitter_is_registered() -> None:
     unregistered: list[str] = []
     for path in _swept_modules():
         relative = str(path.relative_to(REPO_ROOT))
+        tree = ast.parse(path.read_text())
         if relative in SURFACE_MODULES or relative in PASSTHROUGH_MODULES:
             continue
-        if _emits_a_table(ast.parse(path.read_text())):
+        if _registered_dashboard_page(relative, tree):
+            continue
+        if _emits_a_table(tree):
             unregistered.append(relative)
 
     assert not unregistered, (
@@ -417,6 +496,64 @@ def test_every_user_facing_emitter_is_registered() -> None:
         "unmeasured surface. Declare it in `PASSTHROUGH_MODULES` instead, naming the "
         "declaration-based gate in tests/leakage/test_wire_provenance.py that covers it."
     )
+
+
+def test_dashboard_emitters_have_complete_declarations_and_routed_tables() -> None:
+    """A page-level registration records output, provenance, and the disclosure a reader sees."""
+    expected = {
+        "dashboard/components.py",
+        "dashboard/pages/ar_recovery.py",
+        "dashboard/pages/denial_prevention.py",
+        "dashboard/pages/executive_overview.py",
+        "dashboard/pages/model_data_quality.py",
+        "dashboard/pages/work_queue.py",
+    }
+    assert set(DASHBOARD_EMITTERS) == expected
+
+    for module, emitter in DASHBOARD_EMITTERS.items():
+        assert emitter.module == module
+        assert emitter.surface.strip() and emitter.provenance.strip() and emitter.outputs
+        assert emitter.contains_simulated, f"{module}: simulated output must be declared"
+        assert emitter.disclosure.strip(), f"{module}: required disclosure is missing"
+        if module == "dashboard/components.py":
+            continue
+        tree = ast.parse((REPO_ROOT / module).read_text())
+        assert _registered_dashboard_page(module, tree), (
+            f"{module}: page output is not bound to its declared dashboard emitter"
+        )
+
+
+def test_dashboard_emitter_registration_controls() -> None:
+    """The page registry rejects a raw emitter, accepts a bound one, and ignores helpers."""
+    unregistered = ast.parse("from dashboard.components import dataframe\ndataframe(rows)\n")
+    assert _emits_a_table(unregistered)
+    with pytest.raises(AssertionError, match="unregistered dashboard emitter"):
+        assert _registered_dashboard_page("dashboard/pages/control.py", unregistered), (
+            "unregistered dashboard emitter"
+        )
+
+    module = "dashboard/pages/control.py"
+    registered = ast.parse(
+        "from dashboard.components import dataframe\n"
+        "from dashboard.components import render_page_header\n"
+        "from dashboard.provenance import emitter_for\n"
+        f'PAGE_EMITTER = emitter_for("{module}")\n'
+        "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+        "dataframe(rows, emitter=PAGE_EMITTER)\n"
+    )
+    control = DashboardEmitter(
+        module=module,
+        surface="Control page",
+        provenance="SIMULATED",
+        contains_simulated=True,
+        disclosure="Synthetic-data banner required.",
+        outputs=("dataframe",),
+    )
+    assert _registered_dashboard_page(module, registered, {module: control})
+
+    helper = ast.parse("def clamp(value):\n    return max(0, value)\n")
+    assert not _emits_a_table(helper)
+    assert not _registered_dashboard_page("dashboard/pages/helper.py", helper)
 
 
 def test_a_registered_module_actually_has_a_probe_behind_it() -> None:

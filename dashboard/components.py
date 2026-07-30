@@ -35,6 +35,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard import disclosures
+from dashboard.provenance import DashboardEmitter
 
 Classification = Literal["SOURCE", "DERIVED", "REFERENCE", "SIMULATED", "MIXED"]
 
@@ -80,7 +81,7 @@ def render_synthetic_data_banner(extra: str | None = None) -> None:
     st.error(body, icon=":material/warning:")
 
 
-def render_page_header(title: str, subtitle: str) -> None:
+def render_page_header(title: str, subtitle: str, *, emitter: DashboardEmitter) -> None:
     """Title and one-line framing. **Does NOT render the banner, on purpose.**
 
     An earlier version of this function called the banner itself, and every page
@@ -92,6 +93,8 @@ def render_page_header(title: str, subtitle: str) -> None:
 
     So the banner call stays in the page, on its own line, under §6's own words.
     """
+    if not emitter.disclosure.strip():
+        raise ValueError(f"{emitter.module}: dashboard emitter states no disclosure")
     st.title(title)
     st.caption(subtitle)
 
@@ -235,10 +238,18 @@ def simulated_columns_caption(frame: pd.DataFrame) -> None:
     )
 
 
-def dataframe(frame: pd.DataFrame, **kwargs: Any) -> None:
+def prepare_dataframe(frame: pd.DataFrame, *, emitter: DashboardEmitter) -> pd.DataFrame:
+    """The tabular boundary shared by every registered dashboard surface."""
+    if not emitter.contains_simulated:
+        raise ValueError(f"{emitter.module}: table emitter must declare simulated-content handling")
+    return frame.copy(deep=False)
+
+
+def dataframe(frame: pd.DataFrame, *, emitter: DashboardEmitter, **kwargs: Any) -> None:
     """A table plus its simulated-column caption. Always both."""
-    st.dataframe(frame, width="stretch", hide_index=True, **kwargs)
-    simulated_columns_caption(frame)
+    displayed = prepare_dataframe(frame, emitter=emitter)
+    st.dataframe(displayed, width="stretch", hide_index=True, **kwargs)
+    simulated_columns_caption(displayed)
 
 
 def money(value: float) -> str:

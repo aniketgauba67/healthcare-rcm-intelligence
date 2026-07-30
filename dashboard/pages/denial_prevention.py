@@ -40,10 +40,14 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
+from dashboard.provenance import emitter_for
+
+PAGE_EMITTER = emitter_for("dashboard/pages/denial_prevention.py")
 
 render_page_header(
     "Denial prevention",
     "Denial mix, provider clean-claim performance, and the pre-submission risk model.",
+    emitter=PAGE_EMITTER,
 )
 render_synthetic_data_banner()
 data_source_caption()
@@ -142,7 +146,7 @@ provenance_note(
 with st.expander(
     "Denial mix by category, CARC group and driver mechanism", icon=":material/table:"
 ):
-    dataframe(root_cause)
+    dataframe(root_cause, emitter=PAGE_EMITTER)
     st.caption(
         "`carc_category_label` is project-authored taxonomy text, not licensed X12 wording. "
         "`sim_denial_driver_mechanism` is the generator's own cause label and is forbidden "
@@ -190,6 +194,7 @@ dataframe(
             "low_volume_flag",
         ]
     ],
+    emitter=PAGE_EMITTER,
     column_config={
         "prvdr_num": st.column_config.TextColumn(
             "prvdr_num (the key)",
