@@ -2314,6 +2314,57 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   BYTE-IDENTICAL (d11bd0df5a918d0d, p10/p11/p12's digest across four sessions),
 >   manifest diff exactly one line. That was [ARTIFACT-REWRITE]'s second live use
 >   and it correctly did NOT refuse a legitimate digest-only update.
+> [BLACKLIST-LOCKSTEP] part 2 — **RESOLVED: NO CONFIG CHANGE REQUIRED.**
+>   app-engineer-2 confirmed the final spellings and NOT ONE WORD CHANGED. The
+>   VIEW is unrenamed (analytics-engineer's to fix); they re-mark
+>   dollars_at_stake / heuristic_priority_score / action_type at the API boundary
+>   in src/api/tables.py. Every re-marked name is a SUPERSTRING of its blacklist
+>   entry, so the substring guard covers all three — measured, not assumed. The
+>   entries stay accurate because the view they name is unchanged, and
+>   tests/features/test_derived_blacklist_tracks_views.py stays green for the
+>   same reason. It fires the day analytics-engineer renames the view, which is
+>   the outcome it was built for.
+>   FLAG FOR TEAM-LEAD, not mine to decide: this is the presentation-layer
+>   re-marking the [QUEUE-PREFIX] delegation explicitly wanted to AVOID ("a
+>   warehouse and a screen disagreeing on a column name is the worse outcome").
+>   The view and the API now disagree by design, and the disagreement has a
+>   consequence — see below.
+> [DEMO-BUNDLE-PROVENANCE] (ml-engineer-7) registered
+>   `dashboard/demo_data/*.duckdb` in PUBLISHED_SURFACES at app-engineer's
+>   request, and found a defect while verifying their proposed text rather than
+>   transcribing it. TWO CORRECTIONS to the justification they drafted:
+>     - "14 datasets" is 16 declared (9 warehouse `select *` views, 5 model
+>       output, 2 self-describing meta tables). Measured off src/demo/spec.py.
+>     - "per-column classification" is per-DATASET: a provenance class, grain,
+>       contains_simulated flag and note. Simulated COLUMNS are found by marker,
+>       not declared one by one. Writing the stronger claim into a declaration a
+>       reviewer relies on would be the overclaim this module exists to prevent.
+>   THE DEFECT, and it is on the most exposed surface we have: the bundle copies
+>   `vw_work_queue_priority` UNMODIFIED (src/demo/build.py: read_warehouse_datasets
+>   — deliberately, so a dashboard figure cannot diverge from its SQL control
+>   query). So `dollars_at_stake`, `heuristic_priority_score`, `priority_tier` and
+>   `action_type` ship UNMARKED in a committed .duckdb that opens on a clean clone
+>   with no database. The API's re-marking does not reach it. `action_type` is a
+>   CASE on sim_denial_flag — the LABEL under a process name.
+>   Registering the path alone would have made rule 1 green and rule 3 SILENT
+>   (read_columns returns None for .duckdb), i.e. my registration would have
+>   BLESSED it. So the registration is paired with
+>   tests/features/test_demo_bundle_provenance.py, which opens the bundle and
+>   applies the marker rule to the columns actually in it. Skips where no bundle
+>   exists; the bundle is committed, so it runs everywhere once it lands.
+>   FIXABLE BY EITHER OWNER: analytics-engineer marks the view (better — warehouse
+>   and screen then agree) or app-engineer re-marks into the bundle as the API
+>   already does. Not ml's to choose.
+> [BLACKLIST-LIMIT] (team-lead directed) the MEMBERSHIP caveat is now in
+>   docs/model_card.md beside the leakage guards, not only on this board: a
+>   column-name blacklist cannot express that a table's POPULATION is conditioned
+>   on the outcome. vw_work_queue_priority's where clause selects denied-or-open-AR
+>   claims, so which ROWS are present is itself the label whatever the columns are
+>   called, and every guard stays green while the label enters through the row
+>   filter. The rule it implies is about JOINS, not names: Model A features come
+>   from base tables, never from a view whose filter reads a post-submission fact.
+>   VERIFIED rather than asserted — src/features/ contains zero `vw_` references;
+>   extract.py reads sim_*/fact_*/dim_* only.
 > VINTAGE SKEW — MEASURED by team-lead from config/sources.yaml, for the honesty
 > pass. The code sets are CORRECT and unskewed (ICD-10-CM/PCS FY2023, HCPCS 2023,
 > MS-DRG v40 FY2023 — all match the 2023-04 claims). The SKEW is in the crosswalk

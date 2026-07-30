@@ -482,6 +482,22 @@ two headline queues.
   past must not move; flip a claim's own outcome and its own features must not move
   — with a **control test** asserting that a naive whole-dataset provider rate *does*
   break all three, so the checks are known to be sensitive.
+* **A column-name blacklist cannot express MEMBERSHIP, and this is its hard
+  limit.** Most of the machinery on this page guards column NAMES: a blacklist of
+  forbidden columns, a substring matcher that catches a forbidden column renamed,
+  a declaration of every feature's sources, a marking rule on every published
+  table. All of it operates on columns, and a filtered table leaks through none of
+  them. `rcm.vw_work_queue_priority` is the standing example: its `where` clause
+  selects claims that are denied or have open AR, so **which rows are present is
+  itself the label**, whatever the columns are called. Build a Model A feature by
+  joining to that view and every guard on this page stays green while the label
+  walks in through the row filter. No entry on `forbidden_derived_features` can
+  express "this table's population is conditioned on the outcome", because
+  membership is not a column. The rule that follows is a rule about JOINS, not
+  about names: **Model A features are built from base tables, never from a view
+  whose filter reads a post-submission fact.** It is enforced by
+  `src/features/extract.py` reading base tables directly, and by nothing else —
+  which is precisely why it is written here rather than left implicit.
 * **The training matrix is discoverable, and the guard runs on it.** Before this
   was closed, `src/features/` held six modules and no matrix any discovery route
   could find, so the §4.1 *value* probes — the ones that catch a renamed, logged,
