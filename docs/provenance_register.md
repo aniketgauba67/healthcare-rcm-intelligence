@@ -201,8 +201,8 @@ demo bundle use those same names, so no presentation layer removes the marker.
 
 Two views are explicitly pre-Phase-4 scaffolds, self-declaring in every row:
 `vw_work_queue_priority` is a HEURISTIC PLACEHOLDER (`is_heuristic_placeholder`
-true, `heuristic_*` score — not a model, not a probability, not an Expected Net
-Recovery) and `vw_model_monitoring` is a DRIFT SCAFFOLD (`is_drift_scaffold`
+true, `sim_heuristic_priority_score` and `sim_priority_tier` — not a model, not a
+probability, not an Expected Net Recovery) and `vw_model_monitoring` is a DRIFT SCAFFOLD (`is_drift_scaffold`
 true — observed input distributions only, no score/prediction). Phase 4 Model A/C
 replace them.
 

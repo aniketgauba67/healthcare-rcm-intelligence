@@ -325,7 +325,7 @@ history; queue membership itself is restricted to simulated denials or open A/R.
 | `vw_ar_aging` | one AR aging bucket (0-30…120+) | DERIVED from SIMULATED timeline + money; "open" = no simulated payment posted. |
 | `vw_payer_performance` | one simulated payer (`sim_payer_id`), 5 rows | **100% SIMULATED (§3.5)** — payer dimension is invented; every dashboard/export on this view MUST carry the simulated-data banner. |
 | `vw_clean_claim_performance` | one SYNTHETIC billing provider (`prvdr_num`), ~4,877 rows | DERIVED from SIMULATED; keyed on synthetic `prvdr_num` (mandatory), `sim_display_facility_ccn`/`_name`/`_state` display-only. |
-| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `heuristic_*` score, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only. |
+| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `sim_heuristic_priority_score` and `sim_priority_tier`, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only. |
 | `vw_data_quality_scorecard` | one named DQ check (`check_id`) | DERIVED data-quality metadata; each row also carries the provenance class of the data under test. |
 | `vw_model_monitoring` | (submission_month, feature_name) | DRIFT SCAFFOLD, no model exists — `is_drift_scaffold` always true; observed input distributions only, no score/prediction/probability. |
 

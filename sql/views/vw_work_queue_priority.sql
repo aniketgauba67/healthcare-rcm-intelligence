@@ -104,5 +104,5 @@ from scored;
 comment on view rcm.vw_work_queue_priority is
   'HEURISTIC PLACEHOLDER work queue (NOT a model). Rule-based dollars-x-age '
   'ranking of actionable (denied or open-AR) claims; Phase 4 Model A/C replace '
-  'it. Score columns are heuristic_*; payer is SIMULATED (§3.5); items are work, '
+  'it. Ranking columns are sim_heuristic_priority_score and sim_priority_tier; payer is SIMULATED (§3.5); items are work, '
   'not fraud flags.';

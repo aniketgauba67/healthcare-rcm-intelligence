@@ -148,7 +148,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
         grain="one row per actionable claim (denied or open A/R); 2,663 rows",
         note=(
             "HEURISTIC SCAFFOLD, not a model: dollars weighted by age, no learned "
-            "weights, every score column named heuristic_* and every row flagged "
+            "weights, ranking uses sim_heuristic_priority_score and sim_priority_tier, and every row is flagged "
             "is_heuristic_placeholder. Model C's Expected Net Recovery queue is a "
             "separate dataset in this bundle."
         ),
