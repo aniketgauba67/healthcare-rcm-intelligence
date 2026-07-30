@@ -68,15 +68,24 @@ Implemented and QA-accepted:
 
 ### Phase 5 — API, dashboard, and packaging 🚧
 
-Implemented components are in integration QA; Phase 5 is not accepted or
-deployed. Remaining acceptance work includes clean-clone Docker packaging,
-screenshots and demo instructions, and clean-SHA demo-bundle regeneration.
+Phase 5 is in integration QA and is not accepted or deployed.
 
-- Versioned FastAPI scoring endpoints
+Implemented and currently under QA:
+
+- Versioned FastAPI endpoints and schemas
 - Five-page Streamlit analyst dashboard
-- DuckDB/Parquet demo extract
+- DuckDB demo bundle, generated from a dirty tree and not a final release artifact
+- Provenance and simulated-data disclosure protections
+- Dashboard reconciliation reporting
+
+Still required before Phase 5 acceptance:
+
 - Clean-clone Docker startup
-- Screenshots, demo script, and hosted deployment
+- Screenshots
+- Demo script and instructions
+- Hosted deployment evidence
+- Final clean-SHA DuckDB bundle regeneration
+- Final Phase 5 QA acceptance
 
 ## Verified project scale
 
