@@ -857,6 +857,107 @@ def test_the_emitter_detector_leaves_non_tables_alone(shape: str) -> None:
     )
 
 
+_DISPLAY_ONLY_LINKAGE_LABEL = "Facility name (DISPLAY ONLY)"
+
+
+def _literal_text(node: ast.AST | None) -> str | None:
+    return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+
+def _column_config_label(value: ast.AST, symbols: dict[str, str]) -> tuple[str, ast.Call] | None:
+    """Return a Streamlit column-config label expressed as a call argument.
+
+    Mapping values are not always bare strings: Streamlit's actual column labels
+    are normally the first argument to ``st.column_config.*Column(...)``.  Resolve
+    import aliases so ``from streamlit import column_config as columns`` receives
+    the same inspection as the ordinary ``st.column_config`` spelling.
+    """
+    if not isinstance(value, ast.Call):
+        return None
+    target = _resolved_call_target(value, symbols)
+    if not target or ".column_config." not in target or not value.args:
+        return None
+    label = _literal_text(value.args[0])
+    return (label, value) if label is not None else None
+
+
+def _call_has_required_disclosures(tree: ast.AST, symbols: dict[str, str]) -> bool:
+    return any(
+        isinstance(node, ast.Call)
+        and _resolved_call_target(node, symbols) == "dashboard.components.required_disclosures"
+        for node in ast.walk(tree)
+    )
+
+
+def _approved_display_only_linkage(
+    column: str, label: str, config: ast.Call, tree: ast.AST, symbols: dict[str, str]
+) -> bool:
+    """The real-name crosswalk is a disclosed linkage, not a simulated claim value."""
+    if column != "sim_display_facility_name" or label != _DISPLAY_ONLY_LINKAGE_LABEL:
+        return False
+    help_text = next(
+        (_literal_text(keyword.value) for keyword in config.keywords if keyword.arg == "help"),
+        None,
+    )
+    required_help = (
+        "real cms facility name",
+        "seeded random crosswalk",
+        "not a key",
+        "synthetic providers",
+    )
+    if help_text is None or not all(fragment in help_text.lower() for fragment in required_help):
+        return False
+    if not _call_has_required_disclosures(tree, symbols):
+        return False
+
+    from dashboard import disclosures
+    from src.features.leakage import LeakageError, assert_no_forbidden_columns
+
+    if "forbidden as a feature" not in disclosures.CROSSWALK_COLLISION.lower():
+        return False
+    for model in ("A", "C"):
+        try:
+            assert_no_forbidden_columns([column], model=model)
+        except LeakageError:
+            continue
+        return False
+    return True
+
+
+def _display_label_offenders() -> list[str]:
+    """Find simulated columns whose rendered label drops their provenance."""
+    offenders: list[str] = []
+    roots = [*SWEPT_PACKAGES, REPO_ROOT / "src" / "models"]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            tree = ast.parse(path.read_text())
+            symbols = _imported_symbols(tree)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Dict):
+                    continue
+                for key, value in zip(node.keys, node.values, strict=False):
+                    column = _literal_text(key)
+                    if column is None or "sim_" not in column:
+                        continue
+                    label = _literal_text(value)
+                    config: ast.Call | None = None
+                    call_label = _column_config_label(value, symbols)
+                    if call_label is not None:
+                        label, config = call_label
+                    if label is None or "sim" in label.lower():
+                        continue
+                    if config is not None and _approved_display_only_linkage(
+                        column, label, config, tree, symbols
+                    ):
+                        continue
+                    offenders.append(
+                        f"{path.relative_to(REPO_ROOT)}:{key.lineno} {column!r} -> {label!r}"
+                    )
+    return offenders
+
+
 def test_no_display_label_strips_the_simulated_marker() -> None:
     """Relabelling for display is the same defect wearing presentation clothes.
 
@@ -865,32 +966,98 @@ def test_no_display_label_strips_the_simulated_marker() -> None:
     rename in code does. A label that says so — "Denied amount (simulated)" — is
     fine, and is the fix.
     """
-    offenders: list[str] = []
-    roots = [*SWEPT_PACKAGES, REPO_ROOT / "src" / "models"]
-    for root in roots:
-        if not root.is_dir():
-            continue
-        for path in sorted(root.rglob("*.py")):
-            tree = ast.parse(path.read_text())
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Dict):
-                    continue
-                for key, value in zip(node.keys, node.values, strict=False):
-                    if not isinstance(key, ast.Constant) or not isinstance(value, ast.Constant):
-                        continue
-                    if not isinstance(key.value, str) or not isinstance(value.value, str):
-                        continue
-                    if "sim_" in key.value and "sim" not in value.value.lower():
-                        offenders.append(
-                            f"{path.relative_to(REPO_ROOT)}:{key.lineno} "
-                            f"{key.value!r} -> {value.value!r}"
-                        )
+    offenders = _display_label_offenders()
     assert not offenders, (
         "a simulated column is mapped to a display label that does not say it is simulated:\n  "
         + "\n  ".join(offenders)
         + "\nSay so in the label (e.g. 'Denied amount (simulated)') rather than dropping the "
         "marker on the way to the screen."
     )
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "passes"),
+    [
+        (
+            "rework cost without simulated marker",
+            'import streamlit as st\nCONFIG = {"sim_rework_cost": st.column_config.NumberColumn("Rework $")}\n',
+            False,
+        ),
+        (
+            "expected net recovery abbreviated away",
+            'import streamlit as st\nCONFIG = {"sim_expected_net_recovery": st.column_config.NumberColumn("ENR")}\n',
+            False,
+        ),
+        (
+            "deadline without simulated marker",
+            'import streamlit as st\nCONFIG = {"sim_days_to_deadline": st.column_config.NumberColumn("Days left")}\n',
+            False,
+        ),
+        (
+            "correct simulated labels",
+            "import streamlit as st\n"
+            "CONFIG = {\n"
+            '    "sim_rework_cost": st.column_config.NumberColumn("Simulated rework cost"),\n'
+            '    "sim_expected_net_recovery": st.column_config.NumberColumn("Simulated expected net recovery"),\n'
+            '    "sim_days_to_deadline": st.column_config.NumberColumn("Simulated days to deadline"),\n'
+            "}\n",
+            True,
+        ),
+        (
+            "ordinary source label",
+            'import streamlit as st\nCONFIG = {"billed_charge": st.column_config.NumberColumn("Billed charge")}\n',
+            True,
+        ),
+        (
+            "approved display-only crosswalk name",
+            "from dashboard.components import required_disclosures\n"
+            "from streamlit import column_config as columns\n"
+            "required_disclosures()\n"
+            "CONFIG = {\n"
+            '    "sim_display_facility_name": columns.TextColumn(\n'
+            '        "Facility name (DISPLAY ONLY)",\n'
+            '        help="A real CMS facility name attached by a seeded random crosswalk. NOT a key. 2,816 names carry 4,876 synthetic providers, worst case 15:1.",\n'
+            "    )\n"
+            "}\n",
+            True,
+        ),
+        (
+            "display-only crosswalk name without the shared disclosure",
+            "import streamlit as st\n"
+            "CONFIG = {\n"
+            '    "sim_display_facility_name": st.column_config.TextColumn(\n'
+            '        "Facility name (DISPLAY ONLY)",\n'
+            '        help="A real CMS facility name attached by a seeded random crosswalk. NOT a key. 2,816 names carry 4,876 synthetic providers, worst case 15:1.",\n'
+            "    )\n"
+            "}\n",
+            False,
+        ),
+    ],
+)
+def test_display_label_detector_controls(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    source: str,
+    passes: bool,
+) -> None:
+    """Run call-expression label controls through the complete display-label gate."""
+    page = tmp_path / "dashboard" / "pages" / "control.py"
+    page.parent.mkdir(parents=True)
+    page.write_text(source)
+    module_under_test = sys.modules[__name__]
+    monkeypatch.setattr(module_under_test, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        module_under_test,
+        "SWEPT_PACKAGES",
+        (tmp_path / "dashboard", tmp_path / "src" / "api"),
+    )
+
+    if passes:
+        test_no_display_label_strips_the_simulated_marker()
+    else:
+        with pytest.raises(AssertionError, match="dashboard/pages/control.py"):
+            test_no_display_label_strips_the_simulated_marker()
 
 
 def test_no_generated_csv_header_carries_an_unmarked_simulated_column(measured) -> None:
