@@ -26,6 +26,29 @@ here is typed by hand. Two consecutive full runs are byte-identical
 
 ---
 
+## Crosswalk identity and vintage limits
+
+The synthetic claims source is vintage **2023-04**. Real CMS reference data is
+attached only through a seeded synthetic display crosswalk, and it is newer: CMS
+Hospital General Information is vintage **2026-04**, while Medicare Physician &
+Other Practitioners uses data year **2024**, released **2026-05**. These reference
+vintages are temporally newer than the claims, so the resulting display
+association is not a historically accurate 2023 provider/facility assignment.
+Hospitals may open, close, change type, or change attributes, and providers may
+change state or specialty between the claim and the later reference records.
+
+The crosswalk maps **4,876** synthetic providers onto **2,857** real CCNs; the
+worst CCN collision is **8:1**. Displayed facility names are less unique still,
+with a worst name collision of **15:1**. A displayed real-CMS provider/facility
+name or CCN is therefore display enrichment, never a unique analytical identity.
+Use `claim_sk` for claim grain and synthetic `prvdr_num` for provider/facility
+analysis; never group, join, deduplicate, or evaluate performance using a
+displayed name. Crosswalked real provider/facility names, CCNs, NPIs, and display
+attributes are **forbidden as features** in every model. The seeded synthetic
+association is not a real provider/facility relationship.
+
+---
+
 ## 1. Model A — pre-submission denial risk
 
 ### Intended use
@@ -552,12 +575,9 @@ provenance rules are written to prevent.
   anyway. There is **no fairness audit by race or sex here, and there should not be
   a reassuring one** — the outcomes are simulated, so any disparity measured would
   be a property of the generator, not of a payer.
-* **The crosswalk to real facilities and NPIs is display-only** and forbidden as a
-  feature at every boundary, Model C included. It maps synthetic providers onto
-  real CCNs by seeded random assignment purely so the dashboard has recognisable
-  names; it carries no information about the claim and multiplexes 4,876 synthetic
-  providers onto 2,857 real CCNs (worst case 8:1), so a real CCN is not even a
-  stable entity key. All provider analysis keys on the synthetic `prvdr_num`.
+* **The crosswalk limits above apply to both models.** Crosswalked real identities
+  are display-only, forbidden as features at every boundary, and never a
+  substitute for the synthetic analytical keys.
 * **Coverage is claim-weighted, not provider-weighted.** The median provider has
   two claims and never builds a usable history, but volume is concentrated — the
   top 10% of providers hold 53% of claims — so **72% of claims** (83% post-2019) do

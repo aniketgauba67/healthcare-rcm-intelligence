@@ -1,10 +1,15 @@
 # Healthcare RCM Intelligence Platform
 
-> **Status:** In active development — Phases 1–3 of 5 are complete. Machine learning and application packaging are in progress.
+> **Status:** Phases 1–4 of 5 are complete and QA-accepted. Phase 5's
+> API/dashboard/demo integration is in active QA; clean-clone Docker packaging,
+> screenshots and demo instructions, clean-SHA bundle regeneration, and final
+> Phase 5 acceptance remain open.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
-The remaining phases add explainable machine-learning models, a FastAPI scoring service, and a Streamlit analyst dashboard.
+Phase 4 supplies explainable machine-learning models. Phase 5 is integrating
+those models with a FastAPI scoring service, a Streamlit analyst dashboard, and
+a runnable demo bundle; that phase is not yet accepted or deployed.
 
 ## Why this project exists
 
@@ -46,9 +51,9 @@ No simulated outcome is presented as real. Provenance, assumptions, and limitati
 - Includes statistical testing, survival analysis, process mining, risk-adjusted facility analysis, and interrupted time-series methodology
 - Documents 19 decision-relevant analytical insights
 
-### Phase 4 — Explainable machine learning 🚧
+### Phase 4 — Explainable machine learning ✅
 
-Planned and currently in development:
+Implemented and QA-accepted:
 
 - Point-in-time feature store
 - Automated leakage protection
@@ -63,7 +68,9 @@ Planned and currently in development:
 
 ### Phase 5 — API, dashboard, and packaging 🚧
 
-Planned and currently in development:
+Implemented components are in integration QA; Phase 5 is not accepted or
+deployed. Remaining acceptance work includes clean-clone Docker packaging,
+screenshots and demo instructions, and clean-SHA demo-bundle regeneration.
 
 - Versioned FastAPI scoring endpoints
 - Five-page Streamlit analyst dashboard
@@ -146,8 +153,29 @@ Additional safeguards include:
 - The provenance register and data dictionary are updated with schema changes
 - Post-submission and latent values are forbidden from pre-submission ML features
 
+### Crosswalk limits: display enrichment, not identity
+
+The synthetic claims source is vintage **2023-04**. The reference files used
+only to decorate the seeded display crosswalk are newer: CMS Hospital General
+Information is vintage **2026-04**, and Medicare Physician & Other Practitioners
+uses data year **2024**, released **2026-05**. This is a temporal mismatch, not a
+historically accurate 2023 provider/facility assignment. Hospitals may open,
+close, change type, or change attributes; providers may change state or
+specialty between the claim and the later reference file.
+
+The seeded crosswalk maps **4,876** synthetic providers onto **2,857** real
+CCNs, with a worst CCN collision of **8:1**. Grouping by displayed facility name
+is less unique still: the worst name collision is **15:1**. Displayed real-CMS
+provider/facility names and CCNs are display enrichment, not unique analytical
+identifiers. Use `claim_sk` for claim grain and the synthetic `prvdr_num` for
+provider/facility analysis; do not group, join, deduplicate, or evaluate
+performance by a displayed name. Crosswalked real provider/facility names, CCNs,
+NPIs, and display attributes are forbidden as a feature in every ML model. The
+seeded synthetic association is not a real provider/facility relationship.
+
 See:
 
+- [`docs/model_card.md`](docs/model_card.md)
 - [`docs/provenance_register.md`](docs/provenance_register.md)
 - [`docs/data_dictionary.md`](docs/data_dictionary.md)
 - [`docs/assumptions.md`](docs/assumptions.md)
@@ -378,5 +406,3 @@ The interrupted time-series example is explicitly labeled illustrative and does 
 **Aniket Gauba**  
 Computer Science graduate with minors in Data Analytics and Physics  
 [LinkedIn](https://www.linkedin.com/in/aniket-gauba/) | [GitHub](https://github.com/aniketgauba67) | [Portfolio](https://aniketgauba.com)
-
-
