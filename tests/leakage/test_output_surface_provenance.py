@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import sys
 
 import numpy as np
 import pandas as pd
@@ -379,20 +380,69 @@ def _is_route(node: ast.AST) -> bool:
     return False
 
 
+def _imported_symbols(tree: ast.AST) -> dict[str, str]:
+    """Resolve the imports needed to recognise a dashboard render boundary.
+
+    This deliberately follows only module-level import spelling.  The gate is a
+    source-boundary check, not a general Python interpreter, but it must not lose
+    a user-facing table merely because a page calls the shared renderer `grid`.
+    """
+    symbols: dict[str, str] = {}
+    for node in tree.body if isinstance(tree, ast.Module) else ():
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                local = alias.asname or alias.name.split(".", maxsplit=1)[0]
+                symbols[local] = alias.name if alias.asname else local
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                symbols[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return symbols
+
+
+def _dotted_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _dotted_name(node.value)
+        return f"{parent}.{node.attr}" if parent else None
+    return None
+
+
+def _resolved_call_target(call: ast.Call, symbols: dict[str, str]) -> str | None:
+    """Return a call target after resolving its first imported name."""
+    dotted = _dotted_name(call.func)
+    if not dotted:
+        return None
+    root, *tail = dotted.split(".")
+    resolved_root = symbols.get(root, root)
+    return ".".join((resolved_root, *tail))
+
+
+def _user_facing_emitter_calls(tree: ast.AST) -> list[ast.Call]:
+    """Every AST call that the generic output-surface gate classifies as data."""
+    symbols = _imported_symbols(tree)
+    calls: list[ast.Call] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        target = _resolved_call_target(node, symbols)
+        name = target.rsplit(".", maxsplit=1)[-1] if target else ""
+        if name in _EMITTER_CALLS:
+            calls.append(node)
+        elif name in _DATA_IF_NOT_LITERAL and node.args and not _is_text_literal(node.args[0]):
+            calls.append(node)
+        elif any(keyword.arg in _EMITTER_KEYWORDS for keyword in node.keywords):
+            calls.append(node)
+    return calls
+
+
 def _emits_a_table(tree: ast.AST) -> bool:
     for node in ast.walk(tree):
         if _is_route(node):
             return True
-        if isinstance(node, ast.Call):
-            func = node.func
-            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-            if name in _EMITTER_CALLS:
-                return True
-            if name in _DATA_IF_NOT_LITERAL and node.args and not _is_text_literal(node.args[0]):
-                return True
-            if any(kw.arg in _EMITTER_KEYWORDS for kw in node.keywords):
-                return True
-    return False
+    return bool(_user_facing_emitter_calls(tree))
 
 
 def _swept_modules() -> list[pathlib.Path]:
@@ -424,17 +474,38 @@ def _page_binds_declared_emitter(tree: ast.AST, module: str) -> bool:
     return False
 
 
-def _registered_dashboard_page(
+def _uses_page_emitter(call: ast.Call) -> bool:
+    return any(
+        keyword.arg == "emitter"
+        and isinstance(keyword.value, ast.Name)
+        and keyword.value.id == "PAGE_EMITTER"
+        for keyword in call.keywords
+    )
+
+
+def _is_registered_dataframe_boundary(call: ast.Call, symbols: dict[str, str]) -> bool:
+    """Whether a call reaches the one approved dataframe boundary for a page."""
+    return _resolved_call_target(
+        call, symbols
+    ) == "dashboard.components.dataframe" and _uses_page_emitter(call)
+
+
+def _dashboard_page_emitter_errors(
     module: str, tree: ast.AST, registry: dict[str, DashboardEmitter] = DASHBOARD_EMITTERS
-) -> bool:
-    """A dashboard page is registered only when its real render calls bind that entry."""
+) -> list[str]:
+    """Return every unregistered output call in a registered dashboard page.
+
+    A page declaration identifies the required PAGE_EMITTER; it cannot waive the
+    generic AST scan for another output call in the same file.
+    """
+    errors: list[str] = []
     emitter = registry.get(module)
     if (
         emitter is None
         or emitter.module != module
         or not _page_binds_declared_emitter(tree, module)
     ):
-        return False
+        return ["missing or mismatched PAGE_EMITTER registration"]
 
     headers = [
         node
@@ -442,22 +513,32 @@ def _registered_dashboard_page(
         if isinstance(node, ast.Call)
         and (node.func.id if isinstance(node.func, ast.Name) else "") == "render_page_header"
     ]
-    tables = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and (node.func.id if isinstance(node.func, ast.Name) else "") == "dataframe"
-    ]
+    if not headers:
+        errors.append("no render_page_header call")
+    errors.extend(
+        f"render_page_header at line {call.lineno} is not bound to PAGE_EMITTER"
+        for call in headers
+        if not _uses_page_emitter(call)
+    )
 
-    def uses_emitter(call: ast.Call) -> bool:
-        return any(
-            keyword.arg == "emitter"
-            and isinstance(keyword.value, ast.Name)
-            and keyword.value.id == "PAGE_EMITTER"
-            for keyword in call.keywords
-        )
+    symbols = _imported_symbols(tree)
+    calls = _user_facing_emitter_calls(tree)
+    if not calls:
+        errors.append("no user-facing output call")
+    errors.extend(
+        f"unregistered user-facing emitter at line {call.lineno}: "
+        f"{_resolved_call_target(call, symbols) or '<dynamic call>'}"
+        for call in calls
+        if not _is_registered_dataframe_boundary(call, symbols)
+    )
+    return errors
 
-    return bool(headers and tables) and all(uses_emitter(call) for call in [*headers, *tables])
+
+def _registered_dashboard_page(
+    module: str, tree: ast.AST, registry: dict[str, DashboardEmitter] = DASHBOARD_EMITTERS
+) -> bool:
+    """Whether every user-facing emitter call is bound to this page's declaration."""
+    return not _dashboard_page_emitter_errors(module, tree, registry)
 
 
 def test_every_user_facing_emitter_is_registered() -> None:
@@ -474,7 +555,10 @@ def test_every_user_facing_emitter_is_registered() -> None:
         tree = ast.parse(path.read_text())
         if relative in SURFACE_MODULES or relative in PASSTHROUGH_MODULES:
             continue
-        if _registered_dashboard_page(relative, tree):
+        if relative in DASHBOARD_EMITTERS:
+            errors = _dashboard_page_emitter_errors(relative, tree)
+            if errors:
+                unregistered.append(f"{relative}: {'; '.join(errors)}")
             continue
         if _emits_a_table(tree):
             unregistered.append(relative)
@@ -523,25 +607,8 @@ def test_dashboard_emitters_have_complete_declarations_and_routed_tables() -> No
         )
 
 
-def test_dashboard_emitter_registration_controls() -> None:
-    """The page registry rejects a raw emitter, accepts a bound one, and ignores helpers."""
-    unregistered = ast.parse("from dashboard.components import dataframe\ndataframe(rows)\n")
-    assert _emits_a_table(unregistered)
-    with pytest.raises(AssertionError, match="unregistered dashboard emitter"):
-        assert _registered_dashboard_page("dashboard/pages/control.py", unregistered), (
-            "unregistered dashboard emitter"
-        )
-
-    module = "dashboard/pages/control.py"
-    registered = ast.parse(
-        "from dashboard.components import dataframe\n"
-        "from dashboard.components import render_page_header\n"
-        "from dashboard.provenance import emitter_for\n"
-        f'PAGE_EMITTER = emitter_for("{module}")\n'
-        "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
-        "dataframe(rows, emitter=PAGE_EMITTER)\n"
-    )
-    control = DashboardEmitter(
+def _control_emitter(module: str) -> DashboardEmitter:
+    return DashboardEmitter(
         module=module,
         surface="Control page",
         provenance="SIMULATED",
@@ -549,11 +616,126 @@ def test_dashboard_emitter_registration_controls() -> None:
         disclosure="Synthetic-data banner required.",
         outputs=("dataframe",),
     )
-    assert _registered_dashboard_page(module, registered, {module: control})
 
-    helper = ast.parse("def clamp(value):\n    return max(0, value)\n")
-    assert not _emits_a_table(helper)
-    assert not _registered_dashboard_page("dashboard/pages/helper.py", helper)
+
+@pytest.mark.parametrize(
+    ("name", "source", "registration", "passes"),
+    [
+        (
+            "unregistered raw streamlit dataframe",
+            "import streamlit as st\nst.dataframe(rows)\n",
+            None,
+            False,
+        ),
+        (
+            "unregistered module-qualified streamlit dataframe",
+            "import streamlit\nstreamlit.dataframe(rows)\n",
+            None,
+            False,
+        ),
+        (
+            "correct registered shared dataframe",
+            "from dashboard.components import dataframe, render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "dataframe(rows, emitter=PAGE_EMITTER)\n",
+            "dashboard/pages/control.py",
+            True,
+        ),
+        (
+            "registered module-qualified shared dataframe",
+            "import dashboard.components\n"
+            "from dashboard.components import render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "dashboard.components.dataframe(rows, emitter=PAGE_EMITTER)\n",
+            "dashboard/pages/control.py",
+            True,
+        ),
+        (
+            "registered dataframe plus raw streamlit dataframe",
+            "from dashboard.components import dataframe, render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "dataframe(rows, emitter=PAGE_EMITTER)\n"
+            "import streamlit as st\nst.dataframe(rows)\n",
+            "dashboard/pages/control.py",
+            False,
+        ),
+        (
+            "registered dataframe plus unbound aliased shared dataframe",
+            "from dashboard.components import dataframe as grid, render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "grid(rows)\n",
+            "dashboard/pages/control.py",
+            False,
+        ),
+        (
+            "registered aliased shared dataframe",
+            "from dashboard.components import dataframe as grid, render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "grid(rows, emitter=PAGE_EMITTER)\n",
+            "dashboard/pages/control.py",
+            True,
+        ),
+        (
+            "missing page registration",
+            "from dashboard.components import dataframe, render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "dataframe(rows, emitter=PAGE_EMITTER)\n",
+            None,
+            False,
+        ),
+        (
+            "wrong page registration",
+            "from dashboard.components import dataframe, render_page_header\n"
+            "from dashboard.provenance import emitter_for\n"
+            'PAGE_EMITTER = emitter_for("dashboard/pages/control.py")\n'
+            "render_page_header('Control', 'Registered output', emitter=PAGE_EMITTER)\n"
+            "dataframe(rows, emitter=PAGE_EMITTER)\n",
+            "dashboard/pages/other.py",
+            False,
+        ),
+        ("internal helper", "def clamp(value):\n    return max(0, value)\n", None, True),
+    ],
+)
+def test_dashboard_emitter_registration_controls(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    source: str,
+    registration: str | None,
+    passes: bool,
+) -> None:
+    """Run the real full gate against registered, raw, and aliased page controls."""
+    module = "dashboard/pages/control.py"
+    page = tmp_path / module
+    page.parent.mkdir(parents=True)
+    page.write_text(source)
+    module_under_test = sys.modules[__name__]
+    monkeypatch.setattr(module_under_test, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        module_under_test,
+        "SWEPT_PACKAGES",
+        (tmp_path / "dashboard", tmp_path / "src" / "api"),
+    )
+    if registration is not None:
+        monkeypatch.setitem(DASHBOARD_EMITTERS, module, _control_emitter(registration))
+
+    if passes:
+        test_every_user_facing_emitter_is_registered()
+    else:
+        with pytest.raises(AssertionError, match="dashboard/pages/control.py"):
+            test_every_user_facing_emitter_is_registered()
 
 
 def test_a_registered_module_actually_has_a_probe_behind_it() -> None:
