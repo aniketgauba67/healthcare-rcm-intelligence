@@ -310,9 +310,45 @@ that moment: it checks the committed SHA-256 identity, opens a new temporary
 read-only DuckDB connection, validates the declared dataset and provenance
 inventory, and closes that probe connection. This is intentionally independent
 of the cached connection serving application requests, because an already-open
-Unix file descriptor remains readable after its pathname is deleted. An explicit
-replacement bundle must set both `RCM_DEMO_BUNDLE` and its matching
-`RCM_DEMO_BUNDLE_SHA256`; the default clean-clone path needs neither override.
+Unix file descriptor remains readable after its pathname is deleted. The default
+stack serves `/app/dashboard/demo_data/rcm_demo.duckdb`, pinned to SHA-256
+`ef9d8013d84f74133153033a5e68f950cf51cc5e1e559cf80175f93a94c3e7e0`.
+Unset or blank overrides retain those committed defaults.
+
+An approved replacement must set both `RCM_DEMO_BUNDLE` and its matching
+`RCM_DEMO_BUNDLE_SHA256`. The path is inside the container: setting it to an
+arbitrary host path does not make that file visible, so an external bundle needs
+an image rebuild or a read-only bind mount. The API and dashboard cache their
+serving DuckDB connection at process startup. After changing the path or pin,
+recreate both application containers; readiness detects deletion, corruption,
+replacement and pin mismatch, but it does not hot-swap the serving connection.
+Restoring the exact original artifact can recover readiness without a restart;
+switching to a genuinely different approved artifact requires recreation.
+
+For example, this temporary Compose override mounts one host bundle at the same
+container path in both services:
+
+```yaml
+# docker-compose.bundle-override.yml
+services:
+  api:
+    volumes:
+      - "${RCM_DEMO_BUNDLE_HOST:?set an absolute host path}:/opt/rcm/override.duckdb:ro"
+  dashboard:
+    volumes:
+      - "${RCM_DEMO_BUNDLE_HOST:?set an absolute host path}:/opt/rcm/override.duckdb:ro"
+```
+
+```bash
+export RCM_DEMO_BUNDLE_HOST=/absolute/host/path/approved.duckdb
+export RCM_DEMO_BUNDLE=/opt/rcm/override.duckdb
+export RCM_DEMO_BUNDLE_SHA256="$(shasum -a 256 "$RCM_DEMO_BUNDLE_HOST" | awk '{print $1}')"
+docker compose -f docker-compose.yml -f docker-compose.bundle-override.yml \
+  up -d --force-recreate api dashboard
+```
+
+Remove the temporary override file and unset the three variables before
+recreating the services to return to the committed default.
 
 The containerized API and dashboard deliberately use the committed DuckDB demo
 bundle (`RCM_DATA_SOURCE=bundle`). PostgreSQL is still a required, health-checked
@@ -323,12 +359,25 @@ required sentinel columns, and view queryability before the API can start. It
 does not mutate the database from a health-check loop: a partial retained volume
 fails readiness with the missing or mistyped objects named.
 
-The clean-clone path does not pretend that the initialized container database is a
-loaded warehouse. PostgreSQL-mode reconciliation therefore reports unavailable
-model inputs instead of claiming success, and empty monitoring views render an
-explicit unavailable-data state. To exercise the optional live-warehouse backend,
-load it using the supported developer workflow below and explicitly set
-`RCM_DATA_SOURCE=postgres`.
+### Initialized PostgreSQL mode
+
+The clean-clone database contains the tracked schema and published views, but it
+is not a fully populated production warehouse and may lack application or model
+output datasets. All five pages remain renderable without exceptions in this
+initialized-but-unloaded mode and report what is unavailable:
+
+- **Executive Overview** shows an unavailable-data state, not a zero KPI book.
+- **Denial Prevention** shows unavailable-data disclosures, not zero denial or
+  provider metrics.
+- **A/R Recovery** reports aging, payer and appeal-recovery inputs separately and
+  does not fabricate zero-dollar or zero-day measures.
+- **Work Queue** identifies missing model and heuristic queue inputs.
+- **Model & Data Quality** reports incomplete reconciliation with `MISSING_INPUT`
+  or `ERROR` results, suppresses 17/17 success and reports unavailable monitoring
+  cohorts.
+
+To exercise the optional live-warehouse backend with populated data, load it using
+the supported developer workflow below and explicitly set `RCM_DATA_SOURCE=postgres`.
 
 The Compose credentials are non-secret local-demo defaults. Optional overrides
 can be supplied in the shell or an untracked `.env` file:
@@ -342,6 +391,8 @@ can be supplied in the shell or an untracked `.env` file:
 | `RCM_API_PORT` | `8000` |
 | `RCM_DASHBOARD_PORT` | `8501` |
 | `RCM_DASHBOARD_READINESS_PORT` | `8502` |
+| `RCM_DEMO_BUNDLE` | `/app/dashboard/demo_data/rcm_demo.duckdb` |
+| `RCM_DEMO_BUNDLE_SHA256` | committed artifact SHA-256 shown above |
 
 Stop the stack without deleting its database volume:
 
