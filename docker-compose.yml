@@ -26,15 +26,26 @@ services:
       - ./sql/views/vw_payer_performance.sql:/docker-entrypoint-initdb.d/77_vw_payer_performance.sql:ro
       - ./sql/views/vw_work_queue_priority.sql:/docker-entrypoint-initdb.d/78_vw_work_queue_priority.sql:ro
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" &&
-          psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -tAc
-          "select to_regclass('rcm.vw_executive_rcm_summary') is not null" | grep -qx t
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 10s
+
+  warehouse-init:
+    image: ${RCM_APP_IMAGE:-healthcare-rcm-intelligence:local}
+    pull_policy: never
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    command: ["python", "docker/postgres_init.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   api:
     image: ${RCM_APP_IMAGE:-healthcare-rcm-intelligence:local}
@@ -48,7 +59,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
-      RCM_API_HEALTH_URL: http://127.0.0.1:8000/health
+      RCM_REQUIRE_POSTGRES_READY: "true"
+      RCM_API_READINESS_URL: http://127.0.0.1:8000/ready
     command:
       - uvicorn
       - src.api.main:app
@@ -61,6 +73,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      warehouse-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "docker/healthcheck.py", "api"]
       interval: 10s
@@ -75,14 +89,18 @@ services:
     environment:
       RCM_DATA_SOURCE: bundle
       RCM_API_URL: http://api:8000
+      RCM_API_READINESS_URL: http://api:8000/ready
       POSTGRES_USER: ${POSTGRES_USER:-rcm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
       POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
-      RCM_API_HEALTH_URL: http://api:8000/health
-      RCM_DASHBOARD_HEALTH_URL: http://127.0.0.1:8501/_stcore/health
+      RCM_STREAMLIT_LIVENESS_URL: http://127.0.0.1:8501/_stcore/health
+      RCM_DASHBOARD_READINESS_URL: http://127.0.0.1:8502/ready
+      RCM_DASHBOARD_READINESS_PORT: "8502"
     command:
+      - python
+      - docker/dashboard_server.py
       - streamlit
       - run
       - dashboard/app.py
@@ -92,6 +110,7 @@ services:
       - --browser.gatherUsageStats=false
     ports:
       - "${RCM_DASHBOARD_PORT:-8501}:8501"
+      - "${RCM_DASHBOARD_READINESS_PORT:-8502}:8502"
     depends_on:
       postgres:
         condition: service_healthy

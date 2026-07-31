@@ -38,6 +38,7 @@ knows and they do not.
 
 from __future__ import annotations
 
+import os
 import pathlib
 from typing import Annotated, Any, Literal
 
@@ -64,11 +65,13 @@ from src.api.schemas import (
     ErrorResponse,
     ExecutiveMetricsResponse,
     HealthResponse,
+    LivenessResponse,
     ModelInfo,
     WorkQueueResponse,
 )
 from src.demo.bundle import BundleNotFoundError
 from src.demo.source import DataSourceError, get_source
+from src.infra.postgres_contract import PostgresContractError, validate_postgres_contract
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -179,18 +182,55 @@ async def _scoring_unavailable(request: Request, error: scoring.ScoringUnavailab
 
 
 # ---------------------------------------------------------------------------
-# GET /health
+# GET /live, /ready, /health
 # ---------------------------------------------------------------------------
 
 
+@app.get("/live")
+def live() -> LivenessResponse:
+    """Process liveness only; use `/ready` before sending application traffic."""
+    return LivenessResponse(status="live")
+
+
+def _postgres_readiness_required() -> bool:
+    return os.environ.get("RCM_REQUIRE_POSTGRES_READY", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _assert_required_dependencies() -> None:
+    if not _postgres_readiness_required():
+        return
+    try:
+        validate_postgres_contract()
+    except Exception as error:
+        detail = str(error) if isinstance(error, PostgresContractError) else type(error).__name__
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "detail": f"PostgreSQL readiness failed: {detail}",
+                "error": "postgres_not_ready",
+                "hint": (
+                    "Inspect the warehouse-init service. The Docker warehouse must contain "
+                    "exactly the tracked 24 base tables and 9 views before the API is ready."
+                ),
+            },
+        ) from error
+
+
+@app.get("/ready", responses={503: {"model": ErrorResponse}})
 @app.get("/health", responses={503: {"model": ErrorResponse}})
 def health() -> HealthResponse:
-    """Liveness plus the provenance of everything this process would serve.
+    """Dependency readiness plus the provenance of everything this process serves.
 
-    Deliberately more than "ok": a health check that reports only status tells an
-    operator the process is up and nothing about WHICH bundle and WHICH model it
-    is up on, and this service can be up on a stale extract.
+    `/health` remains a compatibility alias for `/ready`. In Compose this checks
+    the complete PostgreSQL object contract before opening and describing the
+    committed DuckDB bundle. `/live` is the process-only probe.
     """
+    _assert_required_dependencies()
     source = _source()
     available = sorted(source.available())
 

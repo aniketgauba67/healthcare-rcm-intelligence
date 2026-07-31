@@ -24,4 +24,4 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY --chown=app:app . .
 RUN test -r dashboard/demo_data/rcm_demo.duckdb
 
-EXPOSE 8000 8501
+EXPOSE 8000 8501 8502

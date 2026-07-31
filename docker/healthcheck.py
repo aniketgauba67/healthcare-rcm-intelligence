@@ -8,29 +8,6 @@ import sys
 import urllib.request
 from typing import Any
 
-import psycopg2
-
-
-def _postgres_ready() -> None:
-    connection = psycopg2.connect(
-        host=os.environ["POSTGRES_HOST"],
-        port=int(os.environ.get("POSTGRES_PORT", "5432")),
-        user=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        dbname=os.environ["POSTGRES_DB"],
-        connect_timeout=3,
-    )
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "select current_database(), to_regclass('rcm.vw_executive_rcm_summary') is not null"
-            )
-            database, warehouse_ready = cursor.fetchone()
-    finally:
-        connection.close()
-    if database != os.environ["POSTGRES_DB"] or not warehouse_ready:
-        raise RuntimeError("PostgreSQL is reachable but the expected warehouse schema is not ready")
-
 
 def _read_url(url: str) -> tuple[int, bytes]:
     with urllib.request.urlopen(url, timeout=4) as response:
@@ -38,7 +15,7 @@ def _read_url(url: str) -> tuple[int, bytes]:
 
 
 def _api_ready() -> None:
-    status, body = _read_url(os.environ.get("RCM_API_HEALTH_URL", "http://127.0.0.1:8000/health"))
+    status, body = _read_url(os.environ.get("RCM_API_READINESS_URL", "http://127.0.0.1:8000/ready"))
     payload: dict[str, Any] = json.loads(body)
     if status != 200 or payload.get("status") != "ok":
         raise RuntimeError(
@@ -51,10 +28,13 @@ def _api_ready() -> None:
 
 def _dashboard_ready() -> None:
     status, body = _read_url(
-        os.environ.get("RCM_DASHBOARD_HEALTH_URL", "http://127.0.0.1:8501/_stcore/health")
+        os.environ.get("RCM_DASHBOARD_READINESS_URL", "http://127.0.0.1:8502/ready")
     )
-    if status != 200 or body.strip().lower() != b"ok":
-        raise RuntimeError(f"Streamlit health is not ready: HTTP {status}, body={body[:80]!r}")
+    payload: dict[str, Any] = json.loads(body)
+    if status != 200 or payload.get("status") != "ready":
+        raise RuntimeError(
+            f"Dashboard is not ready: HTTP {status}, status={payload.get('status')!r}"
+        )
 
 
 def main() -> int:
@@ -63,9 +43,9 @@ def main() -> int:
         return 2
 
     try:
-        _postgres_ready()
-        _api_ready()
-        if sys.argv[1] == "dashboard":
+        if sys.argv[1] == "api":
+            _api_ready()
+        else:
             _dashboard_ready()
     except Exception as error:
         print(f"{type(error).__name__}: {error}", file=sys.stderr)

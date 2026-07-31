@@ -2960,7 +2960,8 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 - [ ] Streamlit dashboard (5 pages, synthetic banner on all)
 - [ ] DuckDB/Parquet demo extract for hosted deployment
 - [ ] docker-compose clean-clone start; implementation complete on
-  `feat/phase5-docker-clean-clone`, pending independent QA
+  `feat/phase5-docker-clean-clone`; QA corrections add an exact 24-base-table /
+  9-view initialization contract and dependency-aware readiness, pending re-review
 - [ ] README final, screenshots, demo script
 - [ ] ACCEPTANCE (qa-reviewer): full honesty pass + reconciliation pass
 

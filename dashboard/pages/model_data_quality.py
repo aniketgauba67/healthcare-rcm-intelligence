@@ -39,6 +39,7 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
+from dashboard.model_monitoring import render_model_monitoring
 from dashboard.provenance import emitter_for
 
 PAGE_EMITTER = emitter_for("dashboard/pages/model_data_quality.py")
@@ -198,43 +199,13 @@ st.caption(
 st.divider()
 st.subheader("Input-distribution monitoring")
 
-monitoring = data.load("vw_model_monitoring")
 st.caption(
     "**This view holds no model score and no prediction.** Every row carries "
     "`is_drift_scaffold`. It tracks how the INPUTS move across submission-month cohorts, "
     "and since the inputs are generated, drift here is drift in the simulation — not "
     "evidence that a deployed model is degrading, because nothing here is deployed."
 )
-
-feature = st.selectbox(
-    "Monitored feature",
-    sorted(monitoring["feature_name"].unique()),
-    index=sorted(monitoring["feature_name"].unique()).index("denial_rate")
-    if "denial_rate" in set(monitoring["feature_name"])
-    else 0,
-)
-series = monitoring.loc[monitoring["feature_name"] == feature].copy()
-series["month"] = pd.to_datetime(series["submission_year_month"] + "-01", errors="coerce")
-drift_chart = (
-    alt.Chart(series.dropna(subset=["month"]))
-    .mark_line(point=alt.OverlayMarkDef(size=14))
-    .encode(
-        x=alt.X("month:T", title="Claim submission month"),
-        y=alt.Y("metric_value:Q", title=f"{feature} ({series['metric_kind'].iloc[0]})"),
-        tooltip=[
-            alt.Tooltip("month:T", title="Month"),
-            alt.Tooltip("metric_value:Q", title="Value", format=".4f"),
-            alt.Tooltip("n_claims:Q", title="Claims", format=","),
-        ],
-    )
-    .properties(height=280)
-)
-st.altair_chart(drift_chart, use_container_width=True)
-provenance_note(
-    "SIMULATED",
-    "The claim count per month is in the tooltip. Early months are thin in the CMS "
-    "extract, so a swing in a rate there is sampling noise rather than drift.",
-)
+render_model_monitoring(data.load("vw_model_monitoring"))
 
 # ---------------------------------------------------------------------------
 # Model cards

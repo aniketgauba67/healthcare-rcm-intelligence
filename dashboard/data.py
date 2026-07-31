@@ -45,6 +45,9 @@ from src.demo.source import DataSourceError, get_source
 #: `src/demo/spec.py` rather than a second list, so a dataset cannot be readable
 #: here and unclassified there.
 DATASETS = tuple(sorted(spec.DATASETS_BY_NAME))
+MONITORING_COLUMNS = frozenset(
+    {"submission_year_month", "feature_name", "metric_kind", "metric_value", "n_claims"}
+)
 
 
 class DashboardDataError(RuntimeError):
@@ -122,6 +125,31 @@ def model_metrics(model: str) -> dict[str, Any]:
             "the bundle with `make demo-extract`."
         )
     return json.loads(match.iloc[0]["metrics_json"])
+
+
+def usable_model_monitoring(frame: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
+    """Return chartable monitoring rows or an honest unavailable-data reason."""
+    missing = sorted(MONITORING_COLUMNS - set(frame.columns))
+    if missing:
+        return frame.iloc[0:0].copy(), (
+            "Model-monitoring data is unavailable because the warehouse view is missing "
+            f"required columns: {', '.join(missing)}."
+        )
+    if frame.empty:
+        return frame.copy(), (
+            "Model-monitoring data is unavailable because this warehouse contains no "
+            "monitoring cohorts yet."
+        )
+
+    usable = frame.dropna(
+        subset=["submission_year_month", "feature_name", "metric_kind", "metric_value"]
+    ).copy()
+    if usable.empty:
+        return usable, (
+            "Model-monitoring data is unavailable because no rows contain the fields "
+            "required to draw a monitoring series."
+        )
+    return usable, None
 
 
 # ---------------------------------------------------------------------------

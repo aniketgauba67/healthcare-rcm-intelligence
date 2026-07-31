@@ -84,6 +84,13 @@ class ErrorResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class LivenessResponse(BaseModel):
+    """Process-only liveness; it deliberately says nothing about dependencies."""
+
+    status: Literal["live"]
+    api_version: str = API_VERSION
+
+
 class ModelInfo(BaseModel):
     name: str
     champion: str

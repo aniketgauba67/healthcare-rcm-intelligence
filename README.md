@@ -285,21 +285,41 @@ Compose builds one reproducible Python 3.11 image and starts:
 
 | Service | URL | Ready when |
 |---|---|---|
-| PostgreSQL 16 | `localhost:5432` | the empty `rcm` warehouse schema and published views exist and `pg_isready` succeeds |
-| FastAPI | <http://localhost:8000> | PostgreSQL is reachable and `/health` reports the bundled data source ready |
-| Streamlit | <http://localhost:8501> | PostgreSQL, FastAPI, and Streamlit health probes all pass |
+| PostgreSQL 16 | `localhost:5432` | `pg_isready` succeeds and `warehouse-init` verifies the exact 24 base tables and 9 views |
+| FastAPI | <http://localhost:8000> | `/ready` verifies PostgreSQL initialization plus the bundled data source |
+| Streamlit | <http://localhost:8501> | dependency readiness at <http://localhost:8502/ready> verifies Streamlit and the API |
 
 OpenAPI is available at <http://localhost:8000/docs> and as JSON at
 <http://localhost:8000/openapi.json>.
 
+The API separates process liveness (`GET /live`) from dependency readiness
+(`GET /ready`; `GET /health` is a compatibility alias for readiness). Streamlit's
+built-in `/_stcore/health` is process liveness only. The dashboard's externally
+requestable dependency readiness endpoint is `GET http://localhost:8502/ready`.
+These commands verify each surface:
+
+```bash
+curl --fail http://localhost:8000/live
+curl --fail http://localhost:8000/ready
+curl --fail http://localhost:8501/_stcore/health
+curl --fail http://localhost:8502/ready
+```
+
 The containerized API and dashboard deliberately use the committed DuckDB demo
 bundle (`RCM_DATA_SOURCE=bundle`). PostgreSQL is still a required, health-checked
-service. Its existing DDL and published views initialize deterministically on the
-first volume start, but the clean-clone path does not pretend that the empty
-container database is a loaded warehouse. The PostgreSQL-mode reconciliation
-therefore reports unavailable model inputs instead of claiming success. To
-exercise the optional live-warehouse backend, load it using the supported
-developer workflow below and explicitly set `RCM_DATA_SOURCE=postgres`.
+service. Its existing DDL initializes 24 base tables and 9 views deterministically
+on the first volume start. On every later Compose startup, the one-shot
+`warehouse-init` service validates every expected object name and relation type,
+required sentinel columns, and view queryability before the API can start. It
+does not mutate the database from a health-check loop: a partial retained volume
+fails readiness with the missing or mistyped objects named.
+
+The clean-clone path does not pretend that the initialized container database is a
+loaded warehouse. PostgreSQL-mode reconciliation therefore reports unavailable
+model inputs instead of claiming success, and empty monitoring views render an
+explicit unavailable-data state. To exercise the optional live-warehouse backend,
+load it using the supported developer workflow below and explicitly set
+`RCM_DATA_SOURCE=postgres`.
 
 The Compose credentials are non-secret local-demo defaults. Optional overrides
 can be supplied in the shell or an untracked `.env` file:
@@ -312,6 +332,7 @@ can be supplied in the shell or an untracked `.env` file:
 | `RCM_POSTGRES_PORT` | `5432` |
 | `RCM_API_PORT` | `8000` |
 | `RCM_DASHBOARD_PORT` | `8501` |
+| `RCM_DASHBOARD_READINESS_PORT` | `8502` |
 
 Stop the stack without deleting its database volume:
 
