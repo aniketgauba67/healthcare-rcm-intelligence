@@ -34,6 +34,13 @@ def test_object_manifest_matches_the_tracked_ddl() -> None:
     assert _tracked(view_pattern, ROOT / "sql" / "views") == set(VIEWS)
     assert len(BASE_TABLES) == 24
     assert len(VIEWS) == 9
+    ddl_text = "\n".join(path.read_text() for path in (ROOT / "sql" / "ddl").glob("*.sql"))
+    view_text = "\n".join(path.read_text() for path in (ROOT / "sql" / "views").glob("*.sql"))
+    for relation, columns in REQUIRED_COLUMNS.items():
+        relation_sql = view_text if relation.startswith("vw_") else ddl_text
+        assert relation in relation_sql
+        for column in columns:
+            assert column in relation_sql, f"{relation}.{column} is not declared by tracked SQL"
 
 
 def test_complete_inventory_and_required_columns_pass() -> None:

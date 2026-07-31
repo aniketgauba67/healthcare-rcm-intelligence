@@ -52,7 +52,7 @@ VIEWS: tuple[str, ...] = (
 )
 
 REQUIRED_COLUMNS: Mapping[str, tuple[str, ...]] = {
-    "fact_inpatient_claim": ("claim_sk", "clm_id", "prvdr_num"),
+    "fact_inpatient_claim": ("claim_sk", "clm_id", "provider_key"),
     "sim_claim_adjudication": ("claim_sk", "sim_denial_flag", "sim_paid_amount"),
     "vw_claim_enriched": ("claim_sk", "sim_denial_flag", "sim_ar_open_flag"),
     "vw_executive_rcm_summary": ("submission_year_month", "claims_submitted"),
