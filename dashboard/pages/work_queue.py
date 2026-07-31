@@ -93,9 +93,10 @@ st.error(disclosures.MODEL_C_HONESTY, icon=":material/trending_down:")
 
 if not data.has("model_c_work_queue"):
     st.info(
-        "The Model C queue is produced by `make train-appeal` and ships in the demo "
-        "bundle. Build one with `make demo-extract`, or read the heuristic scaffold queue "
-        "below, which needs no model artifacts."
+        "The Model C queue is unavailable from this PostgreSQL source. It is produced by "
+        "`make train-appeal` and ships in the demo bundle. Build one with "
+        "`make demo-extract`, or read the heuristic scaffold queue below, which needs no "
+        "model artifacts."
     )
 else:
     metrics_c = data.model_metrics("C")
@@ -324,8 +325,8 @@ st.warning(disclosures.OPERATING_POINT, icon=":material/speed:")
 
 if not data.has("model_a_reason_codes"):
     st.info(
-        "Per-claim drivers are produced by `make train` and ship in the demo bundle. "
-        "Build one with `make demo-extract`."
+        "Per-claim drivers are unavailable from this PostgreSQL source. They are produced "
+        "by `make train` and ship in the demo bundle. Build one with `make demo-extract`."
     )
 else:
     reasons = data.load("model_a_reason_codes")
@@ -472,12 +473,19 @@ try:
 except data.DashboardDataError as error:
     st.error(str(error))
 else:
-    st.caption(
-        "Dollars at stake scaled by an age factor. **No learned weights, no calibration, "
-        "not a model score and not an Expected Net Recovery.** It exists so a deployment "
-        "with no model artifacts still has a worklist, and every row carries "
-        "`is_heuristic_placeholder`."
-    )
+    if heuristic.empty:
+        st.warning(
+            "The heuristic work queue is unavailable because this warehouse contains no "
+            "actionable claim rows. No zero-valued queue metrics are shown.",
+            icon=":material/warning:",
+        )
+    else:
+        st.caption(
+            "Dollars at stake scaled by an age factor. **No learned weights, no calibration, "
+            "not a model score and not an Expected Net Recovery.** It exists so a deployment "
+            "with no model artifacts still has a worklist, and every row carries "
+            "`is_heuristic_placeholder`."
+        )
     columns = [
         c
         for c in (
@@ -493,12 +501,13 @@ else:
     ]
     if role == "Analyst":
         columns = ["claim_sk", *columns]
-    dataframe(heuristic[columns], emitter=PAGE_EMITTER)
-    st.caption(
-        "Every value derived from the simulated adjudication layer is named with `sim_` in "
-        "the view, API, dashboard, and demo bundle."
-    )
-    control_query(reconcile.sql_for("Work queue — Heuristic scaffold rows"))
+    if not heuristic.empty:
+        dataframe(heuristic[columns], emitter=PAGE_EMITTER)
+        st.caption(
+            "Every value derived from the simulated adjudication layer is named with `sim_` in "
+            "the view, API, dashboard, and demo bundle."
+        )
+        control_query(reconcile.sql_for("Work queue — Heuristic scaffold rows"))
 
 st.divider()
 disclosure_block(

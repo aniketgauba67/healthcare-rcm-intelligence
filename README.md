@@ -305,6 +305,15 @@ curl --fail http://localhost:8501/_stcore/health
 curl --fail http://localhost:8502/ready
 ```
 
+Every API readiness request verifies the configured bundle path as it exists at
+that moment: it checks the committed SHA-256 identity, opens a new temporary
+read-only DuckDB connection, validates the declared dataset and provenance
+inventory, and closes that probe connection. This is intentionally independent
+of the cached connection serving application requests, because an already-open
+Unix file descriptor remains readable after its pathname is deleted. An explicit
+replacement bundle must set both `RCM_DEMO_BUNDLE` and its matching
+`RCM_DEMO_BUNDLE_SHA256`; the default clean-clone path needs neither override.
+
 The containerized API and dashboard deliberately use the committed DuckDB demo
 bundle (`RCM_DATA_SOURCE=bundle`). PostgreSQL is still a required, health-checked
 service. Its existing DDL initializes 24 base tables and 9 views deterministically

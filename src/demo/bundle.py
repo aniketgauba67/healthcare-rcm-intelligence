@@ -46,10 +46,13 @@ above it.
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import os
 import pathlib
+import stat
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -67,9 +70,55 @@ BUNDLE_PATH_ENV = "RCM_DEMO_BUNDLE"
 MANIFEST_TABLE = "demo_manifest"
 BUILD_INFO_TABLE = "demo_build_info"
 
+# The currently committed demo artifact. Final Phase 5 acceptance requires a
+# clean-SHA rebuild, and that rebuild must update this pin in the same commit as
+# the DuckDB file. An override exists for an explicitly configured replacement.
+EXPECTED_BUNDLE_SHA256 = "ef9d8013d84f74133153033a5e68f950cf51cc5e1e559cf80175f93a94c3e7e0"
+BUNDLE_SHA256_ENV = "RCM_DEMO_BUNDLE_SHA256"
+MAX_READINESS_BUNDLE_BYTES = 64 * 1024 * 1024
+
+_BUILD_INFO_COLUMNS = frozenset(
+    {
+        "git_commit",
+        "git_branch",
+        "git_tree_dirty",
+        "built_at_utc",
+        "source_vintages",
+        "dataset_names",
+        "contains_simulated",
+        "notice",
+    }
+)
+_MANIFEST_COLUMNS = frozenset(
+    {
+        "dataset",
+        "provenance",
+        "contains_simulated",
+        "grain",
+        "rows",
+        "columns",
+        "simulated_columns",
+        "note",
+    }
+)
+
 
 class BundleNotFoundError(FileNotFoundError):
     """Raised with the command that produces the bundle, not just the path."""
+
+
+class BundleReadinessError(RuntimeError):
+    """The configured on-disk bundle is not the pinned, self-describing artifact."""
+
+
+@dataclass(frozen=True)
+class BundleReadiness:
+    """Identity returned after a fresh, independent readiness validation."""
+
+    path: pathlib.Path
+    sha256: str
+    datasets: tuple[str, ...]
+    git_commit: str
 
 
 def bundle_path() -> pathlib.Path:
@@ -80,6 +129,145 @@ def bundle_path() -> pathlib.Path:
 
 def bundle_exists(path: pathlib.Path | None = None) -> bool:
     return (path or bundle_path()).is_file()
+
+
+def expected_bundle_sha256() -> str:
+    """The artifact identity readiness must observe at the configured path."""
+    return os.environ.get(BUNDLE_SHA256_ENV, EXPECTED_BUNDLE_SHA256).strip().lower()
+
+
+def _sha256_bounded(path: pathlib.Path, size: int) -> str:
+    if size <= 0:
+        raise BundleReadinessError(f"demo bundle is empty: {path}")
+    if size > MAX_READINESS_BUNDLE_BYTES:
+        raise BundleReadinessError(
+            f"demo bundle is {size} bytes, above the {MAX_READINESS_BUNDLE_BYTES}-byte "
+            "readiness limit"
+        )
+
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise BundleReadinessError(f"demo bundle is not readable: {path}: {error}") from error
+    return digest.hexdigest()
+
+
+def _column_names(connection: Any, table: str) -> set[str]:
+    return {str(row[0]) for row in connection.execute(f'describe "{table}"').fetchall()}
+
+
+def validate_bundle_readiness(
+    path: pathlib.Path | None = None,
+    *,
+    expected_sha256: str | None = None,
+) -> BundleReadiness:
+    """Validate the configured artifact through a new read-only connection.
+
+    This deliberately does not call `open_bundle()` or `get_source()`: an
+    already-open DuckDB descriptor remains usable after its pathname is deleted
+    on Unix. Readiness is a claim about what a new process could open now, not
+    what this process opened earlier.
+    """
+    from src.demo import spec
+
+    resolved = (path or bundle_path()).expanduser().resolve()
+    try:
+        metadata = resolved.stat()
+    except OSError as error:
+        raise BundleReadinessError(
+            f"demo bundle path is unavailable: {resolved}: {error}"
+        ) from error
+    if not stat.S_ISREG(metadata.st_mode):
+        raise BundleReadinessError(f"demo bundle path is not a regular file: {resolved}")
+    if not os.access(resolved, os.R_OK):
+        raise BundleReadinessError(f"demo bundle path is not readable: {resolved}")
+
+    observed_sha256 = _sha256_bounded(resolved, metadata.st_size)
+    required_sha256 = (expected_sha256 or expected_bundle_sha256()).strip().lower()
+    if len(required_sha256) != 64 or any(c not in "0123456789abcdef" for c in required_sha256):
+        raise BundleReadinessError(
+            "configured demo bundle SHA-256 is not a 64-character hex digest"
+        )
+    if observed_sha256 != required_sha256:
+        raise BundleReadinessError(
+            "demo bundle fingerprint mismatch: "
+            f"expected {required_sha256}, observed {observed_sha256} at {resolved}"
+        )
+
+    expected_datasets = set(spec.DATASETS_BY_NAME)
+    connection = None
+    try:
+        import duckdb
+
+        connection = duckdb.connect(str(resolved), read_only=True)
+        actual_datasets = {str(row[0]) for row in connection.execute("show tables").fetchall()}
+        if actual_datasets != expected_datasets:
+            missing = sorted(expected_datasets - actual_datasets)
+            unexpected = sorted(actual_datasets - expected_datasets)
+            raise BundleReadinessError(
+                f"demo bundle inventory mismatch: missing={missing}, unexpected={unexpected}"
+            )
+
+        build_columns = _column_names(connection, BUILD_INFO_TABLE)
+        missing_build_columns = sorted(_BUILD_INFO_COLUMNS - build_columns)
+        if missing_build_columns:
+            raise BundleReadinessError(
+                f"{BUILD_INFO_TABLE} is missing columns: {missing_build_columns}"
+            )
+        build_rows = connection.execute(
+            f'select git_commit, dataset_names from "{BUILD_INFO_TABLE}"'
+        ).fetchall()
+        if len(build_rows) != 1 or not str(build_rows[0][0]).strip():
+            raise BundleReadinessError(f"{BUILD_INFO_TABLE} must contain one pinned build row")
+        try:
+            stamped_datasets = set(json.loads(build_rows[0][1]))
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise BundleReadinessError(
+                f"{BUILD_INFO_TABLE}.dataset_names is not valid JSON"
+            ) from error
+        if stamped_datasets != expected_datasets:
+            raise BundleReadinessError(
+                f"{BUILD_INFO_TABLE}.dataset_names does not match the declared bundle inventory"
+            )
+
+        manifest_columns = _column_names(connection, MANIFEST_TABLE)
+        missing_manifest_columns = sorted(_MANIFEST_COLUMNS - manifest_columns)
+        if missing_manifest_columns:
+            raise BundleReadinessError(
+                f"{MANIFEST_TABLE} is missing columns: {missing_manifest_columns}"
+            )
+        manifest_datasets = [
+            str(row[0])
+            for row in connection.execute(f'select dataset from "{MANIFEST_TABLE}"').fetchall()
+        ]
+        if len(manifest_datasets) != len(set(manifest_datasets)):
+            raise BundleReadinessError(f"{MANIFEST_TABLE} contains duplicate dataset rows")
+        if set(manifest_datasets) != expected_datasets:
+            raise BundleReadinessError(
+                f"{MANIFEST_TABLE} does not match the declared bundle inventory"
+            )
+
+        for dataset in sorted(expected_datasets):
+            connection.execute(f'select * from "{dataset}" limit 0')
+    except BundleReadinessError:
+        raise
+    except Exception as error:
+        raise BundleReadinessError(
+            f"demo bundle could not be validated as read-only DuckDB: {type(error).__name__}: {error}"
+        ) from error
+    finally:
+        if connection is not None:
+            connection.close()
+
+    return BundleReadiness(
+        path=resolved,
+        sha256=observed_sha256,
+        datasets=tuple(sorted(expected_datasets)),
+        git_commit=str(build_rows[0][0]),
+    )
 
 
 class Bundle:

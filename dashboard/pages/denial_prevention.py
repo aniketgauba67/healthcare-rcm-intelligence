@@ -59,6 +59,23 @@ except data.DashboardDataError as error:
     st.error(str(error))
     st.stop()
 
+empty_sections = [
+    label
+    for label, frame in (
+        ("denial-mix", root_cause),
+        ("provider-performance", providers),
+    )
+    if frame.empty
+]
+if empty_sections:
+    st.warning(
+        "Denial-prevention data is unavailable because this warehouse contains no rows for: "
+        f"{', '.join(empty_sections)}. No zero-valued denial or provider metrics are shown.",
+        icon=":material/warning:",
+    )
+    required_disclosures()
+    st.stop()
+
 
 # ---------------------------------------------------------------------------
 # Denial mix
@@ -243,6 +260,7 @@ if not data.has("model_a_scores"):
         "Model datasets are not available from this data source. They are produced by "
         "`make train` and ship in the demo bundle — build one with `make demo-extract`."
     )
+    required_disclosures()
     st.stop()
 
 metrics = data.model_metrics("A")

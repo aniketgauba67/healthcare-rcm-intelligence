@@ -69,8 +69,8 @@ from src.api.schemas import (
     ModelInfo,
     WorkQueueResponse,
 )
-from src.demo.bundle import BundleNotFoundError
-from src.demo.source import DataSourceError, get_source
+from src.demo.bundle import BundleNotFoundError, BundleReadinessError, validate_bundle_readiness
+from src.demo.source import BUNDLE, DataSourceError, configured_kind, get_source
 from src.infra.postgres_contract import PostgresContractError, validate_postgres_contract
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -221,6 +221,26 @@ def _assert_required_dependencies() -> None:
         ) from error
 
 
+def _assert_bundle_readiness() -> None:
+    if configured_kind() != BUNDLE:
+        return
+    try:
+        validate_bundle_readiness()
+    except BundleReadinessError as error:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "detail": f"DuckDB bundle readiness failed: {error}",
+                "error": "bundle_not_ready",
+                "hint": (
+                    "Restore the pinned committed demo bundle at RCM_DEMO_BUNDLE, then retry. "
+                    "Readiness opens and validates the on-disk artifact independently of the "
+                    "cached serving connection."
+                ),
+            },
+        ) from error
+
+
 @app.get("/ready", responses={503: {"model": ErrorResponse}})
 @app.get("/health", responses={503: {"model": ErrorResponse}})
 def health() -> HealthResponse:
@@ -231,6 +251,7 @@ def health() -> HealthResponse:
     committed DuckDB bundle. `/live` is the process-only probe.
     """
     _assert_required_dependencies()
+    _assert_bundle_readiness()
     source = _source()
     available = sorted(source.available())
 

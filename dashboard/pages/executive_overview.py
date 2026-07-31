@@ -50,10 +50,21 @@ data_source_caption()
 
 try:
     monthly = data.load("vw_executive_rcm_summary")
-    totals = data.executive_totals()
 except data.DashboardDataError as error:
     st.error(str(error))
     st.stop()
+
+if monthly.empty:
+    st.warning(
+        "Executive metrics are unavailable because this warehouse contains no monthly "
+        "summary rows. No zero-valued operational KPIs or empty trend are shown: an unloaded "
+        "warehouse does not establish a zero-volume revenue-cycle book.",
+        icon=":material/warning:",
+    )
+    required_disclosures()
+    st.stop()
+
+totals = data.executive_totals()
 
 
 # ---------------------------------------------------------------------------

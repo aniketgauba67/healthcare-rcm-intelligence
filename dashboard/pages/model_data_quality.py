@@ -151,46 +151,55 @@ st.divider()
 st.subheader("Warehouse data-quality scorecard")
 
 scorecard = data.load("vw_data_quality_scorecard")
-passing = int(scorecard["pass_flag"].fillna(False).astype(bool).sum())
-critical_failing = int(
-    (
-        (scorecard["severity"] == "critical") & ~scorecard["pass_flag"].fillna(False).astype(bool)
-    ).sum()
-)
+if scorecard.empty:
+    st.warning(
+        "The warehouse data-quality scorecard contains no rows. No zero-valued check totals "
+        "are shown because this initialized-but-unloaded warehouse has not produced a "
+        "scorecard result.",
+        icon=":material/warning:",
+    )
+else:
+    passing = int(scorecard["pass_flag"].fillna(False).astype(bool).sum())
+    critical_failing = int(
+        (
+            (scorecard["severity"] == "critical")
+            & ~scorecard["pass_flag"].fillna(False).astype(bool)
+        ).sum()
+    )
 
-kpi_row(
-    [
-        Kpi("Checks", f"{len(scorecard)}", "DERIVED", "Named checks over the warehouse."),
-        Kpi("Passing", f"{passing} / {len(scorecard)}", "DERIVED", ""),
-        Kpi(
-            "Critical failures",
-            f"{critical_failing}",
-            "DERIVED",
-            "A critical failure fails the reconciliation gate.",
-        ),
-        Kpi(
-            "Subject",
-            "warehouse",
-            "DERIVED",
-            "These measure the DATA, not the business. A failing row is a data-quality "
-            "review flag, not a finding about any provider.",
-        ),
-    ]
-)
-dataframe(
-    scorecard,
-    emitter=PAGE_EMITTER,
-    column_config={
-        "description": st.column_config.TextColumn("Check", width="large"),
-        "metric_value": st.column_config.NumberColumn("Value", format="%.4f"),
-        "pass_flag": st.column_config.CheckboxColumn("Pass"),
-    },
-)
-st.caption(
-    "`subject_provenance` names the class of data under test, which is the column that "
-    "keeps this table honest: a check over a SIMULATED subject is measuring our generator, "
-    "not the CMS files."
-)
+    kpi_row(
+        [
+            Kpi("Checks", f"{len(scorecard)}", "DERIVED", "Named checks over the warehouse."),
+            Kpi("Passing", f"{passing} / {len(scorecard)}", "DERIVED", ""),
+            Kpi(
+                "Critical failures",
+                f"{critical_failing}",
+                "DERIVED",
+                "A critical failure fails the reconciliation gate.",
+            ),
+            Kpi(
+                "Subject",
+                "warehouse",
+                "DERIVED",
+                "These measure the DATA, not the business. A failing row is a data-quality "
+                "review flag, not a finding about any provider.",
+            ),
+        ]
+    )
+    dataframe(
+        scorecard,
+        emitter=PAGE_EMITTER,
+        column_config={
+            "description": st.column_config.TextColumn("Check", width="large"),
+            "metric_value": st.column_config.NumberColumn("Value", format="%.4f"),
+            "pass_flag": st.column_config.CheckboxColumn("Pass"),
+        },
+    )
+    st.caption(
+        "`subject_provenance` names the class of data under test, which is the column that "
+        "keeps this table honest: a check over a SIMULATED subject is measuring our generator, "
+        "not the CMS files."
+    )
 
 # ---------------------------------------------------------------------------
 # Input drift
