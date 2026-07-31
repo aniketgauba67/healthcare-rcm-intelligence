@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from docker.dashboard_server import evaluate_dashboard_readiness
+from docker.dashboard_server import ReadinessHandler, evaluate_dashboard_readiness
 from src.api import main as api_main
 from src.infra.postgres_contract import PostgresContractError
 
@@ -64,3 +64,17 @@ def test_dashboard_readiness_requires_streamlit_and_api(monkeypatch) -> None:
     status, dependencies = evaluate_dashboard_readiness(streamlit_down)
     assert not status
     assert dependencies["streamlit"] == "unready (HTTP 503)"
+
+
+def test_dashboard_readiness_ignores_client_disconnect_while_writing() -> None:
+    class DisconnectedWriter:
+        def write(self, body: bytes) -> None:
+            raise BrokenPipeError
+
+    handler = object.__new__(ReadinessHandler)
+    handler.send_response = lambda status: None
+    handler.send_header = lambda name, value: None
+    handler.end_headers = lambda: None
+    handler.wfile = DisconnectedWriter()
+
+    handler._write(200, {"status": "ready"})
