@@ -42,9 +42,12 @@ def test_equivalent_bundle_writes_are_byte_identical(tmp_path) -> None:
     frames = {"vw_executive_rcm_summary": pd.DataFrame({"claim_count": [20_867]})}
     expected = set(frames)
     output = tmp_path / "rcm_demo.duckdb"
+    equivalent = tmp_path / "equivalent.duckdb"
 
     demo_build.write_bundle(frames, output, expected=expected, stamp=_stamp())
     first_hash = hashlib.sha256(output.read_bytes()).digest()
+    demo_build.write_bundle(frames, equivalent, expected=expected, stamp=_stamp())
+    assert demo_build._bundles_logically_equal(output, equivalent)
     demo_build.write_bundle(frames, output, expected=expected, stamp=_stamp())
 
     assert hashlib.sha256(output.read_bytes()).digest() == first_hash

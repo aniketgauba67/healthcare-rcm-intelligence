@@ -557,10 +557,10 @@ def _bundles_logically_equal(existing: pathlib.Path, candidate: pathlib.Path) ->
         columns = connection.execute(
             """
             select database_name, schema_name, table_name, column_name, data_type,
-                   ordinal_position
+                   column_index
             from duckdb_columns()
             where database_name in ('existing', 'candidate')
-            order by schema_name, table_name, ordinal_position
+            order by schema_name, table_name, column_index
             """
         ).fetchall()
         existing_columns = [row[1:] for row in columns if row[0] == "existing"]
