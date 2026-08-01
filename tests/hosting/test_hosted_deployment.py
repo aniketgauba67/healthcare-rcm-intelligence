@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import os
 import subprocess
 import sys
+import threading
+import time
 
 import pytest
 
 from scripts import initialize_hosted_postgres as hosted_initializer
+from src.api import scoring
 from src.demo.bundle import EXPECTED_BUNDLE_SHA256, open_bundle
 from src.infra import postgres_contract
 
@@ -181,6 +185,34 @@ def test_api_health_does_not_import_training_or_explanation_modules() -> None:
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_model_initialization_is_single_flight(monkeypatch) -> None:
+    scoring._cached_denial_risk_model.cache_clear()
+    workers = 8
+    start = threading.Barrier(workers)
+    fitted = object()
+    fit_calls = 0
+
+    def fit_once():  # noqa: ANN202
+        nonlocal fit_calls
+        fit_calls += 1
+        time.sleep(0.05)
+        return fitted
+
+    monkeypatch.setattr(scoring, "_fit_denial_risk_model", fit_once)
+
+    def load_after_barrier():  # noqa: ANN202
+        start.wait()
+        return scoring.load_denial_risk_model()
+
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            loaded = list(executor.map(lambda _: load_after_barrier(), range(workers)))
+        assert fit_calls == 1
+        assert all(model is fitted for model in loaded)
+    finally:
+        scoring._cached_denial_risk_model.cache_clear()
 
 
 class _FakeCursor:

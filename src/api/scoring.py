@@ -51,6 +51,7 @@ import functools
 import hashlib
 import json
 import pathlib
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -73,6 +74,13 @@ MODEL_C_CHAMPION = "xgboost + isotonic"
 MODEL_CARD_ROC_UNCALIBRATED = 0.6254
 MODEL_CARD_ROC_CALIBRATED = 0.6185
 _ROC_TOLERANCE = 5e-5
+
+# ``functools.lru_cache`` protects its dictionary, but it does not provide
+# single-flight construction: concurrent misses may all execute the wrapped
+# function. On a small hosted instance, overlapping model fits can exceed the
+# memory limit before the first fit reaches the cache. Serialize the cache lookup
+# and construction so every caller observes the same fitted object.
+_MODEL_A_LOAD_LOCK = threading.Lock()
 
 PROBABILITY_FROM_MODEL_C = "model_c_champion_xgboost_isotonic"
 PROBABILITY_FROM_CATEGORY_RULE = "denial_category_prior_overturn_rate (category_rule baseline)"
@@ -156,9 +164,19 @@ class DenialRiskModel:
         return calibrated, raw
 
 
-@functools.lru_cache(maxsize=1)
 def load_denial_risk_model() -> DenialRiskModel:
-    """Refit the champion from the committed matrix. Called once per process."""
+    """Return the one process-wide Model A instance, constructing it once."""
+    with _MODEL_A_LOAD_LOCK:
+        return _cached_denial_risk_model()
+
+
+@functools.lru_cache(maxsize=1)
+def _cached_denial_risk_model() -> DenialRiskModel:
+    return _fit_denial_risk_model()
+
+
+def _fit_denial_risk_model() -> DenialRiskModel:
+    """Refit the champion from the committed matrix."""
     from sklearn.metrics import roc_auc_score
 
     from src.features.build import MODEL_A_FEATURES

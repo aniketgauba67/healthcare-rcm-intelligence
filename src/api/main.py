@@ -38,6 +38,8 @@ knows and they do not.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 import os
 import pathlib
 from typing import Annotated, Any, Literal
@@ -101,6 +103,14 @@ MODEL_C_LIMITATIONS = [
     "measurements on this book.",
 ]
 
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Build the single scoring model before the process accepts traffic."""
+    scoring.load_denial_risk_model()
+    yield
+
+
 app = FastAPI(
     title="Healthcare RCM Intelligence API",
     version=API_VERSION,
@@ -117,6 +127,7 @@ app = FastAPI(
         f"{DOLLARS_AT_RISK}"
     ),
     contact={"name": "Healthcare RCM Intelligence Platform"},
+    lifespan=_lifespan,
 )
 
 
