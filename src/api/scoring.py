@@ -162,10 +162,10 @@ def load_denial_risk_model() -> DenialRiskModel:
     from sklearn.metrics import roc_auc_score
 
     from src.features.build import MODEL_A_FEATURES
+    from src.features.splits import calibration_split, split_from_config
     from src.models.baselines import logistic_baseline
     from src.models.calibrate import calibrate, method_from_config
     from src.models.preprocess import prepare_matrix
-    from src.models.train import make_folds
 
     if not COMMITTED_MATRIX.is_file():
         raise ScoringUnavailableError(
@@ -178,25 +178,32 @@ def load_denial_risk_model() -> DenialRiskModel:
     frame = pd.read_parquet(COMMITTED_MATRIX)
     frame[feature_set.time_column] = pd.to_datetime(frame[feature_set.time_column])
 
-    folds = make_folds(frame, config)
+    split = split_from_config(frame, config)
+    calibration = calibration_split(frame, split, config)
+    fit_mask = calibration.train
+    calibration_mask = calibration.test
+    test_mask = split.test
     matrix = prepare_matrix(frame, feature_set)
     label = frame[feature_set.label].astype(int).to_numpy()
 
     pipeline = logistic_baseline(feature_set, config)
-    pipeline.fit(matrix[folds.fit], label[folds.fit])
+    pipeline.fit(matrix[fit_mask], label[fit_mask])
     calibrated = calibrate(
-        pipeline, matrix[folds.calibrate], label[folds.calibrate], method_from_config(config)
+        pipeline,
+        matrix[calibration_mask],
+        label[calibration_mask],
+        method_from_config(config),
     )
 
-    raw_test = np.asarray(pipeline.predict_proba(matrix[folds.test]))[:, 1]
-    cal_test = np.asarray(calibrated.predict_proba(matrix[folds.test]))[:, 1]
-    roc_raw = float(roc_auc_score(label[folds.test], raw_test))
-    roc_cal = float(roc_auc_score(label[folds.test], cal_test))
+    raw_test = np.asarray(pipeline.predict_proba(matrix[test_mask]))[:, 1]
+    cal_test = np.asarray(calibrated.predict_proba(matrix[test_mask]))[:, 1]
+    roc_raw = float(roc_auc_score(label[test_mask], raw_test))
+    roc_cal = float(roc_auc_score(label[test_mask], cal_test))
     _assert_reproduces_model_card(roc_raw, roc_cal)
 
     numeric = tuple(feature_set.by_kind("numeric"))
     medians = {
-        name: float(matrix.loc[folds.fit, name].astype(float).median())
+        name: float(matrix.loc[fit_mask, name].astype(float).median())
         for name in numeric
         if name in matrix.columns
     }
@@ -212,8 +219,8 @@ def load_denial_risk_model() -> DenialRiskModel:
         fitted_at=utc_now(),
         roc_auc_test=round(roc_raw, 4),
         roc_auc_test_calibrated=round(roc_cal, 4),
-        test_rows=int(folds.test.sum()),
-        cut_date=str(folds.split.cut_date.date()),
+        test_rows=int(test_mask.sum()),
+        cut_date=str(split.cut_date.date()),
     )
 
 

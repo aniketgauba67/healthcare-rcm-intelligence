@@ -46,6 +46,10 @@ class DataSourceInfo(BaseModel):
 
     kind: Literal["bundle", "postgres"]
     path: str
+    artifact_sha256: str = Field(
+        default="",
+        description="SHA-256 of the exact DuckDB artifact opened by this process.",
+    )
     git_commit: str = Field(description="Commit the demo bundle was built from.")
     git_tree_dirty: bool = False
     built_at_utc: str = ""

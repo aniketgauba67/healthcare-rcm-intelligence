@@ -418,6 +418,10 @@ date, synthetic-banner visibility, and simulated-derived content for every
 screenshot. Review the [model card](docs/model_card.md) before presenting model
 results or work-queue outputs.
 
+The [zero-cost hosted deployment guide](docs/hosted_deployment.md) records the
+Neon Free, Render Free, and Streamlit Community Cloud architecture and its
+credential-handling rules. Public URLs are not claimed until hosted QA passes.
+
 These images came from the integrated local Docker Compose stack. They are local
 reproducibility evidence, not hosted-deployment evidence.
 

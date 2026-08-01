@@ -124,7 +124,10 @@ def validate_columns(actual: Mapping[str, set[str]]) -> list[str]:
 
 
 def connect() -> Any:
-    """Connect using the same Compose/PostgreSQL environment as the applications."""
+    """Connect using a hosted DSN or the Compose PostgreSQL environment."""
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if database_url:
+        return psycopg2.connect(database_url, connect_timeout=3)
     return psycopg2.connect(
         host=os.environ.get("POSTGRES_HOST", "postgres"),
         port=int(os.environ.get("POSTGRES_PORT", "5432")),

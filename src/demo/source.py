@@ -82,6 +82,7 @@ class BundleSource:
         return {
             "kind": self.kind,
             "path": str(self._bundle.path),
+            "artifact_sha256": self._bundle.artifact_sha256,
             "git_commit": info.get("git_commit", "unknown"),
             "git_tree_dirty": bool(info.get("git_tree_dirty", False)),
             "built_at_utc": info.get("built_at_utc", "unknown"),
@@ -131,6 +132,7 @@ class PostgresSource:
             "path": str(self._engine.url).replace(self._engine.url.password or "", "***")
             if self._engine.url.password
             else str(self._engine.url),
+            "artifact_sha256": "",
             "git_commit": "n/a (live warehouse)",
             "git_tree_dirty": False,
             "built_at_utc": "n/a (live warehouse)",

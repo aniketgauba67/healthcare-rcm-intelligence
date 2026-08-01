@@ -281,9 +281,13 @@ class Bundle:
                 "an existing bundle. The hosted demo ships this file committed; a clean clone "
                 "should already have it."
             )
+        metadata = path.stat()
+        artifact_sha256 = _sha256_bounded(path, metadata.st_size)
+
         import duckdb
 
         self.path = path
+        self.artifact_sha256 = artifact_sha256
         self._connection = duckdb.connect(str(path), read_only=True)
         self._local = threading.local()
 
