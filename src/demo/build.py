@@ -498,7 +498,7 @@ def write_bundle(
             {
                 **stamp,
                 "source_vintages": json.dumps(vintages),
-                "dataset_names": json.dumps(sorted(frames)),
+                "dataset_names": json.dumps(sorted(set(frames) | spec.SELF_DESCRIBING_TABLES)),
                 "contains_simulated": True,
                 "notice": (
                     "Every sim_-prefixed column in this bundle is SIMULATED by this "

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any
 
+import duckdb
 import pandas as pd
 
 from src.demo import build as demo_build
@@ -46,6 +48,15 @@ def test_equivalent_bundle_writes_are_byte_identical(tmp_path) -> None:
 
     demo_build.write_bundle(frames, output, expected=expected, stamp=_stamp())
     first_hash = hashlib.sha256(output.read_bytes()).digest()
+    connection = duckdb.connect(str(output), read_only=True)
+    try:
+        raw_inventory = connection.execute("select dataset_names from demo_build_info").fetchone()[
+            0
+        ]
+        stamped = set(json.loads(raw_inventory))
+    finally:
+        connection.close()
+    assert stamped == set(frames) | spec.SELF_DESCRIBING_TABLES
     demo_build.write_bundle(frames, equivalent, expected=expected, stamp=_stamp())
     assert demo_build._bundles_logically_equal(output, equivalent)
     demo_build.write_bundle(frames, output, expected=expected, stamp=_stamp())
