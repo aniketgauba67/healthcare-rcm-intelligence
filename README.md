@@ -2,15 +2,16 @@
 
 > **Status:** Phases 1–4 of 5 are complete and QA-accepted. Phase 5's
 > API/dashboard/demo integration is in active QA. Clean-clone Docker packaging
-> is independently QA-approved and integrated. Local screenshots and walkthrough
-> evidence are captured but still require independent QA; hosted deployment,
-> clean-SHA bundle regeneration, and final Phase 5 acceptance remain open.
+> and local demo evidence are independently QA-approved and integrated. A
+> zero-cost hosted portfolio deployment is live and awaiting independent QA;
+> clean-SHA bundle regeneration and final Phase 5 acceptance remain open.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
 Phase 4 supplies explainable machine-learning models. Phase 5 is integrating
 those models with a FastAPI scoring service, a Streamlit analyst dashboard, and
-a runnable demo bundle; that phase is not yet accepted or deployed.
+a runnable demo bundle. The free-tier hosted demo is available, but Phase 5 is
+not yet accepted and the deployment is not production-grade or always-on.
 
 ## Why this project exists
 
@@ -79,14 +80,32 @@ Implemented and currently under QA:
 - Provenance and simulated-data disclosure protections
 - Dashboard reconciliation reporting
 - Independently QA-approved clean-clone Docker Compose stack
-- Local screenshots and demo walkthrough evidence, pending independent QA
+- Independently QA-approved local screenshots and demo walkthrough evidence
+- Zero-cost Neon, Render, and Streamlit deployment, pending independent QA
 
 Still required before Phase 5 acceptance:
 
-- Independent QA acceptance of the local screenshots and demo walkthrough
-- Hosted deployment evidence
+- Independent QA acceptance of the hosted deployment and its evidence
 - Final clean-SHA DuckDB bundle regeneration
 - Final Phase 5 QA acceptance
+
+## Live portfolio demo
+
+- [Live dashboard](https://pzcgc7diz3azrawrcsxobm.streamlit.app/)
+- [Live API readiness](https://healthcare-rcm-intelligence-api.onrender.com/ready)
+- [API documentation](https://healthcare-rcm-intelligence-api.onrender.com/docs)
+- [Hosted deployment guide and evidence](docs/hosted_deployment.md)
+- [Local demo walkthrough](docs/demo_walkthrough.md)
+- [Model card](docs/model_card.md)
+
+These links are zero-cost hosted portfolio evidence. Render may sleep after
+inactivity, so the first API request can take about a minute. The services are
+not represented as production-grade or always-on, and the current DuckDB bundle
+is still dirty-tree generated and non-final.
+
+![Hosted dashboard overview](docs/images/hosted/streamlit-overview.png)
+
+![Hosted bundle reconciliation](docs/images/hosted/streamlit-reconciliation-17-of-17.png)
 
 ## Verified project scale
 
@@ -138,7 +157,7 @@ Simulated adjudication layer      Reference enrichment
                          |
                          v
         ML models -> FastAPI -> Streamlit dashboard
-                  (in development)
+                  (Phase 5 QA)
 ```
 
 ## Data provenance

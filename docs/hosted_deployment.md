@@ -1,8 +1,24 @@
 # Zero-Cost Hosted Deployment
 
-This guide prepares the accepted application for a portfolio deployment on Neon
-Free, Render Free, and Streamlit Community Cloud. No hosted deployment is claimed
-until the public URLs and independent QA evidence are added to this document.
+This guide records the zero-cost portfolio deployment on Neon Free, Render Free,
+and Streamlit Community Cloud. The services are publicly reachable, but Phase 5
+remains under QA. This is not a production or always-on deployment, and the
+current DuckDB artifact is not the final release bundle.
+
+## Public services
+
+| Surface | Public URL |
+|---|---|
+| Dashboard | <https://pzcgc7diz3azrawrcsxobm.streamlit.app/> |
+| API | <https://healthcare-rcm-intelligence-api.onrender.com> |
+| API documentation | <https://healthcare-rcm-intelligence-api.onrender.com/docs> |
+| API liveness | <https://healthcare-rcm-intelligence-api.onrender.com/live> |
+| API readiness | <https://healthcare-rcm-intelligence-api.onrender.com/ready> |
+
+All public checks in this document were run against branch
+`feat/phase5-hosted-deployment` at source SHA
+`119828e8915044622faa65755a615375799df0fc` on 2026-08-01. The screenshots are
+free-tier portfolio evidence, not proof of production availability.
 
 ## Architecture
 
@@ -85,6 +101,61 @@ dashboard. Do not commit `.streamlit/secrets.toml`.
 
 ## Current release state
 
-Hosted URLs, provider status evidence, and screenshots are pending. Phase 5
-remains under QA, and the current DuckDB bundle remains dirty-tree generated and
-non-final until the clean integration-SHA regeneration gate is completed.
+### Hosted validation
+
+- Neon Free, AWS US East 1: PostgreSQL 16.14; one `rcm` schema; 24 base tables;
+  9 views; all required relation types, sentinel columns, and published-view
+  queries passed. A second run validated and reused the complete contract without
+  mutation.
+- Render Free: `/live`, `/ready`, `/health`, `/openapi.json`,
+  `/metrics/executive`, and the `backtest`, `live_snapshot`, and `heuristic`
+  work-queue modes returned HTTP 200 at 2026-08-01T21:34:00Z.
+- Streamlit Community Cloud: the public app and process-health endpoint returned
+  HTTP 200. Overview and all five dashboard pages rendered without a visible
+  exception. Each page retained the synthetic-data banner and disclosures.
+- Model & Data Quality reported `17 declared | 17 evaluated | 17 passed | 0
+  failed | 0 not evaluated` against the populated committed DuckDB bundle.
+
+### Screenshot manifest
+
+Every screenshot was captured on 2026-08-01 from source SHA
+`119828e8915044622faa65755a615375799df0fc`. Provider credentials, database
+hostnames, account identifiers, and secrets are intentionally absent.
+
+| File | Public surface | Backend | Synthetic banner | Simulated-derived fields visible |
+|---|---|---|---|---|
+| `api-openapi.png` | FastAPI Swagger UI | DuckDB + Neon readiness | API disclosure | Schema descriptions |
+| `api-readiness.png` | Render API `/ready` | DuckDB + Neon readiness | API notice | Bundle/model metadata |
+| `render-service-status.png` | Non-secret summary of public HTTP probes | Render Free | N/A | No |
+| `neon-schema-contract.png` | Non-secret summary of actual validation output | Neon PostgreSQL | N/A | No |
+| `streamlit-application-status.png` | Streamlit process health | Streamlit Community Cloud | N/A | No |
+| `streamlit-overview.png` | Dashboard overview | DuckDB | Yes | Yes |
+| `streamlit-executive-overview.png` | Executive Overview | DuckDB | Yes | Yes |
+| `streamlit-denial-prevention.png` | Denial Prevention | DuckDB | Yes | Yes |
+| `streamlit-ar-recovery.png` | A/R Recovery | DuckDB | Yes | Yes |
+| `streamlit-work-queue.png` | Work Queue | DuckDB | Yes | Yes |
+| `streamlit-model-data-quality.png` | Model & Data Quality | DuckDB | Yes | Yes |
+| `streamlit-reconciliation-17-of-17.png` | 17/17 reconciliation | DuckDB | Yes | Yes |
+
+![Public Streamlit overview](images/hosted/streamlit-overview.png)
+
+![Hosted 17/17 reconciliation](images/hosted/streamlit-reconciliation-17-of-17.png)
+
+![Public FastAPI documentation](images/hosted/api-openapi.png)
+
+![Render service status](images/hosted/render-service-status.png)
+
+![Neon schema contract](images/hosted/neon-schema-contract.png)
+
+### Free-tier limitations and remaining release gates
+
+Render Free may sleep after inactivity, so its first request can take about a
+minute. Streamlit Community Cloud and Neon Free also provide portfolio-scale,
+best-effort availability rather than production service guarantees. No paid
+resource, payment method, paid disk, paid database, paid instance, or custom
+domain is used.
+
+Phase 5 remains under QA. The current DuckDB bundle still reports
+`git_tree_dirty=true` and remains non-final until it is deterministically
+regenerated from the final clean integration SHA, independently reviewed,
+redeployed, and accepted. Hosted evidence does not by itself complete Phase 5.
