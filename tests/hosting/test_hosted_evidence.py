@@ -36,6 +36,7 @@ EXPECTED_IMAGES = (
 def test_public_links_and_release_limitations_are_documented() -> None:
     readme = README.read_text()
     guide = HOSTED_GUIDE.read_text()
+    normalized_readme = " ".join(readme.split())
     normalized_guide = " ".join(guide.split())
 
     for url in PUBLIC_URLS:
@@ -45,6 +46,8 @@ def test_public_links_and_release_limitations_are_documented() -> None:
     combined = f"{readme}\n{guide}"
     assert "Phase 5 remains under QA" in combined
     assert "not production-grade or always-on" in readme
+    assert "not accepted or deployed" not in readme
+    assert "hosted portfolio demo is live" in normalized_readme
     assert "git_tree_dirty=true" in guide
     assert "remains non-final" in combined
     assert "No paid resource" in normalized_guide

@@ -70,7 +70,8 @@ Implemented and QA-accepted:
 
 ### Phase 5 — API, dashboard, and packaging 🚧
 
-Phase 5 is in integration QA and is not accepted or deployed.
+Phase 5 is in integration QA and is not accepted. The zero-cost hosted portfolio
+demo is live, but it is not production-grade or always-on.
 
 Implemented and currently under QA:
 
