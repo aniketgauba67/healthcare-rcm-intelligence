@@ -19,10 +19,18 @@ def _stamp() -> dict[str, Any]:
 
 
 def test_build_stamp_uses_source_commit_time(monkeypatch) -> None:
+    status_args = (
+        "status",
+        "--porcelain",
+        "--untracked-files=no",
+        "--",
+        ".",
+        *(f":(exclude){path}" for path in demo_build.BUILD_OUTPUT_PATHS),
+    )
     values = {
         ("rev-parse", "HEAD"): "a" * 40,
         ("show", "-s", "--format=%cI", "HEAD"): "2026-08-01T18:23:58-04:00",
-        ("status", "--porcelain"): "",
+        status_args: "",
         ("rev-parse", "--abbrev-ref", "HEAD"): "release/phase5-final-bundle",
     }
     monkeypatch.setattr(demo_build, "_git", lambda *args: values[args])

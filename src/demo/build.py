@@ -68,6 +68,10 @@ SOURCES_CONFIG_PATH = REPO_ROOT / "config" / "sources.yaml"
 COMMITTED_MATRIX = REPO_ROOT / "artifacts" / "features" / "model_a_training_matrix.parquet"
 MODEL_A_ARTIFACTS = REPO_ROOT / "models_artifacts" / "model_a"
 MODEL_C_ARTIFACTS = REPO_ROOT / "models_artifacts" / "model_c"
+BUILD_OUTPUT_PATHS = (
+    DEFAULT_BUNDLE_PATH.relative_to(REPO_ROOT).as_posix(),
+    (DEFAULT_BUNDLE_PATH.parent / "README.md").relative_to(REPO_ROOT).as_posix(),
+)
 
 #: The two headline figures the refit must reproduce, from docs/model_card.md §1.
 #: Checked to 4 decimal places, which is the precision the card publishes.
@@ -104,7 +108,16 @@ def build_stamp() -> dict[str, Any]:
     """
     sha = _git("rev-parse", "HEAD")
     commit_time = _git("show", "-s", "--format=%cI", "HEAD")
-    dirty = bool(_git("status", "--porcelain"))
+    dirty = bool(
+        _git(
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            ".",
+            *(f":(exclude){path}" for path in BUILD_OUTPUT_PATHS),
+        )
+    )
     built_at_utc = (
         pd.Timestamp(commit_time).tz_convert("UTC").isoformat()
         if commit_time
