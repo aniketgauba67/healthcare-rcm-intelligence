@@ -198,6 +198,7 @@ def validate_bundle_readiness(
         )
 
     expected_datasets = set(spec.DATASETS_BY_NAME)
+    expected_manifest_datasets = expected_datasets - spec.SELF_DESCRIBING_TABLES
     connection = None
     try:
         import duckdb
@@ -245,9 +246,9 @@ def validate_bundle_readiness(
         ]
         if len(manifest_datasets) != len(set(manifest_datasets)):
             raise BundleReadinessError(f"{MANIFEST_TABLE} contains duplicate dataset rows")
-        if set(manifest_datasets) != expected_datasets:
+        if set(manifest_datasets) != expected_manifest_datasets:
             raise BundleReadinessError(
-                f"{MANIFEST_TABLE} does not match the declared bundle inventory"
+                f"{MANIFEST_TABLE} does not match the declared data-dataset inventory"
             )
 
         for dataset in sorted(expected_datasets):
