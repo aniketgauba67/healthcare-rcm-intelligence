@@ -102,12 +102,20 @@ def build_stamp() -> dict[str, Any]:
     during development and misleading if it ships without saying so.
     """
     sha = _git("rev-parse", "HEAD")
+    commit_time = _git("show", "-s", "--format=%cI", "HEAD")
     dirty = bool(_git("status", "--porcelain"))
+    built_at_utc = (
+        pd.Timestamp(commit_time).tz_convert("UTC").isoformat()
+        if commit_time
+        else pd.Timestamp.utcnow().isoformat()
+    )
     return {
         "git_commit": sha or "unknown",
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD") or "unknown",
         "git_tree_dirty": dirty,
-        "built_at_utc": pd.Timestamp.utcnow().isoformat(),
+        # A source-derived timestamp makes clean builds byte-reproducible. The
+        # wall-clock capture time belongs in release evidence, not artifact identity.
+        "built_at_utc": built_at_utc,
     }
 
 
@@ -460,13 +468,16 @@ def build_manifest(
 
 
 def write_bundle(
-    frames: dict[str, pd.DataFrame], output: pathlib.Path, expected: set[str] | None = None
+    frames: dict[str, pd.DataFrame],
+    output: pathlib.Path,
+    expected: set[str] | None = None,
+    stamp: dict[str, Any] | None = None,
 ) -> pathlib.Path:
     """Write every frame plus the manifest and build stamp into one DuckDB file."""
     import duckdb
 
     manifest = build_manifest(frames, expected=expected)
-    stamp = build_stamp()
+    stamp = stamp or build_stamp()
     vintages = source_vintages()
     build_info = pd.DataFrame(
         [
@@ -507,7 +518,11 @@ def write_bundle(
 PROVENANCE_NOTE_NAME = "README.md"
 
 
-def write_provenance_note(output: pathlib.Path, manifest: pd.DataFrame) -> pathlib.Path:
+def write_provenance_note(
+    output: pathlib.Path,
+    manifest: pd.DataFrame,
+    stamp: dict[str, Any] | None = None,
+) -> pathlib.Path:
     """A note beside the bundle, for a reader who finds the file and not the repo.
 
     Same reasoning as the artifact READMEs the training runs write: a data file is
@@ -515,7 +530,7 @@ def write_provenance_note(output: pathlib.Path, manifest: pd.DataFrame) -> pathl
     a DuckDB shell shows five payers with different denial rates and nothing
     saying the payer dimension does not exist.
     """
-    stamp = build_stamp()
+    stamp = stamp or build_stamp()
     lines = [
         "# Demo data bundle — SIMULATED OUTCOMES",
         "",
@@ -602,8 +617,9 @@ def build(output: pathlib.Path, skip_models: bool = False) -> dict[str, Any]:
         expected = set(spec.DATASETS_BY_NAME)
 
     manifest = build_manifest(frames, expected=expected)
-    write_bundle(frames, output, expected=expected)
-    note = write_provenance_note(output, manifest)
+    stamp = build_stamp()
+    write_bundle(frames, output, expected=expected, stamp=stamp)
+    note = write_provenance_note(output, manifest, stamp=stamp)
 
     return {
         "output": str(output),

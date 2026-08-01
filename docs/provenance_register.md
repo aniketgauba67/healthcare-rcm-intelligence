@@ -388,7 +388,7 @@ pointing at code.
 | Opened | read-only, one cursor per thread (a hosted demo shares one process between viewers) |
 | Published-surface entry | `src/features/provenance.py`, glob `dashboard/demo_data/*.duckdb` |
 | Bundle's own register | the `demo_manifest` table, 14 rows — one per *data* dataset |
-| Build stamp | the `demo_build_info` table: git commit, branch, dirty-tree flag, UTC build time, source vintages |
+| Build stamp | the `demo_build_info` table: git commit, branch, dirty-tree flag, reproducible UTC source-commit timestamp, source vintages |
 
 ### Per-table classification
 
