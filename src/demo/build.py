@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -497,22 +498,92 @@ def write_bundle(
     )
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    if output.exists():
-        output.unlink()
+    candidate = output.with_name(f".{output.name}.candidate")
+    candidate.unlink(missing_ok=True)
 
-    connection = duckdb.connect(str(output))
     try:
-        writable = {**frames, MANIFEST_TABLE: manifest, BUILD_INFO_TABLE: build_info}
-        for name in sorted(writable):
-            # Registered explicitly rather than relying on DuckDB's replacement
-            # scan of local variables: the scan resolves a bare name out of the
-            # calling frame, which works until someone renames the loop variable.
-            connection.register("_source", writable[name])
-            connection.execute(f'create table "{name}" as select * from _source')
-            connection.unregister("_source")
+        connection = duckdb.connect(str(candidate))
+        try:
+            writable = {**frames, MANIFEST_TABLE: manifest, BUILD_INFO_TABLE: build_info}
+            for name in sorted(writable):
+                # Registered explicitly rather than relying on DuckDB's replacement
+                # scan of local variables: the scan resolves a bare name out of the
+                # calling frame, which works until someone renames the loop variable.
+                connection.register("_source", writable[name])
+                connection.execute(f'create table "{name}" as select * from _source')
+                connection.unregister("_source")
+        finally:
+            connection.close()
+
+        if not _bundles_logically_equal(output, candidate):
+            os.replace(candidate, output)
+    finally:
+        candidate.unlink(missing_ok=True)
+    return output
+
+
+def _bundles_logically_equal(existing: pathlib.Path, candidate: pathlib.Path) -> bool:
+    """Whether two DuckDB artifacts have the same schemas and row multisets.
+
+    DuckDB checkpoints may carry different unused padding bytes across fresh
+    writes. The committed artifact is content-addressed, so an equivalent rebuild
+    keeps its existing bytes instead of changing its SHA for storage-only noise.
+    """
+    import duckdb
+
+    if not existing.is_file() or not candidate.is_file():
+        return False
+
+    def sql_path(path: pathlib.Path) -> str:
+        return path.resolve().as_posix().replace("'", "''")
+
+    connection = duckdb.connect()
+    try:
+        connection.execute(f"attach '{sql_path(existing)}' as existing (read_only)")
+        connection.execute(f"attach '{sql_path(candidate)}' as candidate (read_only)")
+        columns = connection.execute(
+            """
+            select database_name, schema_name, table_name, column_name, data_type,
+                   ordinal_position
+            from duckdb_columns()
+            where database_name in ('existing', 'candidate')
+            order by schema_name, table_name, ordinal_position
+            """
+        ).fetchall()
+        existing_columns = [row[1:] for row in columns if row[0] == "existing"]
+        candidate_columns = [row[1:] for row in columns if row[0] == "candidate"]
+        if existing_columns != candidate_columns:
+            return False
+
+        tables = connection.execute(
+            """
+            select schema_name, table_name
+            from duckdb_tables()
+            where database_name = 'existing'
+            order by schema_name, table_name
+            """
+        ).fetchall()
+        for schema_name, table_name in tables:
+            schema = schema_name.replace('"', '""')
+            table = table_name.replace('"', '""')
+            existing_table = f'existing."{schema}"."{table}"'
+            candidate_table = f'candidate."{schema}"."{table}"'
+            has_delta = connection.execute(
+                f"""
+                select exists(
+                    (select * from {existing_table} except all select * from {candidate_table})
+                    union all
+                    (select * from {candidate_table} except all select * from {existing_table})
+                )
+                """
+            ).fetchone()[0]
+            if has_delta:
+                return False
+        return True
+    except duckdb.Error:
+        return False
     finally:
         connection.close()
-    return output
 
 
 PROVENANCE_NOTE_NAME = "README.md"

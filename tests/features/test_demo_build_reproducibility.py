@@ -33,15 +33,34 @@ def test_build_stamp_uses_source_commit_time(monkeypatch) -> None:
 def test_equivalent_bundle_writes_are_byte_identical(tmp_path) -> None:
     frames = {"vw_executive_rcm_summary": pd.DataFrame({"claim_count": [20_867]})}
     expected = set(frames)
-    first = tmp_path / "first" / "rcm_demo.duckdb"
-    second = tmp_path / "second" / "rcm_demo.duckdb"
+    output = tmp_path / "rcm_demo.duckdb"
 
-    demo_build.write_bundle(frames, first, expected=expected, stamp=_stamp())
-    demo_build.write_bundle(frames, second, expected=expected, stamp=_stamp())
+    demo_build.write_bundle(frames, output, expected=expected, stamp=_stamp())
+    first_hash = hashlib.sha256(output.read_bytes()).digest()
+    demo_build.write_bundle(frames, output, expected=expected, stamp=_stamp())
 
-    assert (
-        hashlib.sha256(first.read_bytes()).digest() == hashlib.sha256(second.read_bytes()).digest()
+    assert hashlib.sha256(output.read_bytes()).digest() == first_hash
+    assert not output.with_name(f".{output.name}.candidate").exists()
+
+
+def test_logical_comparison_rejects_changed_rows(tmp_path) -> None:
+    expected = {"vw_executive_rcm_summary"}
+    first = tmp_path / "first.duckdb"
+    second = tmp_path / "second.duckdb"
+    demo_build.write_bundle(
+        {"vw_executive_rcm_summary": pd.DataFrame({"claim_count": [20_867]})},
+        first,
+        expected=expected,
+        stamp=_stamp(),
     )
+    demo_build.write_bundle(
+        {"vw_executive_rcm_summary": pd.DataFrame({"claim_count": [20_868]})},
+        second,
+        expected=expected,
+        stamp=_stamp(),
+    )
+
+    assert not demo_build._bundles_logically_equal(first, second)
 
 
 def test_build_reuses_one_stamp_for_bundle_and_note(monkeypatch, tmp_path) -> None:

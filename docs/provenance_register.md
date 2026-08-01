@@ -390,6 +390,13 @@ pointing at code.
 | Bundle's own register | the `demo_manifest` table, 14 rows — one per *data* dataset |
 | Build stamp | the `demo_build_info` table: git commit, branch, dirty-tree flag, reproducible UTC source-commit timestamp, source vintages |
 
+`make demo-extract` writes a complete candidate before replacing the published
+artifact. When every table schema and row multiset matches the existing bundle,
+the existing bytes are retained. This keeps the pinned SHA stable across honest
+no-op rebuilds despite DuckDB checkpoint padding that is not part of the logical
+data contract; any schema or row change replaces the artifact and requires a new
+pin.
+
 ### Per-table classification
 
 Every table carries a §3.1 class and a declared `contains_simulated` flag. The
