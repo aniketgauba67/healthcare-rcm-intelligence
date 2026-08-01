@@ -2,9 +2,9 @@
 
 > **Status:** Phases 1–4 of 5 are complete and QA-accepted. Phase 5's
 > API/dashboard/demo integration is in active QA. Clean-clone Docker packaging
-> is implemented and awaiting independent QA; screenshots, demo walkthrough
-> instructions, clean-SHA bundle regeneration, and final Phase 5 acceptance
-> remain open.
+> is independently QA-approved and integrated. Local screenshots and walkthrough
+> evidence are captured but still require independent QA; hosted deployment,
+> clean-SHA bundle regeneration, and final Phase 5 acceptance remain open.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
@@ -78,13 +78,12 @@ Implemented and currently under QA:
 - DuckDB demo bundle, generated from a dirty tree and not a final release artifact
 - Provenance and simulated-data disclosure protections
 - Dashboard reconciliation reporting
-- Clean-clone Docker Compose stack, pending independent QA
+- Independently QA-approved clean-clone Docker Compose stack
+- Local screenshots and demo walkthrough evidence, pending independent QA
 
 Still required before Phase 5 acceptance:
 
-- Independent QA acceptance of the clean-clone Docker startup
-- Screenshots
-- Demo walkthrough script and instructions
+- Independent QA acceptance of the local screenshots and demo walkthrough
 - Hosted deployment evidence
 - Final clean-SHA DuckDB bundle regeneration
 - Final Phase 5 QA acceptance
@@ -409,6 +408,24 @@ docker compose down -v
 This is local demo packaging, not hosted deployment evidence or final Phase 5
 acceptance. The committed DuckDB bundle was generated from a dirty tree and
 remains non-final until it is regenerated from the final clean integration SHA.
+
+## Local demo evidence
+
+The [local demo walkthrough](docs/demo_walkthrough.md) gives the startup,
+readiness, API, five-page dashboard, reconciliation, and shutdown sequence for a
+5–8 minute demonstration. It also records the source SHA, backend mode, capture
+date, synthetic-banner visibility, and simulated-derived content for every
+screenshot. Review the [model card](docs/model_card.md) before presenting model
+results or work-queue outputs.
+
+These images came from the integrated local Docker Compose stack. They are local
+reproducibility evidence, not hosted-deployment evidence.
+
+![Docker Compose services healthy](docs/images/docker-services-healthy.png)
+
+![Executive Overview with synthetic-data disclosure](docs/images/dashboard-executive-overview.png)
+
+![Dashboard reconciliation passing 17 of 17 controls](docs/images/dashboard-reconciliation-17-of-17.png)
 
 ## Full warehouse developer setup
 
