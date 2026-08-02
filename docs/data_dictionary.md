@@ -309,6 +309,14 @@ its provenance marker at exactly the point that marker is load-bearing.
 `vw_claim_enriched` is the shared base (all others read from it), so the join
 logic and provenance live in one place.
 
+The derived adjudication flags and A/R balance on that base retain simulated
+provenance in their names: `sim_adjudicated`, `sim_clean_claim_flag`,
+`sim_first_pass_paid_flag`, `sim_ar_open_flag`, and `sim_ar_balance_amt`.
+`vw_work_queue_priority` likewise exposes `sim_action_type`,
+`sim_dollars_at_stake`, `sim_heuristic_priority_score`, `sim_priority_tier`, and
+`sim_appeal_levels`. They are computed from simulated outcomes, money, and appeal
+history; queue membership itself is restricted to simulated denials or open A/R.
+
 | View | Grain | Provenance summary |
 |---|---|---|
 | `vw_claim_enriched` | one inpatient claim (`claim_sk`), 20,867 rows | MIXED, labeled per column in-header: SOURCE (CMS RIF fields, incl. real billed charge + the one real Medicare paid amount), DERIVED (length-of-stay, flags), REFERENCE (`drg_desc` and code descriptions, display-only), SIMULATED (all `sim_*` adjudication/timeline/money **and the `sim_facility_*` linkage columns, display-only, prefix preserved on output**). |
@@ -317,7 +325,7 @@ logic and provenance live in one place.
 | `vw_ar_aging` | one AR aging bucket (0-30…120+) | DERIVED from SIMULATED timeline + money; "open" = no simulated payment posted. |
 | `vw_payer_performance` | one simulated payer (`sim_payer_id`), 5 rows | **100% SIMULATED (§3.5)** — payer dimension is invented; every dashboard/export on this view MUST carry the simulated-data banner. |
 | `vw_clean_claim_performance` | one SYNTHETIC billing provider (`prvdr_num`), ~4,877 rows | DERIVED from SIMULATED; keyed on synthetic `prvdr_num` (mandatory), `sim_display_facility_ccn`/`_name`/`_state` display-only. |
-| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `heuristic_*` score, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only. |
+| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `sim_heuristic_priority_score` and `sim_priority_tier`, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only. |
 | `vw_data_quality_scorecard` | one named DQ check (`check_id`) | DERIVED data-quality metadata; each row also carries the provenance class of the data under test. |
 | `vw_model_monitoring` | (submission_month, feature_name) | DRIFT SCAFFOLD, no model exists — `is_drift_scaffold` always true; observed input distributions only, no score/prediction/probability. |
 
@@ -335,11 +343,16 @@ warehouse.
 `make train` rewrites it from the same code path as a side effect of fitting, so
 the guard always checks the object the model actually saw.
 
-**This is the only data file committed to git in this repository.** Everything
-under `data/` and `models_artifacts/` is gitignored. A reader with a clean clone
-and no database can open this file and nothing else, which is why its columns are
-classified in full in `docs/provenance_register.md` ("The committed Model A
-training matrix") rather than only summarized here.
+**This is one of exactly two data files committed to git in this repository**, the
+other being the Phase 5 hosted-demo bundle
+`dashboard/demo_data/rcm_demo.duckdb` (registered at the end of this file). Until
+Phase 5 this section read "the only data file committed to git", and that sentence
+became false the moment the bundle landed — a stale exclusivity claim in a
+provenance document, corrected here rather than left to age. Everything else under
+`data/` and `models_artifacts/` is gitignored. A reader with a clean clone and no
+database can open these two files and nothing else, which is why this one's
+columns are classified in full in `docs/provenance_register.md` ("The committed
+Model A training matrix") rather than only summarized here.
 
 | Property | Value |
 |---|---|
@@ -377,3 +390,87 @@ The sidecar manifest carries rows, feature list, split boundary, parquet SHA-256
 and a digest of every `forbidden_*` block in `config/model.yaml`. It contains **no
 timestamp**: every field derives from content or config, so every writer produces
 byte-identical bytes and any diff on this artifact means the data changed.
+
+## Hosted-demo bundle (committed DuckDB — Phase 5)
+
+`dashboard/demo_data/rcm_demo.duckdb`, 8,400,896 bytes (8.0 MB), **16 tables /
+71,813 rows**. Built by `src/demo/build.py` (`make demo-extract`) from the
+PostgreSQL warehouse plus the model artifacts; committed via the
+`!dashboard/demo_data/*.duckdb` exception in `.gitignore`. CLAUDE.md §2 locks the
+hosted demo to a bundled extract, so this file is what the deployed Streamlit app
+reads — no database, no network, no credentials.
+
+The authoritative per-table classification is in `docs/provenance_register.md`
+("The committed hosted-demo bundle"). This section is the column-level reader's
+guide.
+
+| Property | Value |
+|---|---|
+| Tables | 16 — 9 curated-view copies, 5 model outputs, 2 meta |
+| Rows | 71,813 |
+| Declaration | `src/demo/spec.py` (build fails on an undeclared or a missing table) |
+| Opened | read-only; one DuckDB cursor per thread |
+| Self-description | `demo_manifest` (14 rows) and `demo_build_info` (1 row) |
+| Regenerate | `make demo-extract` |
+
+### The nine curated-view tables
+
+Copied `select * from rcm.vw_...` **verbatim** — no recomputation, so column names,
+types and grain are exactly those documented under "Analytics KPI views (`vw_*`)"
+above. Nothing needs restating here; that is the point of copying rather than
+recomputing.
+
+| Table | Grain | Rows | Cols |
+|---|---|---|---|
+| `vw_claim_enriched` | one inpatient claim (`claim_sk`) | 20,867 | 77 |
+| `vw_executive_rcm_summary` | one claim-submission month | 109 | 24 |
+| `vw_denial_root_cause` | (denial category, CARC group, driver) | 34 | 16 |
+| `vw_ar_aging` | one A/R aging bucket (5-bucket spine) | 5 | 10 |
+| `vw_payer_performance` | one **simulated** payer archetype | 5 | 22 |
+| `vw_clean_claim_performance` | one **synthetic** billing provider (`prvdr_num`) | 4,877 | 18 |
+| `vw_work_queue_priority` | one actionable claim (denied or open A/R) | 2,663 | 16 |
+| `vw_data_quality_scorecard` | one named data-quality check | 15 | 10 |
+| `vw_model_monitoring` | (submission month, monitored feature) | 981 | 6 |
+
+### The five model-output tables
+
+These exist only in the bundle — a training run produced them, no warehouse view
+holds them.
+
+| Table | Grain | Rows | Cols | Notes |
+|---|---|---|---|---|
+| `model_a_scores` | one claim | 20,867 | 7 | `fold` ∈ {fit, calibrate, test}. **16,694 rows are IN-SAMPLE**; every performance figure on the dashboard restricts to `fold == 'test'` (4,173 rows) and says so. `sim_denial_flag` is carried for evaluation only and is never a feature. |
+| `model_a_reason_codes` | (claim, contributing feature), test fold, top drivers | 20,865 | 7 | Per-claim SHAP folded back to declared features and mapped to project-authored reason codes / analyst actions. ~33% of simulated denials are label noise with no mechanism, so a decomposition is not a causal account. |
+| `model_a_shap_global` | one declared feature | 39 | 5 | Global SHAP importance, summed over each feature's encoded columns. |
+| `model_c_work_queue` | one denial per queue snapshot | 469 | 13 | `queue_mode` separates `backtest` (468 rows) from `live_snapshot` (1 row — degenerate, and shipped rather than dropped because the degeneracy is a true fact about the data). `tier`, `tier_rank`, `queue_position` and `recommended_action` carry no `sim_` marker because they describe **our process**, not the simulated world. |
+| `model_metrics` | one model (A, C) | 2 | 4 | Each run's `metrics.json` verbatim, so the dashboard reports what the run reported. Every metric scores a SIMULATED label — `contains_simulated` is `true` despite there being no `sim_` column. |
+
+### The two self-describing tables
+
+| Table | Columns | Notes |
+|---|---|---|
+| `demo_manifest` | `dataset`, `provenance`, `contains_simulated`, `grain`, `rows`, `columns`, `simulated_columns`, `note` | The bundle's own register, rendered on the dashboard's Model & data quality page. **14 rows, not 16** — it omits itself and `demo_build_info` to stop the self-reference. |
+| `demo_build_info` | `git_commit`, `git_branch`, `git_tree_dirty`, `built_at_utc`, `source_vintages`, `dataset_names`, `contains_simulated`, `notice` | The build stamp ([SHA-STAMP] applied to this artifact). The release candidate carries source commit `ab2aa41541909a991877a8264a64e5856896599b` and `git_tree_dirty = false`; the dashboard displays that clean generating identity. |
+
+### Reading the columns
+
+`contains_simulated` is **declared, not inferred from spellings.** `vw_model_monitoring`
+and `model_metrics` hold no `sim_`-prefixed column and are both simulated in
+substance — drift in the first is drift in the simulation, and every metric in the
+second scores a simulated label. A rule that read column names would call both
+clean, which is why §3.2's marker identifies simulated *columns* while the *table*
+flag is asserted by `src/demo/spec.py`.
+
+Within a table, the §3.2 marker is a **prefix** test and not a substring one:
+`medicare_source_paid_amt` in `vw_executive_rcm_summary` is SOURCE — the one real
+Medicare payer's paid amount — and must never be reported as simulated.
+
+**Nothing downstream of submission is real**: every denial, appeal, payment,
+payment date, workflow event, cost and the whole five-payer dimension is generated
+here (§3.5 — Medicare FFS has one payer). Real facility and provider names are
+display-only and forbidden as a model feature (§3.4); 4,876 synthetic providers map
+onto 2,857 real CCNs carrying only 2,816 distinct names, so collisions run to 8:1
+by CCN and **15:1 by name**, and every provider-level table is keyed on the
+synthetic `prvdr_num`. The claims are vintage 2023-04 while the facility reference
+is 2026-04 and the provider reference is data year 2024 — roughly three years
+newer than the claims they decorate.

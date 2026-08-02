@@ -42,9 +42,14 @@ DERIVED_COLUMNS = frozenset(
         "length_of_stay_days",
         "log_billed_charge_amt",
         "patient_age_years",
-        # A modelling fold label, not a claim fact. It reads a SIMULATED date but
-        # keeps its bare name because the §4.1 leakage guard discovers the split
-        # column by name; renaming it would blind the guard's temporal check.
+        # A modelling fold label, not a claim fact. It reads a SIMULATED date and
+        # still keeps its bare name, on its own merits: a fold assignment is
+        # metadata about OUR experiment, not a statement about the simulated
+        # world, and §3.2 governs simulated values. The earlier justification —
+        # that the §4.1 guard discovers the split column by name and a rename
+        # would blind it — was REJECTED by QA ruling C (2026-07-28) while the
+        # outcome was upheld. A guard must never be the reason a correctness-
+        # improving rename cannot happen.
         "split",
     }
 )

@@ -1,12 +1,132 @@
 services:
   postgres:
     image: postgres:16
-    env_file: .env
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
+    ports:
+      - "${RCM_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/ddl/00_schema.sql:/docker-entrypoint-initdb.d/00_schema.sql:ro
+      - ./sql/ddl/10_dimensions.sql:/docker-entrypoint-initdb.d/10_dimensions.sql:ro
+      - ./sql/ddl/20_facts.sql:/docker-entrypoint-initdb.d/20_facts.sql:ro
+      - ./sql/ddl/30_sim_crosswalk.sql:/docker-entrypoint-initdb.d/30_sim_crosswalk.sql:ro
+      - ./sql/ddl/40_quarantine.sql:/docker-entrypoint-initdb.d/40_quarantine.sql:ro
+      - ./sql/ddl/50_sim_adjudication.sql:/docker-entrypoint-initdb.d/50_sim_adjudication.sql:ro
+      - ./sql/ddl/60_reference_codes.sql:/docker-entrypoint-initdb.d/60_reference_codes.sql:ro
+      - ./sql/views/vw_claim_enriched.sql:/docker-entrypoint-initdb.d/70_vw_claim_enriched.sql:ro
+      - ./sql/views/vw_ar_aging.sql:/docker-entrypoint-initdb.d/71_vw_ar_aging.sql:ro
+      - ./sql/views/vw_clean_claim_performance.sql:/docker-entrypoint-initdb.d/72_vw_clean_claim_performance.sql:ro
+      - ./sql/views/vw_data_quality_scorecard.sql:/docker-entrypoint-initdb.d/73_vw_data_quality_scorecard.sql:ro
+      - ./sql/views/vw_denial_root_cause.sql:/docker-entrypoint-initdb.d/74_vw_denial_root_cause.sql:ro
+      - ./sql/views/vw_executive_rcm_summary.sql:/docker-entrypoint-initdb.d/75_vw_executive_rcm_summary.sql:ro
+      - ./sql/views/vw_model_monitoring.sql:/docker-entrypoint-initdb.d/76_vw_model_monitoring.sql:ro
+      - ./sql/views/vw_payer_performance.sql:/docker-entrypoint-initdb.d/77_vw_payer_performance.sql:ro
+      - ./sql/views/vw_work_queue_priority.sql:/docker-entrypoint-initdb.d/78_vw_work_queue_priority.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  warehouse-init:
+    image: ${RCM_APP_IMAGE:-healthcare-rcm-intelligence:local}
+    pull_policy: never
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    command: ["python", "docker/postgres_init.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: ${RCM_APP_IMAGE:-healthcare-rcm-intelligence:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      RCM_DATA_SOURCE: bundle
+      RCM_DEMO_BUNDLE: ${RCM_DEMO_BUNDLE:-/app/dashboard/demo_data/rcm_demo.duckdb}
+      RCM_DEMO_BUNDLE_SHA256: ${RCM_DEMO_BUNDLE_SHA256:-66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95}
+      POSTGRES_USER: ${POSTGRES_USER:-rcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      RCM_REQUIRE_POSTGRES_READY: "true"
+      RCM_API_READINESS_URL: http://127.0.0.1:8000/ready
+    command:
+      - uvicorn
+      - src.api.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    ports:
+      - "${RCM_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      warehouse-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "docker/healthcheck.py", "api"]
+      interval: 10s
+      timeout: 8s
+      retries: 3
+      start_period: 45s
+    init: true
+
+  dashboard:
+    image: ${RCM_APP_IMAGE:-healthcare-rcm-intelligence:local}
+    pull_policy: never
+    environment:
+      RCM_DATA_SOURCE: bundle
+      RCM_DEMO_BUNDLE: ${RCM_DEMO_BUNDLE:-/app/dashboard/demo_data/rcm_demo.duckdb}
+      RCM_DEMO_BUNDLE_SHA256: ${RCM_DEMO_BUNDLE_SHA256:-66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95}
+      RCM_API_URL: http://api:8000
+      RCM_API_READINESS_URL: http://api:8000/ready
+      POSTGRES_USER: ${POSTGRES_USER:-rcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
+      POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      RCM_STREAMLIT_LIVENESS_URL: http://127.0.0.1:8501/_stcore/health
+      RCM_DASHBOARD_READINESS_URL: http://127.0.0.1:8502/ready
+      RCM_DASHBOARD_READINESS_PORT: "8502"
+    command:
+      - python
+      - docker/dashboard_server.py
+      - streamlit
+      - run
+      - dashboard/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    ports:
+      - "${RCM_DASHBOARD_PORT:-8501}:8501"
+      - "${RCM_DASHBOARD_READINESS_PORT:-8502}:8502"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "docker/healthcheck.py", "dashboard"]
+      interval: 10s
+      timeout: 8s
+      retries: 3
+      start_period: 30s
+    init: true
+
 volumes:
   pgdata:

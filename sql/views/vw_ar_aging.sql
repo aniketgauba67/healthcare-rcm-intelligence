@@ -8,7 +8,7 @@
 --               latest activity date observed anywhere in the sim adjudication
 --               timeline (so the newest claims age from "today" in the data).
 --
--- Sources:      rcm.vw_claim_enriched (ar_open_flag, ar_balance_amt).
+-- Sources:      rcm.vw_claim_enriched (sim_ar_open_flag, sim_ar_balance_amt).
 -- Provenance:   SIMULATED timeline + money. Columns:
 --                 aging_bucket, bucket_sort            = DERIVED
 --                 open_claims, denied_open, nondenied_open = DERIVED from SIMULATED
@@ -31,7 +31,7 @@
 --
 -- Control query (must reconcile):
 --   select sum(open_claims) from rcm.vw_ar_aging;      -- = 1911 (all unpaid claims)
---   equals: select count(*) from rcm.vw_claim_enriched where ar_open_flag;
+--   equals: select count(*) from rcm.vw_claim_enriched where sim_ar_open_flag;
 --   select count(*) from rcm.vw_ar_aging;              -- = 5 (spine: all buckets)
 -- ============================================================================
 
@@ -49,12 +49,12 @@ open_claims as (
     select
         e.claim_sk,
         e.sim_denial_flag,
-        e.ar_balance_amt,
+        e.sim_ar_balance_amt,
         e.billed_charge_amt,
         (s.as_of_date - e.sim_submission_date) as days_outstanding
     from rcm.vw_claim_enriched e
     cross join snapshot s
-    where e.ar_open_flag
+    where e.sim_ar_open_flag
 ),
 bucketed as (
     select *,
@@ -83,7 +83,7 @@ select
     count(b.claim_sk)                                       as open_claims,
     count(b.claim_sk) filter (where b.sim_denial_flag)      as denied_open_claims,
     count(b.claim_sk) filter (where not b.sim_denial_flag)  as nondenied_open_claims,
-    round(coalesce(sum(b.ar_balance_amt), 0), 2)            as sim_ar_balance_amt,
+    round(coalesce(sum(b.sim_ar_balance_amt), 0), 2)        as sim_ar_balance_amt,
     round(coalesce(sum(b.billed_charge_amt), 0), 2)         as source_billed_at_risk_amt,
     round(avg(b.days_outstanding), 1)                       as avg_days_outstanding,
     min(b.days_outstanding)                                 as min_days_outstanding,

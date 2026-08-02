@@ -3,20 +3,20 @@
 --
 -- ***  HEURISTIC SCAFFOLD — NOT A MODEL  ***
 --      Phase 4 has not run. This view ranks work with a TRANSPARENT, RULE-BASED
---      heuristic (dollars at stake weighted by age). heuristic_priority_score is
+--      heuristic (dollars at stake weighted by age). sim_heuristic_priority_score is
 --      NOT a model score, NOT a probability, and NOT an Expected Net Recovery.
 --      Model A (denial risk) and Model C (appeal success / Expected Net Recovery)
 --      replace this ranking in Phase 4; this view exists only so the dashboard
 --      work-queue page has a defensible ordering until then. Every score column
---      is named heuristic_* and is_heuristic_placeholder is always true.
+--      is named sim_heuristic_* and is_heuristic_placeholder is always true.
 --
 -- Grain:        one row per ACTIONABLE claim (claim_sk). Actionable =
---               denied (sim_denial_flag) OR open AR (ar_open_flag / unpaid).
+--               denied (sim_denial_flag) OR open AR (sim_ar_open_flag / unpaid).
 --
 -- Sources:      rcm.vw_claim_enriched + rcm.sim_appeals (appeal-state context).
 -- Provenance:   keys/provider = SOURCE (synthetic); payer/denial/amounts/dates =
---               SIMULATED; heuristic_priority_score, priority_tier, action_type,
---               age_days = DERIVED (rule-based, from SIMULATED inputs).
+--               SIMULATED; sim_heuristic_priority_score, sim_priority_tier,
+--               sim_action_type, sim_appeal_levels and age_days = DERIVED.
 --
 -- HONESTY:      Payer shown is SIMULATED (§3.5). A queued claim is a work item,
 --               never a fraud flag. The heuristic deliberately uses only dollars
@@ -26,7 +26,7 @@
 -- Control query (must reconcile):
 --   select count(*) from rcm.vw_work_queue_priority;   -- = actionable claim count
 --   equals: select count(*) from rcm.vw_claim_enriched
---           where sim_denial_flag or ar_open_flag;
+--           where sim_denial_flag or sim_ar_open_flag;
 -- ============================================================================
 
 create or replace view rcm.vw_work_queue_priority as
@@ -37,7 +37,7 @@ with snapshot as (
 ),
 appeal_state as (
     select claim_sk,
-           count(*)                                        as appeal_levels,
+           count(*)                                        as sim_appeal_levels,
            bool_or(sim_appeal_outcome = 'OVERTURNED')      as any_overturned
     from rcm.sim_appeals
     group by claim_sk
@@ -52,34 +52,34 @@ actionable as (
         e.sim_denial_flag,
         e.sim_denial_category,                             -- SIMULATED
         e.sim_denial_type,
-        e.ar_open_flag,
+        e.sim_ar_open_flag,
         e.sim_denied_amount,
-        e.ar_balance_amt,
+        e.sim_ar_balance_amt,
         (s.as_of_date - e.sim_submission_date)             as age_days,
-        ap.appeal_levels,
+        ap.sim_appeal_levels,
         ap.any_overturned,
         -- dollars at stake: denied amount if denied, else outstanding AR balance
         case when e.sim_denial_flag then e.sim_denied_amount
-             else e.ar_balance_amt end                     as dollars_at_stake
+             else e.sim_ar_balance_amt end                 as sim_dollars_at_stake
     from rcm.vw_claim_enriched e
     cross join snapshot s
     left join appeal_state ap on ap.claim_sk = e.claim_sk
-    where e.sim_denial_flag or e.ar_open_flag
+    where e.sim_denial_flag or e.sim_ar_open_flag
 ),
 scored as (
     select *,
         -- HEURISTIC: dollars at stake scaled by an age factor in [1, 2].
         -- Purely mechanical; NOT a learned or calibrated score.
         round(
-            dollars_at_stake
+            sim_dollars_at_stake
             * (1 + least(greatest(age_days, 0), 365) / 365.0)
-        , 2) as heuristic_priority_score,
+        , 2) as sim_heuristic_priority_score,
         case
-            when sim_denial_flag and coalesce(appeal_levels, 0) = 0 then 'DENIAL_REWORK'
-            when sim_denial_flag and appeal_levels > 0 and not any_overturned then 'APPEAL_REVIEW'
+            when sim_denial_flag and coalesce(sim_appeal_levels, 0) = 0 then 'DENIAL_REWORK'
+            when sim_denial_flag and sim_appeal_levels > 0 and not any_overturned then 'APPEAL_REVIEW'
             when sim_denial_flag then 'DENIAL_RESOLVED_MONITOR'
             else 'AR_FOLLOWUP'
-        end as action_type
+        end as sim_action_type
     from actionable
 )
 select
@@ -88,21 +88,21 @@ select
     prvdr_num,
     sim_facility_name,                                     -- SIMULATED linkage, display only
     sim_payer_id,                                          -- SIMULATED
-    action_type,
+    sim_action_type,
     sim_denial_flag,
     sim_denial_category,
     sim_denial_type,
-    ar_open_flag,
+    sim_ar_open_flag,
     age_days,
-    round(dollars_at_stake, 2)         as dollars_at_stake,
-    heuristic_priority_score,
-    ntile(4) over (order by heuristic_priority_score desc) as priority_tier,  -- 1 = highest
-    coalesce(appeal_levels, 0)         as appeal_levels,
+    round(sim_dollars_at_stake, 2)     as sim_dollars_at_stake,
+    sim_heuristic_priority_score,
+    ntile(4) over (order by sim_heuristic_priority_score desc) as sim_priority_tier,
+    coalesce(sim_appeal_levels, 0)     as sim_appeal_levels,
     true                               as is_heuristic_placeholder             -- Phase 4 replaces
 from scored;
 
 comment on view rcm.vw_work_queue_priority is
   'HEURISTIC PLACEHOLDER work queue (NOT a model). Rule-based dollars-x-age '
   'ranking of actionable (denied or open-AR) claims; Phase 4 Model A/C replace '
-  'it. Score columns are heuristic_*; payer is SIMULATED (§3.5); items are work, '
+  'it. Ranking columns are sim_heuristic_priority_score and sim_priority_tier; payer is SIMULATED (§3.5); items are work, '
   'not fraud flags.';

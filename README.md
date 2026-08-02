@@ -1,10 +1,17 @@
 # Healthcare RCM Intelligence Platform
 
-> **Status:** In active development — Phases 1–3 of 5 are complete. Machine learning and application packaging are in progress.
+> **Status:** Phases 1–4 of 5 are complete and QA-accepted. Phase 5's
+> API/dashboard/demo integration is in active QA. Clean-clone Docker packaging
+> and local demo evidence are independently QA-approved and integrated. A
+> zero-cost hosted portfolio deployment is live and awaiting independent QA;
+> clean-SHA bundle regeneration and final Phase 5 acceptance remain open.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
-The remaining phases add explainable machine-learning models, a FastAPI scoring service, and a Streamlit analyst dashboard.
+Phase 4 supplies explainable machine-learning models. Phase 5 is integrating
+those models with a FastAPI scoring service, a Streamlit analyst dashboard, and
+a runnable demo bundle. The free-tier hosted demo is available, but Phase 5 is
+not yet accepted and the deployment is not production-grade or always-on.
 
 ## Why this project exists
 
@@ -46,9 +53,9 @@ No simulated outcome is presented as real. Provenance, assumptions, and limitati
 - Includes statistical testing, survival analysis, process mining, risk-adjusted facility analysis, and interrupted time-series methodology
 - Documents 19 decision-relevant analytical insights
 
-### Phase 4 — Explainable machine learning 🚧
+### Phase 4 — Explainable machine learning ✅
 
-Planned and currently in development:
+Implemented and QA-accepted:
 
 - Point-in-time feature store
 - Automated leakage protection
@@ -63,13 +70,44 @@ Planned and currently in development:
 
 ### Phase 5 — API, dashboard, and packaging 🚧
 
-Planned and currently in development:
+Phase 5 is in integration QA and is not accepted. The zero-cost hosted portfolio
+demo is live, but it is not production-grade or always-on.
 
-- Versioned FastAPI scoring endpoints
+Implemented and currently under QA:
+
+- Versioned FastAPI endpoints and schemas
 - Five-page Streamlit analyst dashboard
-- DuckDB/Parquet demo extract
-- Clean-clone Docker startup
-- Screenshots, demo script, and hosted deployment
+- DuckDB demo bundle regenerated from clean source SHA `ab2aa41541909a991877a8264a64e5856896599b`; pending final artifact QA
+- Provenance and simulated-data disclosure protections
+- Dashboard reconciliation reporting
+- Independently QA-approved clean-clone Docker Compose stack
+- Independently QA-approved local screenshots and demo walkthrough evidence
+- Independently QA-approved zero-cost Neon, Render, and Streamlit deployment
+
+Still required before Phase 5 acceptance:
+
+- Independent QA acceptance of the clean-SHA DuckDB bundle
+- Hosted redeployment and public verification with the clean bundle pin
+- Final Phase 5 QA acceptance
+
+## Live portfolio demo
+
+- [Live dashboard](https://pzcgc7diz3azrawrcsxobm.streamlit.app/)
+- [Live API readiness](https://healthcare-rcm-intelligence-api.onrender.com/ready)
+- [API documentation](https://healthcare-rcm-intelligence-api.onrender.com/docs)
+- [Hosted deployment guide and evidence](docs/hosted_deployment.md)
+- [Local demo walkthrough](docs/demo_walkthrough.md)
+- [Model card](docs/model_card.md)
+
+These links are zero-cost hosted portfolio evidence. Render may sleep after
+inactivity, so the first API request can take about a minute. The services are
+not represented as production-grade or always-on. They continue to serve the
+prior dirty-tree bundle until the clean-SHA release candidate is independently
+accepted and redeployed.
+
+![Hosted dashboard overview](docs/images/hosted/streamlit-overview.png)
+
+![Hosted bundle reconciliation](docs/images/hosted/streamlit-reconciliation-17-of-17.png)
 
 ## Verified project scale
 
@@ -121,7 +159,7 @@ Simulated adjudication layer      Reference enrichment
                          |
                          v
         ML models -> FastAPI -> Streamlit dashboard
-                  (in development)
+                  (Phase 5 QA)
 ```
 
 ## Data provenance
@@ -146,8 +184,29 @@ Additional safeguards include:
 - The provenance register and data dictionary are updated with schema changes
 - Post-submission and latent values are forbidden from pre-submission ML features
 
+### Crosswalk limits: display enrichment, not identity
+
+The synthetic claims source is vintage **2023-04**. The reference files used
+only to decorate the seeded display crosswalk are newer: CMS Hospital General
+Information is vintage **2026-04**, and Medicare Physician & Other Practitioners
+uses data year **2024**, released **2026-05**. This is a temporal mismatch, not a
+historically accurate 2023 provider/facility assignment. Hospitals may open,
+close, change type, or change attributes; providers may change state or
+specialty between the claim and the later reference file.
+
+The seeded crosswalk maps **4,876** synthetic providers onto **2,857** real
+CCNs, with a worst CCN collision of **8:1**. Grouping by displayed facility name
+is less unique still: the worst name collision is **15:1**. Displayed real-CMS
+provider/facility names and CCNs are display enrichment, not unique analytical
+identifiers. Use `claim_sk` for claim grain and the synthetic `prvdr_num` for
+provider/facility analysis; do not group, join, deduplicate, or evaluate
+performance by a displayed name. Crosswalked real provider/facility names, CCNs,
+NPIs, and display attributes are forbidden as a feature in every ML model. The
+seeded synthetic association is not a real provider/facility relationship.
+
 See:
 
+- [`docs/model_card.md`](docs/model_card.md)
 - [`docs/provenance_register.md`](docs/provenance_register.md)
 - [`docs/data_dictionary.md`](docs/data_dictionary.md)
 - [`docs/assumptions.md`](docs/assumptions.md)
@@ -229,7 +288,173 @@ Configured dependencies are not presented as completed product features until th
 └── pyproject.toml          # Python dependencies and tooling configuration
 ```
 
-## Local setup
+## Docker demo
+
+### Prerequisites
+
+- Docker Engine with Docker Compose v2
+- Enough local memory and disk for the Python application image
+
+No host Python, PostgreSQL, `.venv`, or `.env` is required. From a fresh clone:
+
+```bash
+docker compose up --build
+```
+
+Compose builds one reproducible Python 3.11 image and starts:
+
+| Service | URL | Ready when |
+|---|---|---|
+| PostgreSQL 16 | `localhost:5432` | `pg_isready` succeeds and `warehouse-init` verifies the exact 24 base tables and 9 views |
+| FastAPI | <http://localhost:8000> | `/ready` verifies PostgreSQL initialization plus the bundled data source |
+| Streamlit | <http://localhost:8501> | dependency readiness at <http://localhost:8502/ready> verifies Streamlit and the API |
+
+OpenAPI is available at <http://localhost:8000/docs> and as JSON at
+<http://localhost:8000/openapi.json>.
+
+The API separates process liveness (`GET /live`) from dependency readiness
+(`GET /ready`; `GET /health` is a compatibility alias for readiness). Streamlit's
+built-in `/_stcore/health` is process liveness only. The dashboard's externally
+requestable dependency readiness endpoint is `GET http://localhost:8502/ready`.
+These commands verify each surface:
+
+```bash
+curl --fail http://localhost:8000/live
+curl --fail http://localhost:8000/ready
+curl --fail http://localhost:8501/_stcore/health
+curl --fail http://localhost:8502/ready
+```
+
+Every API readiness request verifies the configured bundle path as it exists at
+that moment: it checks the committed SHA-256 identity, opens a new temporary
+read-only DuckDB connection, validates the declared dataset and provenance
+inventory, and closes that probe connection. This is intentionally independent
+of the cached connection serving application requests, because an already-open
+Unix file descriptor remains readable after its pathname is deleted. The default
+stack serves `/app/dashboard/demo_data/rcm_demo.duckdb`, pinned to SHA-256
+`66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`.
+Unset or blank overrides retain those committed defaults.
+
+An approved replacement must set both `RCM_DEMO_BUNDLE` and its matching
+`RCM_DEMO_BUNDLE_SHA256`. The path is inside the container: setting it to an
+arbitrary host path does not make that file visible, so an external bundle needs
+an image rebuild or a read-only bind mount. The API and dashboard cache their
+serving DuckDB connection at process startup. After changing the path or pin,
+recreate both application containers; readiness detects deletion, corruption,
+replacement and pin mismatch, but it does not hot-swap the serving connection.
+Restoring the exact original artifact can recover readiness without a restart;
+switching to a genuinely different approved artifact requires recreation.
+
+For example, this temporary Compose override mounts one host bundle at the same
+container path in both services:
+
+```yaml
+# docker-compose.bundle-override.yml
+services:
+  api:
+    volumes:
+      - "${RCM_DEMO_BUNDLE_HOST:?set an absolute host path}:/opt/rcm/override.duckdb:ro"
+  dashboard:
+    volumes:
+      - "${RCM_DEMO_BUNDLE_HOST:?set an absolute host path}:/opt/rcm/override.duckdb:ro"
+```
+
+```bash
+export RCM_DEMO_BUNDLE_HOST=/absolute/host/path/approved.duckdb
+export RCM_DEMO_BUNDLE=/opt/rcm/override.duckdb
+export RCM_DEMO_BUNDLE_SHA256="$(shasum -a 256 "$RCM_DEMO_BUNDLE_HOST" | awk '{print $1}')"
+docker compose -f docker-compose.yml -f docker-compose.bundle-override.yml \
+  up -d --force-recreate api dashboard
+```
+
+Remove the temporary override file and unset the three variables before
+recreating the services to return to the committed default.
+
+The containerized API and dashboard deliberately use the committed DuckDB demo
+bundle (`RCM_DATA_SOURCE=bundle`). PostgreSQL is still a required, health-checked
+service. Its existing DDL initializes 24 base tables and 9 views deterministically
+on the first volume start. On every later Compose startup, the one-shot
+`warehouse-init` service validates every expected object name and relation type,
+required sentinel columns, and view queryability before the API can start. It
+does not mutate the database from a health-check loop: a partial retained volume
+fails readiness with the missing or mistyped objects named.
+
+### Initialized PostgreSQL mode
+
+The clean-clone database contains the tracked schema and published views, but it
+is not a fully populated production warehouse and may lack application or model
+output datasets. All five pages remain renderable without exceptions in this
+initialized-but-unloaded mode and report what is unavailable:
+
+- **Executive Overview** shows an unavailable-data state, not a zero KPI book.
+- **Denial Prevention** shows unavailable-data disclosures, not zero denial or
+  provider metrics.
+- **A/R Recovery** reports aging, payer and appeal-recovery inputs separately and
+  does not fabricate zero-dollar or zero-day measures.
+- **Work Queue** identifies missing model and heuristic queue inputs.
+- **Model & Data Quality** reports incomplete reconciliation with `MISSING_INPUT`
+  or `ERROR` results, suppresses 17/17 success and reports unavailable monitoring
+  cohorts.
+
+To exercise the optional live-warehouse backend with populated data, load it using
+the supported developer workflow below and explicitly set `RCM_DATA_SOURCE=postgres`.
+
+The Compose credentials are non-secret local-demo defaults. Optional overrides
+can be supplied in the shell or an untracked `.env` file:
+
+| Variable | Default |
+|---|---|
+| `POSTGRES_USER` | `rcm` |
+| `POSTGRES_PASSWORD` | `rcm_demo_only` |
+| `POSTGRES_DB` | `rcm_warehouse` |
+| `RCM_POSTGRES_PORT` | `5432` |
+| `RCM_API_PORT` | `8000` |
+| `RCM_DASHBOARD_PORT` | `8501` |
+| `RCM_DASHBOARD_READINESS_PORT` | `8502` |
+| `RCM_DEMO_BUNDLE` | `/app/dashboard/demo_data/rcm_demo.duckdb` |
+| `RCM_DEMO_BUNDLE_SHA256` | committed artifact SHA-256 shown above |
+
+Stop the stack without deleting its database volume:
+
+```bash
+docker compose down
+```
+
+For a destructive local reset, including the named PostgreSQL volume:
+
+```bash
+docker compose down -v
+```
+
+This is local demo packaging, not hosted deployment evidence or final Phase 5
+acceptance. The committed DuckDB release candidate was generated from clean
+source SHA `ab2aa41541909a991877a8264a64e5856896599b` and records
+`git_tree_dirty=false`; independent artifact QA and hosted redeployment remain
+required before acceptance.
+
+## Local demo evidence
+
+The [local demo walkthrough](docs/demo_walkthrough.md) gives the startup,
+readiness, API, five-page dashboard, reconciliation, and shutdown sequence for a
+5–8 minute demonstration. It also records the source SHA, backend mode, capture
+date, synthetic-banner visibility, and simulated-derived content for every
+screenshot. Review the [model card](docs/model_card.md) before presenting model
+results or work-queue outputs.
+
+The [zero-cost hosted deployment guide](docs/hosted_deployment.md) records the
+Neon Free, Render Free, and Streamlit Community Cloud architecture and its
+credential-handling rules. Public URLs are not claimed until hosted QA passes.
+
+These images came from the integrated local Docker Compose stack. They are local
+reproducibility evidence, not hosted-deployment evidence.
+
+![Docker Compose services healthy](docs/images/docker-services-healthy.png)
+
+![Executive Overview with synthetic-data disclosure](docs/images/dashboard-executive-overview.png)
+
+![Dashboard reconciliation passing 17 of 17 controls](docs/images/dashboard-reconciliation-17-of-17.png)
+
+## Full warehouse developer setup
 
 ### Prerequisites
 
@@ -255,10 +480,10 @@ make setup
 
 Create a local `.env` file using the repository’s environment template when available. Secrets and local database credentials must not be committed.
 
-### 4. Start PostgreSQL
+### 4. Start PostgreSQL only
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
 ### 5. Download and stage source data
@@ -378,5 +603,3 @@ The interrupted time-series example is explicitly labeled illustrative and does 
 **Aniket Gauba**  
 Computer Science graduate with minors in Data Analytics and Physics  
 [LinkedIn](https://www.linkedin.com/in/aniket-gauba/) | [GitHub](https://github.com/aniketgauba67) | [Portfolio](https://aniketgauba.com)
-
-

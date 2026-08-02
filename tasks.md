@@ -2048,6 +2048,18 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> FIRST BLOCKER GROUP CLOSED by ml-engineer on `feat/phase5-matrix-guard`,
+> pending independent QA. The matrix writer now distinguishes a genuine first
+> write from an existing artifact whose repository, HEAD, committed manifest, or
+> expected path cannot be verified; only the first case is quiet. All comparisons
+> remain against `git show HEAD:<manifest>`, never the working-tree sidecar.
+> Missing/malformed comparison fields, row/column drift, and material null-rate
+> drift refuse before either artifact file is touched. `priority_tier` remains
+> forbidden as a feature and exempt as process metadata; its reason now correctly
+> states that it is an ntile over `heuristic_priority_score`, not a direct
+> computation from `sim_denial_flag`. Focused guard, manifest, matcher, blacklist,
+> and QA tier tests: 56 passed / 1 skipped (the live-Postgres staleness rebuild;
+> no database configured). Repository-wide ruff check and format check clean.
 > CRASH #9 2026-07-30 02:23-03:20Z: app-engineer-3 and qa-reviewer-p18 hit the cap.
 > ml-engineer-9 survived (idle). PRESERVED: 0fb7eb2 on feat/phase5-app — 210 lines
 > of §3.3 registration for the 8 MB demo bundle across provenance_register and
@@ -2278,6 +2290,255 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   [README-FINAL] the human's 382-line README still marks Phase 4 as 🚧 and has
 >     ZERO mentions of docs/model_card.md. Update status and add the pointer —
 >     carefully, on top of the human's text, not over it.
+> ML BLOCKERS — STATUS (ml-engineer-7, branch feat/phase5-blockers):
+>   [QUEUE-PREFIX] f0a1e12, [ARTIFACT-REWRITE] bfea020, [SHA-STAMP] 4a87270 —
+>   committed by ml-engineer-6, with qa-reviewer-p16 gating.
+>   [LOG-SIM-DENIED] **RULED: RENAME. `log_sim_denied_amount` ->
+>   `sim_log_denied_amount`.** The trigger ruling A named has NOT strictly fired,
+>   and that is measured, not assumed: no Model C matrix is committed
+>   (`git ls-files` shows artifacts/features/model_a_* only), models_artifacts/ is
+>   gitignored, Model C publishes no SHAP, and no dashboard can surface the name
+>   because WORK_QUEUE_SCHEMA is closed and checked inside build_work_queue — the
+>   column appears in NO artifact, metrics.json field, slice CSV, model-card line
+>   or doc. Exposure today is still zero, exactly as p11 measured it.
+>   It was renamed anyway, and the reason is not that the name is wrong. qa's
+>   re-aim is right: the marker was present, the value reads as generated, and the
+>   gate should fire on ABSENCE not position. What decided it is arithmetic on the
+>   exception rather than taste: Model A has 39 specs with ZERO infixed names and
+>   Model C had 52 with ONE, so this was the last one. Renaming it costs a single
+>   feature and converts "a marker somewhere, plus an exception someone must
+>   remember" into a rule with no exception list, stated literally at the feature
+>   layer by tests/features/test_feature_marker_position.py (STRICTER companion to
+>   qa's tests/leakage/test_feature_prefix_survival.py; it does not replace or
+>   weaken it, and carries a negative control so it cannot degrade into `"sim_" in
+>   name`). Phase 5 adds a dashboard, an API and a demo extract — three new ways a
+>   feature name becomes a column header — and an exception is free only while
+>   every future author remembers it. Consistency with f0a1e12 is real and points
+>   the same way: within one pipeline five queue columns now lead with the marker.
+>   NO NUMBER MOVED, verified rather than asserted: `make train-appeal` before and
+>   after, and model_c/metrics.json is byte-identical apart from the run-stamp
+>   block (dirty-tree warning — SHA-STAMP behaving as designed). xgboost
+>   0.5611/0.4914, category_rule 0.5571/0.4793, queue 65.7/61.0/59.8/0.7, 237
+>   deadline-critical over 22 monthly queues, folds 619/155/193. Model A is not
+>   touched: the column is Model C's alone and the committed matrix is unchanged.
+>   FOR app-engineer: `sim_log_denied_amount` is a MODEL INPUT and belongs on no
+>   page. If the work-queue page needs a dollars-in-dispute figure, the declared
+>   column is `sim_recoverable_amt` (WORK_QUEUE_SCHEMA). Nothing else is blocked.
+>   FOR qa: tests/leakage/test_feature_prefix_survival.py is yours and I did not
+>   touch it. It still PASSES (the prefixed name contains the marker), but its
+>   docstring cites `log_sim_denied_amount` as the live example of the infix case
+>   it deliberately permits; that example is now historical.
+> [ARTIFACT-REGEN] (ml-engineer-7) models_artifacts/ regenerated on
+>   feat/phase5-blockers @ e19836c, clean tree, both metrics.json stamping
+>   {"describe": "e19836c", "dirty": false}. Queue CSV headers now carry the
+>   markers. Every headline reproduces: Model A logistic ROC 0.6254 / PR 0.2210,
+>   xgboost − logistic +0.0003 [−0.0173, +0.0183]; Model C xgboost 0.5611, queue
+>   65.7 / 61.0 / 59.8 / 0.7. The feat+phase4-ml worktree's pre-rename copies are
+>   correct FOR THAT TREE and were left alone; nothing should be bundled from any
+>   worktree — regenerate after the merge so the stamp matches what ships.
+> [BLACKLIST-LOCKSTEP] (ml-engineer-7) PARTIALLY LANDED; the rename half waits on
+>   app-engineer's final column names, requested and not guessed.
+>   MEASURED FIRST, and it changes the risk story: the runtime guard
+>   (src/features/leakage.py `_offenders`) matches exact-then-SUBSTRING, so
+>   `dollars_at_stake` STILL BLOCKS `sim_dollars_at_stake`. A `sim_` prefix rename
+>   does NOT open a hole in either commit order — Model A stays protected through
+>   the window. What breaks is a rename that changes a WORD: `sim_amount_at_stake`
+>   is blocked by nothing. That is the case lockstep actually exists for.
+>   TWO REAL GAPS FOUND WHILE MEASURING, neither caused by the rename:
+>     - `action_type` was on NO list and nothing else was a substring of it, so it
+>       was blocked by nothing — vw_work_queue_priority:78-82 builds it as a CASE
+>       on sim_denial_flag, encoding the LABEL. Now forbidden.
+>     - `age_days` deliberately NOT forbidden, with the reason written into the
+>       config: it is a monotone function of the permitted point-in-time boundary
+>       plus one global constant, and sim_submission_date-derived features are
+>       already live and legitimate. What is label-bearing in that view is
+>       MEMBERSHIP, which is not a column and no blacklist entry can express.
+>   ANSWER TO THE QUESTION TEAM-LEAD PUT TO qa-reviewer-p16 — would the existing
+>   config-vs-doc test have CAUGHT this drift? **In CI, NO. On a loaded warehouse,
+>   YES.** test_forbidden_config_agreement.py's dead-pattern check is explicitly
+>   scoped to `forbidden_features` and its own docstring excludes the DERIVED view
+>   block, because the generated schema is the wrong universe for it.
+>   test_live_leakage.py DOES cover it against the whole rcm catalog — but that
+>   module is pytest.mark.integration, excluded from CI unit runs, and skips
+>   outright when no views are present. So on a clean clone, in CI, or before
+>   `make views`, the drift is invisible. Closed by
+>   tests/features/test_derived_blacklist_tracks_views.py, which resolves every
+>   `forbidden_derived_features` key against the sql/views/ TEXT with no database.
+>   A staleness tripwire, not proof of existence — the live check stays the
+>   authority — and it moves discovery to the commit that renames the column.
+>   NEGATIVE CONTROL RUN: replaying the rename in the view text strands exactly
+>   `dollars_at_stake` and `heuristic_priority_score` and nothing else.
+>   A TRAP RECORDED IN THE CONFIG: the tests resolve these names with fnmatch, the
+>   RUNTIME guard has no glob support. `*dollars_at_stake` would pass every test
+>   and block nothing. Third test in the new file refuses a glob outright.
+>   The blacklist widening tripped the manifest's leakage_config_digest guard, as
+>   designed, so the committed matrix was rebuilt in the same commit: parquet
+>   BYTE-IDENTICAL (d11bd0df5a918d0d, p10/p11/p12's digest across four sessions),
+>   manifest diff exactly one line. That was [ARTIFACT-REWRITE]'s second live use
+>   and it correctly did NOT refuse a legitimate digest-only update.
+> [BLACKLIST-LOCKSTEP] part 2 — **RESOLVED: NO CONFIG CHANGE REQUIRED.**
+>   app-engineer-2 confirmed the final spellings and NOT ONE WORD CHANGED. The
+>   VIEW is unrenamed (analytics-engineer's to fix); they re-mark
+>   dollars_at_stake / heuristic_priority_score / action_type at the API boundary
+>   in src/api/tables.py. Every re-marked name is a SUPERSTRING of its blacklist
+>   entry, so the substring guard covers all three — measured, not assumed. The
+>   entries stay accurate because the view they name is unchanged, and
+>   tests/features/test_derived_blacklist_tracks_views.py stays green for the
+>   same reason. It fires the day analytics-engineer renames the view, which is
+>   the outcome it was built for.
+>   FLAG FOR TEAM-LEAD, not mine to decide: this is the presentation-layer
+>   re-marking the [QUEUE-PREFIX] delegation explicitly wanted to AVOID ("a
+>   warehouse and a screen disagreeing on a column name is the worse outcome").
+>   The view and the API now disagree by design, and the disagreement has a
+>   consequence — see below.
+> [DEMO-BUNDLE-PROVENANCE] (ml-engineer-7) registered
+>   `dashboard/demo_data/*.duckdb` in PUBLISHED_SURFACES at app-engineer's
+>   request, and found a defect while verifying their proposed text rather than
+>   transcribing it. TWO CORRECTIONS to the justification they drafted:
+>     - "14 datasets" is 16 declared (9 warehouse `select *` views, 5 model
+>       output, 2 self-describing meta tables). Measured off src/demo/spec.py.
+>     - "per-column classification" is per-DATASET: a provenance class, grain,
+>       contains_simulated flag and note. Simulated COLUMNS are found by marker,
+>       not declared one by one. Writing the stronger claim into a declaration a
+>       reviewer relies on would be the overclaim this module exists to prevent.
+>   THE DEFECT, and it is on the most exposed surface we have: the bundle copies
+>   `vw_work_queue_priority` UNMODIFIED (src/demo/build.py: read_warehouse_datasets
+>   — deliberately, so a dashboard figure cannot diverge from its SQL control
+>   query). So `dollars_at_stake`, `heuristic_priority_score`, `priority_tier` and
+>   `action_type` ship UNMARKED in a committed .duckdb that opens on a clean clone
+>   with no database. The API's re-marking does not reach it. `action_type` is a
+>   CASE on sim_denial_flag — the LABEL under a process name.
+>   Registering the path alone would have made rule 1 green and rule 3 SILENT
+>   (read_columns returns None for .duckdb), i.e. my registration would have
+>   BLESSED it. So the registration is paired with
+>   tests/features/test_demo_bundle_provenance.py, which opens the bundle and
+>   applies the marker rule to the columns actually in it. Skips where no bundle
+>   exists; the bundle is committed, so it runs everywhere once it lands.
+>   FIXABLE BY EITHER OWNER: analytics-engineer marks the view (better — warehouse
+>   and screen then agree) or app-engineer re-marks into the bundle as the API
+>   already does. Not ml's to choose.
+> [SKIP-BLIND] (ml-engineer-9) the [PASSTHROUGH-BLIND] shape swept across every
+>   ml-owned guard, as directed. **ONE real instance, and it is in the file written
+>   to close the previous one** — tests/features/test_demo_bundle_provenance.py.
+>   Both column checks looked their table up by name and `pytest.skip`ped when it
+>   was absent, so a bundle that is PRESENT, openable and holding sixteen tables
+>   reported nothing to check the moment one was RENAMED. MEASURED on a scratchpad
+>   copy of the committed bundle with `vw_work_queue_priority` renamed and nothing
+>   else touched: the unmarked-column check goes from a correct RED naming all four
+>   columns to SKIPPED, and in a suite summary a skip is indistinguishable from a
+>   pass. The docstring's defence ("SKIPS when the bundle is absent... not a silent
+>   pass") was true and covered the wrong condition: a missing TABLE is not a
+>   missing bundle.
+>   This is why it mattered now rather than later — a view rename is in flight for
+>   [BLACKLIST-LOCKSTEP], so the exact condition that disarms the check is the one
+>   being planned. Closed by `_require_table`, which FAILS on absence, names the
+>   tables the bundle really holds, and tells the author which of the two cases
+>   they are in (rename: re-point the constant in the same commit; drop: write a
+>   sentence). Discovery moves to the commit that causes the drift. Negative
+>   control included so the check cannot regress to a skip unnoticed.
+>   SECOND, SMALLER FINDING in the same file, same family: rule 2 in
+>   src/features/provenance.py is two-directional ("an undeclared column is one
+>   that skipped rule 3") but the bundle check compared one direction only —
+>   declared-minus-present. One column was slipping through it, measured not
+>   supposed: `queue_mode` (1 `live_snapshot` row / 468 `backtest`), which the demo
+>   build adds when it unions the two queue builds into one table and which the
+>   per-run CSVs do not carry. Both directions are now checked, with a written
+>   BUNDLE_ONLY_COLUMNS allowance that costs a sentence the way `marker_exempt`
+>   does. FLAGGED FOR app-engineer AND qa, NOT RULED ON BY ME: the column is
+>   app-engineer's, the allowance records that the check now SEES it rather than
+>   that it is fine. My read is that it is the `as_of`/`split` class (a parameter
+>   of our build, no dollar/rate/date reading) but that call is not mine.
+>   CLEAN elsewhere, which is the useful half of the result. Every other skip in
+>   tests/features/ and tests/models/ is absence of a gitignored artifact or of a
+>   Postgres URL — the surface genuinely is not there — and each already says so.
+>   SWEEP SCOPE, written down so the next ml session RE-RUNS it instead of
+>   re-deriving what it covered (team-lead directed; a clean sweep is only durable
+>   if its scope is recorded). The command, verbatim:
+>     `grep -rn "pytest.skip\|importorskip\|skipif" tests/features tests/models
+>      src/features src/models`
+>   plus `grep -rn "exists()\|return None\|except \|is None" src/features/*.py
+>   src/models/*.py` for the non-test guards. Directories: tests/features/,
+>   tests/models/, src/features/, src/models/ — i.e. ml-owned only. NOT swept:
+>   tests/leakage/ and tests/integration/ (qa's files), src/api/, dashboard/,
+>   src/demo/ (app-engineer's), sql/ (analytics').
+>   At 7866630 that command returns 12 live skip sites, and the TEST APPLIED to each
+>   is: *is the skip's precondition the thing that is actually absent, or a plausible
+>   neighbour of it?* Classification — 5 no-Postgres (test_feature_store_postgres x2,
+>   test_determinism, test_train_postgres x2: the database itself is absent);
+>   4 gitignored-artifact-absent (test_matrix_provenance x3, test_dollars_at_risk_
+>   ruling, test_published_provenance work-queue CSVs, test_matrix_write_guard
+>   matrix); 2 manifest-not-tracked-at-HEAD (test_matrix_write_guard — the ABSENT
+>   leg of store.py's three-valued baseline, the one legitimately quiet case, since
+>   UNREADABLE refuses); 1 bundle-absent + 1 duckdb-not-installed
+>   (test_demo_bundle_provenance). All 12 pass the test. The two that FAILED it are
+>   the two now fixed: table-absent-while-bundle-present (555b77e) and
+>   published_files-empty-while-the-repo-holds-an-undeclared-tree (7866630).
+>   Non-test guards: the one instrument that returns None rather than a verdict is
+>   `provenance.read_columns` on a `.duckdb`, which is honest about the limit and is
+>   covered by tests/features/test_demo_bundle_provenance.py opening the file itself.
+>   The three-valued ABSENT/READABLE/UNREADABLE baseline in src/features/store.py
+>   is the pattern the rest of them follow. ONE STRUCTURAL LIMIT recorded rather
+>   than fixed: provenance rule 1's coverage scans a hardcoded PUBLISHED_ROOTS, so
+>   its docstring claim that a new Phase 5 output "fails the build until it is
+>   declared here" holds for a new FILE, not a new DIRECTORY. Evidence it does not
+>   self-extend: `dashboard/demo_data` had to be hand-added at app-engineer's
+>   request. Not currently exploited — measured: every tabular file Phase 5 writes
+>   lands under an existing root — so this is a note for whoever adds the next
+>   output root, not a defect.
+>   CLOSED by [ROOTS-INVERTED] below on team-lead authorisation, so the docstring
+>   no longer claims a guarantee the code does not provide.
+>   `queue_mode` RULED PERMITTED UNMARKED by team-lead 2026-07-29 — a build label is
+>   metadata about which of OUR runs produced the row (the `split`/`as_of` class,
+>   QA ruling C) and §3.2 governs simulated VALUES, which a build label is not. Two
+>   conditions attached: the reason is recorded where the column is declared (it is,
+>   in BUNDLE_ONLY_COLUMNS — a bare exemption list is how `action_type` got
+>   through), and app-engineer-3 keeps the call as owner. Also flagged by team-lead
+>   FOR app-engineer-3, not an ml item: the 1-row `live_snapshot` against 468
+>   `backtest` rows is the Phase 4 degenerate-queue finding resurfacing in the
+>   bundle, and the dashboard should carry the model card's caveat rather than let
+>   one row read as a queue. Relayed.
+> [ROOTS-INVERTED] (ml-engineer-9, team-lead AUTHORISED) provenance rule 1's
+>   coverage scan inverted rather than widened. It asked "is every file under these
+>   three hardcoded roots declared?", which catches a new FILE and misses a new
+>   DIRECTORY — a whole output tree could appear and rule 1 stayed green having
+>   never looked. Now: walk the repo, and every tabular file that is OURS must live
+>   under a DECLARED root. Default-deny, so the next output directory fails the
+>   build the day it appears, which is what the docstring already promised.
+>   `NON_OUTPUT_TREES` holds the exclusions and each carries a sentence, enforced by
+>   a test — which caught SEVEN of my own entries as too thin to be reasons on the
+>   first run, so the bar is real and not decorative.
+>   THE `data/` DECISION, because it is the one that could have given the purchase
+>   away: excluded as the FOUR TIERS (raw / validated / curated / simulated) and NOT
+>   as the parent. Excluding `data/` would let a published extract escape under a
+>   new `data/<something>/`; naming the tiers means such a directory fails. A test
+>   asserts `data/demo/hosted_extract.parquet` is NOT excluded. `mlruns/` is
+>   deliberately NOT pre-excluded: if anyone turns MLflow on, rule 1 fires and
+>   someone decides whether that tree is published, which is the behaviour being
+>   bought.
+>   `.claude/` exclusion is load-bearing, not hygiene: `.claude/worktrees/` holds
+>   full checkouts, so without it a scan from the primary checkout reports six other
+>   worktrees' artifacts as uncovered — a guard that cries wolf gets switched off.
+>   MEASURED both ways: primary checkout 1 tabular file ours, this worktree 16, rule
+>   1 GREEN from both, scan under 0.01s (excluded trees are pruned during the walk,
+>   so `.venv` is never descended into).
+>   AND IT IMMEDIATELY EXPOSED ONE MORE [SKIP-BLIND], in the commit that made it
+>   possible: `test_the_files_actually_on_disk_are_all_covered` was guarded by
+>   `if not published_files(): skip("no artifacts generated")`. Defensible while the
+>   scan only looked inside the roots — empty roots did mean nothing to check — but
+>   after the inversion an undeclared output tree is exactly what it can find when
+>   the roots are empty, so the guard would have skipped the only case needing it.
+>   Now unconditional. Same lesson as 555b77e: a skip's precondition must be the
+>   thing actually absent, not a plausible neighbour of it.
+> [BLACKLIST-LIMIT] (team-lead directed) the MEMBERSHIP caveat is now in
+>   docs/model_card.md beside the leakage guards, not only on this board: a
+>   column-name blacklist cannot express that a table's POPULATION is conditioned
+>   on the outcome. vw_work_queue_priority's where clause selects denied-or-open-AR
+>   claims, so which ROWS are present is itself the label whatever the columns are
+>   called, and every guard stays green while the label enters through the row
+>   filter. The rule it implies is about JOINS, not names: Model A features come
+>   from base tables, never from a view whose filter reads a post-submission fact.
+>   VERIFIED rather than asserted — src/features/ contains zero `vw_` references;
+>   extract.py reads sim_*/fact_*/dim_* only.
 > VINTAGE SKEW — MEASURED by team-lead from config/sources.yaml, for the honesty
 > pass. The code sets are CORRECT and unskewed (ICD-10-CM/PCS FY2023, HCPCS 2023,
 > MS-DRG v40 FY2023 — all match the 2023-04 claims). The SKEW is in the crosswalk
@@ -2291,11 +2552,417 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > (4,876 synthetic providers onto 2,857 real CCNs, worst 8:1, display-only,
 > forbidden as a feature). README:145 says "display-only enrichment" WITHOUT the
 > numbers. Dashboard does not exist yet. Needs to be visible in all three.
-- [ ] FastAPI endpoints with schemas + version metadata
-- [ ] Streamlit dashboard (5 pages, synthetic banner on all)
-- [ ] DuckDB/Parquet demo extract for hosted deployment
-- [ ] docker-compose clean-clone start; CI green
-- [ ] README final, screenshots, demo script
+>
+> ===== qa-reviewer-p16 REVIEW ROUND 1, 2026-07-29 =====
+>
+> [BLOCKERS-3] ml-engineer-6's three blockers: **PASS**, measured on
+> feat/phase5-blockers @ **4a87270** merged into feat/phase5-qa @ **8ea639c**.
+> Commands: `make features` / `make train` / `make train-appeal`, `uv run pytest
+> -m "not integration" -q`, `uv run ruff check . && ruff format --check .`.
+>   NO NUMBER MOVED — re-measured, not taken on trust. Model A logistic ROC
+>   **0.6254** / PR **0.2210**; xgboost − logistic **+0.0003 [−0.0173, +0.0183]**;
+>   Model C xgboost **0.5611**; queue **65.7 / 61.0 / 59.8 / 0.7**. All identical.
+>   The committed parquet is byte-identical (d11bd0df…, unchanged by bfea020 —
+>   only the .json manifest gained `null_rates`), so Model A's numbers could not
+>   have moved; Model C's were re-run and matched anyway.
+>   QUEUE-PREFIX: all five columns renamed; shipped CSV headers verified on disk
+>   (`sim_p_overturn, sim_recoverable_amt, sim_expected_recovery_amt,
+>   sim_expected_net_recovery, sim_days_to_deadline`). `assert_publishable` runs
+>   INSIDE the builder, so the guarantee is structural. The QA exposure gate
+>   (test_output_surface_provenance) went RED→GREEN on this commit and nothing
+>   else changed, which is what makes it evidence.
+>   SHA-STAMP: dirty-tree semantics probed in three states. Clean → plain commit.
+>   Tracked file modified → `describe: <sha>-dirty`, `dirty: true`, warning, and
+>   the prose says "an uncommitted working tree". UNTRACKED FILE ONLY → `git
+>   describe` alone reads clean, and the stamp still reports `dirty: true` because
+>   it cross-checks `git status --porcelain`. That second path is the one that
+>   would have produced a machine-attested falsehood; it is handled.
+>
+> [GUARD-DISARM] **NEW, ml's to fix, gate is RED and committed.**
+> `committed_manifest()` collapses four conditions to None — no git, path outside
+> the repo, `git show` failed, and MANIFEST DID NOT PARSE — and
+> `_refuse_or_report` treats None as "nothing to protect". Three of those are.
+> The fourth is not. MEASURED: with a corrupt committed manifest, and separately
+> with the manifest untracked while the PARQUET is still committed, a matrix with
+> `diagnosis_count` entirely null was written straight over the committed parquet
+> with **no exception raised** — the exact failure bfea020 exists to prevent.
+> This is the module's own principle turned on itself: `manifest_deviations`
+> already refuses to pass over a missing `null_rates` block ("NULL RATES NOT
+> COMPARED") because a check that did not run must not read like one that passed.
+> Repro: `uv run pytest tests/features/test_matrix_write_guard.py -q` (2 RED).
+> Not a blocker on merging the three — the settled shape is met — but must close
+> before Phase 5 acceptance.
+>
+> [EMITTER-HOLE] **FOUND IN MY OWN INHERITED GATE, fixed, 723a95c.** The
+> [QUEUE-PREFIX] "harder half" — the check extended so this cannot recur in Phase
+> 5's outputs — was NOT covering half of Phase 5. Measured by planting three
+> probe modules: a Streamlit page and a `df.to_dict()` helper were caught; a
+> **FastAPI route** (`@router.get` returning `[{"recoverable_amt": …}]`) was NOT.
+> It calls nothing on the emitter list and declares no `response_model`, so the
+> only evidence it is a user-facing surface is the decorator. The gate was
+> reporting a clean Phase 5 API boundary while blind to it. Added
+> route-decorator detection, `model_dump`, and `st.write`/`st.json` when the
+> first argument is not a string literal (prose stays exempt, measured). Added
+> positive AND negative controls on the DETECTOR — the registration test is green
+> on a tree with no dashboard and no API, and that green said nothing about
+> whether the detector could see anything at all.
+>
+> [FIREWALL-DOC-HOLE] **RULED (d5b8402): NOT fixable by redaction. Recorded as a
+> known limitation in docs/assumptions.md §12 and pinned by
+> tests/leakage/test_firewall_doc_hole.py.** Three classes, all measured:
+>   A. Realized label statistics. `sim_denial_flag` IS the Model A label; its mean
+>      on the committed matrix is **0.1276**, which is the doc's 12.8%. Model A
+>      prints `test base rate 0.1205` itself. Deleting the figure removes an
+>      auditable record and restores nothing.
+>   B. Generator internals + a prototype of ml's own deliverable: oracle AUC 0.68
+>      (from `sim_latent_p`, banned as a feature), the latent 8.9% / 16.7% solve,
+>      and §4.1's "+0.005–0.009 AUC" GBM-over-logistic prediction — published
+>      BEFORE ml produced +0.0003 [−0.0173, +0.0183]. Required by §1/§7; deleting
+>      them trades honesty for a wall with no other sides.
+>   C. **FOUND WHILE RULING, and worse than A and B together.**
+>      `config/simulation.yaml` (NOT firewalled from ml) publishes the latent
+>      FORMULA and every coefficient, §3 republishes the odds ratios, §2 gives the
+>      solved intercept — and all **fifteen** mechanism indicators the formula
+>      consumes are features in the committed matrix. `sim_latent_p` is therefore
+>      analytically reconstructible without opening `src/simulation/` once. Also
+>      not fixable: those are legitimate pre-submission features.
+>   THE EVIDENCE THE DISCIPLINE HELD IS IN THE NUMBER: Model A shipped **0.6254**
+>   against a reconstructible **0.68** ceiling. A pipeline exploiting A, B or C
+>   sits at the ceiling. §4.5's value is that gap, not an access control, and no
+>   surface may describe it as an information barrier.
+>   docs/simulated_forbidden_columns.md deliberately untouched.
+>   CONSEQUENT FINDING FOR ml: **docs/model_card.md:139-141 is false as written** —
+>   "The generator's realized overturn and rework rates sit behind the §4.5
+>   firewall". They do not; assumptions.md §9 publishes the realized rework figure
+>   ($29.88/denied claim) and §8 the overturn target. The threshold argument
+>   survives (both factors were fixed from published benchmarks, before the
+>   threshold) but the sentence justifying it is not true. ml to reword.
+>
+> [APP-R1] app-engineer @ **6e51e61** (demo extract): reviewed, NOT yet gateable —
+> no dashboard page, no API endpoint, no bundle built, no tests. What is there is
+> good and two things are verified rather than accepted:
+>   * `dashboard/disclosures.py` numbers CHECKED against the runs I made, all
+>     correct: 0.6254/0.2210, +0.0003 [−0.0173,+0.0183], logistic−payer_rule
+>     +0.0333 [+0.0066,+0.0571] ROC and +0.0695 [+0.0444,+0.0998] PR, Model C
+>     0.5611 and −0.0356 [−0.1325,+0.0597], 65.7/61.0/59.8, capacity point 9.6% /
+>     20.9% / 26.3% (= 2.18× the 0.1205 base rate), 50.9% concentration, 2,663
+>     denials / 967 appealed / 193 test rows. MODEL_C_HONESTY states the negative
+>     result correctly and explicitly ("the probability does not earn its place in
+>     the ordering"). NOT_A_FRAUD_SIGNAL present.
+>   * KEYING RULE verified in the WAREHOUSE, not in the prose:
+>     `vw_clean_claim_performance` is `group by e.prvdr_num`, and live it returns
+>     4,877 rows = 4,877 distinct prvdr_num over 2,857 distinct CCNs. Correct.
+>   MEASURED, AND THE DISCLOSURE UNDERSTATES IT — **grouping by facility NAME is
+>   worse than by CCN. Worst case 15:1, not 8:1**, and 1,302 distinct names carry
+>   more than one synthetic provider (vs 1,311 of 2,857 CCNs = the 45.9% already
+>   quoted). Distinct display names = **2,816** < 2,857 CCNs, because real CMS
+>   facilities share names across sites. The disclosure correctly forbids grouping
+>   on either, but quotes only the 8:1 CCN figure — and NAME is the key a
+>   dashboard is far more likely to group on, being the human-readable one. Add
+>   the 15:1 name figure wherever 8:1 appears.
+>   §5/§6 PROCESS: `src/demo/` is a new package nobody owns (app-engineer owns
+>   `src/api/`, `dashboard/`, `docker-compose.yml`); the commit does not update
+>   tasks.md (§6); and 1,417 lines of new module ship with zero tests (§6, "every
+>   new module gets tests in the matching tests/ subfolder in the same PR").
+>   tests/ is mine — coordinate, do not skip.
+>   Minor: spec.py says vw_clean_claim_performance is 4,877 rows while the
+>   disclosure says 4,876 crosswalked providers. Both are right (one provider has
+>   no crosswalk row); say so once so it does not read as a typo.
+>
+> STILL RED AND CORRECTLY SO on feat/phase5-qa @ **58574e9** (= a8dab94 + 4a87270
+> + 6e51e61 + my three commits): 4 disclosure gaps the human named — vintage skew
+> absent from README.md and docs/model_card.md, collision numbers and keying rule
+> absent from README.md ([README-FINAL]) — plus
+> `test_the_dashboard_exists_before_phase_5_is_accepted`. Repro:
+> `uv run pytest tests/contracts/test_user_facing_disclosures.py
+> tests/contracts/test_dashboard_banner.py -q`.
+> QA REVIEW ROUND 2 (qa-reviewer-p17), measured on feat/phase5-qa @ 6e7b288 =
+> main a04d38c + feat/phase5-blockers f18dfc7 + feat/phase5-app 08d88cc. Baseline
+> before the merges: 7 failed / 437 passed (the six inherited RED gates + the
+> dashboard-exists gate). After: 8 failed / 443 passed — the one new red is
+> [EMITTER-HOLE]'s route detector firing on src/api/main.py, which is the gate
+> working. Repro for everything below:
+>   uv run pytest -q -p no:randomly --ignore=tests/integration
+>   RCM_DATA_SOURCE=postgres uv run python -c "<TestClient over src.api.main:app>"
+>
+> [APP-R2] THE API RUNS. Nobody had run these 1,816 lines. Exercised against the
+> live warehouse (read-only, RCM_DATA_SOURCE=postgres): /health 200 (degraded, as
+> designed — no model_c_work_queue outside a bundle), /metrics/executive 200 with
+> claims_submitted=20867 and denied_claims=2663, which are the control-query
+> figures, /work-queue?queue_mode=heuristic 200, /claims/1 200,
+> /work-queue (model modes) 501 with the correct hint. No 500s. The schemas are
+> strict enough that a malformed data_source block is rejected by pydantic — found
+> that by hitting it with a stub.
+>
+> [PASSTHROUGH-BLIND] — THE FINDING OF THIS ROUND, and it is about MY OWN GATE.
+> The [EMITTER-HOLE] fix made the detector SEE src/api/main.py. Registering it as
+> a surface would make the gate GREEN AND PROVE NOTHING. Measured: I built the
+> surface (route function, stub source, frame shaped like vw_work_queue_priority)
+> and ran the exposure probe. It reported ZERO unmarked simulated columns —
+> including on `sim_dollars_at_stake`, the very column the app re-marks. The
+> reason is structural, not a bug: the probe perturbs a simulated INPUT and sees
+> which emitted columns MOVE, so it can only see columns the surface COMPUTES. The
+> entire API read side is PASS-THROUGH — every column arrives already computed by
+> a view — so nothing moves and everything reads clean. The probe was built for
+> src/models/work_queue.py, which computes its columns; at the wire it is the
+> wrong instrument. **A perturbation probe cannot measure provenance across a
+> pass-through boundary; only a DECLARATION can.** Same family as
+> MATCHER-EXPRESSIVENESS: the instrument that runs is weaker than the instrument
+> the gate's green implies.
+>
+> [WIRE-UNMARKED] What the right instrument finds. Cross-referencing the columns
+> vw_work_queue_priority actually emits (verified against the live PG catalog, and
+> a static parse of the view SQL agrees for 8 of 9 views) against
+> config/model.yaml `forbidden_derived_features` — ml's own list, with ml's own
+> reasons, so this is not a QA opinion:
+>   sim_ marked on the wire: dollars_at_stake -> sim_dollars_at_stake,
+>     heuristic_priority_score -> sim_heuristic_priority_score (app re-marks both).
+>   UNMARKED AND UNDECLARED: `ar_open_flag` ("derived from sim_payment_date") and
+>     `appeal_levels` ("count over sim_appeals; non-zero implies a denial"). They
+>     are in neither RE_MARKED_COLUMNS nor PROCESS_METADATA_COLUMNS. They ship.
+>     Confirmed in a live response body.
+>   WRONGLY EXEMPTED: `action_type` is declared PROCESS METADATA by
+>     src/api/tables.py:39-51, while config/model.yaml:192 forbids it as "a CASE on
+>     sim_denial_flag; encodes the label directly". A rank or a recommendation is
+>     process metadata under RULING C; a restatement of the label under a workflow
+>     name is not. Every row of the live heuristic response carries
+>     action_type=DENIAL_REWORK beside sim_denial_flag=true.
+>   `priority_tier` is a rank and stays exempt under RULING C — recorded so the
+>     omission does not read as an oversight (the age_days precedent).
+>
+> [EXEMPT-NO-REASON] src/api/tables.py::PROCESS_METADATA_COLUMNS is a BARE
+> frozenset of 9 names. The qa exemption list it mirrors requires a REASON per
+> entry and has `test_no_exemption_is_speculative` to refuse any exemption the
+> probe would not otherwise have reported. Two lists, same job, and the one that
+> actually runs at the wire has neither property. This is how `action_type` above
+> got exempted with nothing to argue with.
+>
+> [REMARK-IS-API-ONLY] `re_mark_simulated_columns` lives in src/api/tables.py.
+> dashboard/ is a separate package that will read the same views through the same
+> src/demo/source.py. If the dashboard renders a queue frame without calling it,
+> the identical unmarked columns ship on the SCREEN while the API is clean —
+> and the screen is the surface the human's honesty instruction names.
+> app-engineer-2: the re-marking belongs below both, not inside src/api/.
+>
+> [BUNDLE-ABSENT] `git ls-files` finds no .duckdb and no dashboard/demo_data/.
+> src/demo/source.py:157 tells the reader "A clean clone ships one" and
+> src/demo/spec.py:5 calls it "a COMMITTED data file". Neither is true yet, so the
+> §7 clean-clone criterion is unmet by construction and the default data source
+> raises on a fresh checkout. Not a defect in the code — the build step is
+> pending — but the docstrings state it in the present tense TODAY.
+> src/demo/spec.py declares provenance and contains_simulated PER DATASET, not per
+> column; team-lead's acceptance condition already requires per-column
+> classification for the bundle, and [PASSTHROUGH-BLIND] is the argument for why
+> that per-column declaration is the only instrument that can check the wire.
+>
+> [MEMBERSHIP-UNDISCLOSED] ml-engineer-7's observation, checked at the API and not
+> just reserved for the page: WorkQueueResponse carries `ranking`,
+> `ordering_caveat` and `limitations`, and all three describe the ORDER. None
+> states the MEMBERSHIP — that the where clause selected denied-or-open-AR claims,
+> so the list already knows the outcome. Applies to /work-queue in both modes.
+>
+> [ROC-MISMATCH] low severity, honesty surface. src/api/main.py:79 tells every
+> caller "the champion is a regularized logistic regression at ROC-AUC 0.6254"
+> while /health on the same process reports roc_auc_test_fold 0.6185 for
+> "logistic + isotonic". Both numbers are in docs/model_card.md:69-71 (uncalibrated
+> vs calibrated) so neither is wrong, but the two statements the service makes
+> about itself do not agree and a reader cannot tell which is the shipped number.
+>
+> OWNERSHIP NOTE, not a blocker: ml-engineer added tests/features/
+> test_derived_blacklist_tracks_views.py and test_feature_marker_position.py.
+> tests/ is qa's under §5. Both are good tests and both stay; recorded so the
+> boundary does not erode by precedent.
+>
+> ===== qa-reviewer-p18 REVIEW ROUND 3, 2026-07-29 =====
+> Measured on feat/phase5-qa @ **51cac7d** = main **0b6bd2d** + feat/phase5-blockers
+> **21fe077** + feat/phase5-app **5a88d6b** + the preserved gate **5a59f42**.
+> Repro for everything: `uv run pytest -q -p no:randomly --ignore=tests/integration`
+> Baseline at 51cac7d before my commits: **12 failed / 471 passed**.
+> After: **22 failed / 487 passed** — one red REMOVED as a false positive of my own
+> gate, eleven added, every one measured below.
+>
+> [DASHBOARD-BLANK] **THE BLOCKER OF THIS ROUND. Two of the five pages are blank
+> pages, and the whole dashboard had never been run by anyone.** All five pages call
+> `render_page_header(title, subtitle, banner_extra=...)`; components.py:83 defines
+> `render_page_header(title, subtitle)`. ar_recovery.py:43 and work_queue.py:61
+> raise `TypeError: unexpected keyword argument 'banner_extra'` on the first
+> statement that renders anything, so both produce **ZERO** blocks. The other three
+> render 16 / 16 / 41 with no exceptions. Measured with streamlit's own AppTest,
+> one interpreter per page.
+>   This is an INTERRUPTED REFACTOR, not carelessness: components.py:83-94 documents
+>   deliberately REMOVING the banner from render_page_header, agreeing with the qa
+>   banner gate that a §6 obligation discharged two frames away is one a future
+>   author can silently drop. The docstring landed; the five call sites did not.
+>   Fix (app-engineer): add `banner_extra: str | None = None` to render_page_header
+>   and have it call render_synthetic_data_banner(extra=banner_extra) — OR keep the
+>   split and put `render_synthetic_data_banner(MEMBERSHIP_WARNING)` in each page.
+>   The second matches the docstring's own argument.
+> [BANNER-ABSENT] §6, "no page ships without it": **zero of five pages render the
+>   banner**, confirmed twice by independent instruments — statically by
+>   test_dashboard_banner.py (AST call names; `banner_extra=` is a kwarg, not a
+>   call, so it correctly did not count it) and in the RENDERED OUTPUT by my new
+>   test_dashboard_renders.py. app.py:116 renders it inside `landing()`, which
+>   `st.navigation` executes for the HOME page only; the sidebar carries
+>   BANNER_SHORT as a caption, which is not the §6 block.
+> [RENDER-GATE] NEW, mine, tests/contracts/test_dashboard_renders.py. The static
+>   banner gate cannot see a page that crashes ABOVE its banner call, which is the
+>   exact failure above — a correct call on line 50 with a TypeError on line 43 is
+>   green forever. So each page is now RUN and the check is made on the output, with
+>   positive and negative controls ON THE HARNESS (a page that raises, a page that
+>   renders nothing). Subprocess per page is required, not stylistic: five pages
+>   through AppTest in one interpreter SEGFAULTS (exit 139) after the first, because
+>   the pages pull duckdb/xgboost/shap into a process AppTest is driving.
+>
+> [DISCLOSURE-FALSE-RED] **A red of MY OWN, and it was pointing at correct work.**
+> test_user_facing_disclosures.py reported that `dashboard/` never says the
+> crosswalk is forbidden as a model feature. It says exactly that, at
+> dashboard/disclosures.py:119-120, and a user reads it — but the gate ran
+> `read_text()` and the sentence is built by implicit concatenation, so the FILE
+> holds `**forbidden as a "\n    "feature**` and the regex cannot cross the quote,
+> the newline and the indent. PROVED both ways: runtime string matches, file text
+> does not. Same family as MATCHER-EXPRESSIVENESS — the instrument that ran was
+> weaker than its result implied — and this one pushes an author towards rewording
+> an honest sentence to satisfy a grep. FIXED at the root: Python surfaces are now
+> read through `ast`, which merges adjacent literals at parse time, so the gate sees
+> the value a user sees. Docstrings and comments are now EXCLUDED (a user reads
+> neither), with three controls pinning concatenation-yes / comment-no /
+> docstring-no. The dashboard surface still passes the vintage and collision checks
+> under the stricter rule, so those disclosures are in real rendered strings.
+> app-engineer's disclosure work is good: the 15:1 NAME figure, the 2,816 distinct
+> names, the 4,877-vs-4,876 note, and the keying rule are all present and correct.
+>
+> STILL RED AND CORRECT — the four the human named, all in docs (README.md ×3,
+> docs/model_card.md ×1): vintage skew absent from README and never stated as a
+> MISMATCH in the model card; collision numbers and keying rule absent from README.
+> [README-FINAL] is also still open: README:3 says "Phases 1–3 of 5 are complete",
+> Phase 4 and 5 are 🚧, and there are ZERO mentions of docs/model_card.md.
+>
+> [GUARD-DISARM-3] p17's preserved gate is RIGHT and I re-measured it end to end
+> rather than trusting the docstring: with git unrunnable, the committed parquet went
+> **1,469,982 -> 1,456,629 bytes** and `diagnosis_count` null rate **0.0 -> 1.0**
+> with NO exception. The control beside it (a first write with no artifact present)
+> correctly stays quiet, so the fix must distinguish "nothing to protect" from
+> "cannot tell".
+>   **THE FIX IS NOT WHERE IT LOOKS.** The door taken is NOT the FileNotFoundError
+>   handler at store.py:328 — control flow never reaches it. `_repo_root_for`
+>   (store.py:226-234) catches `CalledProcessError, FileNotFoundError, OSError,
+>   NotADirectoryError` together and returns None, so committed_baseline:300 answers
+>   `absent` with `reason="<path> is not inside a git repository"` — a statement that
+>   is FALSE in this state, in a diagnostic a future reader will act on. Fix
+>   `_repo_root_for` to distinguish "git answered: not a repo" from "git could not be
+>   run", and propagate the second as `unreadable`. Patching only line 328 leaves the
+>   parquet just as overwritable and the test just as red.
+>
+> [BUNDLE-UNMARKED] ml's own gate (21fe077) is RED against app's bundle, and it is
+> the [REMARK-IS-API-ONLY] prediction coming true in the most exposed artifact in
+> the repo: the committed 8,400,896-byte rcm_demo.duckdb ships
+> vw_work_queue_priority with `dollars_at_stake`, `heuristic_priority_score`,
+> `action_type` unmarked. src/api/tables.py re-marks all three on the API path
+> (`sim_action_type` now included — [WIRE-UNMARKED]'s action_type finding is CLOSED
+> at the API), so the two published surfaces disagree and the bundle is the one a
+> reader opens with none of our code in front of it. Fixable by analytics-engineer
+> in the view (better — warehouse and screen then agree) or app-engineer on the way
+> into the bundle.
+> [TIER-DISPUTED] the fourth column ml's gate flags, `priority_tier`, is where **two
+>   live instruments contradict each other**, and I removed my own hardcoded
+>   carve-out rather than keep the disagreement invisible. MEASURED at the source,
+>   sql/views/vw_work_queue_priority.sql:99:
+>       ntile(4) over (order by heuristic_priority_score desc) as priority_tier
+>   So the EXEMPTION is factually right and **config/model.yaml:186's REASON is the
+>   inaccurate one** — it says "built on sim_denial_flag". Forbidding it as a FEATURE
+>   stays correct (transitively simulated money). ONE-LINE FIX, ml-engineer: reword
+>   that reason to name the ntile over heuristic_priority_score, and the
+>   `"ntile" not in reason` filter exempts it in ml's own words with no name
+>   subtraction anywhere. test_wire_provenance.py no longer subtracts
+>   `{"priority_tier"}` by name, so it is red until that wording lands — red is the
+>   honest state for two gates that disagree about a published column.
+>
+> [BUNDLE-UNREGISTERED-§3.3] the 8 MB bundle is registered in
+> src/features/provenance.py PUBLISHED_SURFACES and in docs/model_card.md, and NOT
+> in docs/provenance_register.md or docs/data_dictionary.md — grep finds no
+> `rcm_demo`, no `demo_build_info`, no `demo_manifest` in either. §3.3 requires both
+> in the same PR that adds a table, and the bundle adds 16 datasets including two
+> NEW tables that exist nowhere else (`demo_manifest`, `demo_build_info`). This is
+> the Phase 4 unregistered-artifact hole recurring on a bigger surface.
+>   ON TEAM-LEAD'S "per-column classification" CONDITION: ml is right that
+>   src/demo/spec.py declares per-DATASET, and right to have refused the overclaim.
+>   My ruling as reviewer: per-dataset class + the `sim_` marker rule is sufficient
+>   **only while the marker rule actually holds on the bundle's columns**, and
+>   [BUNDLE-UNMARKED] is that premise failing today. Fix the three columns and the
+>   per-dataset declaration becomes honest; leave them and no amount of declaration
+>   makes it so.
+>
+> [RECONCILE-17/17] **§7 PASS on the path that ships, run rather than asserted.**
+> dashboard/reconcile.py declares 17 checks, each reaching the figure from a second
+> dataset and carrying runnable control SQL. Against the committed bundle: 17
+> evaluated, **17/17 pass**. Against Postgres: 14/14 pass.
+> [RECONCILE-SILENT-SKIP] but `run()` does `continue` on any check whose datasets
+>   are absent, and model_data_quality.py:76 prints "All {len(results)} reconciled
+>   figures match" over the EVALUATED count. MEASURED on Postgres: **17 declared, 14
+>   evaluated, 3 vanished** (the model ones) behind a green tick with nothing saying
+>   three checks never ran. Same shape as [GUARD-DISARM] but in a reporter, on the
+>   one page whose job is telling a reader the numbers can be trusted — and the repo
+>   already refuses it one layer down, where `manifest_deviations` emits "NULL RATES
+>   NOT COMPARED" rather than passing over a missing baseline. Pinned RED by
+>   tests/contracts/test_dashboard_reconciliation.py. Small fix, app-engineer's:
+>   carry the unevaluated figures through as NOT_CHECKED rows or print
+>   declared-vs-evaluated.
+>
+> [COMPOSE-CLEAN-CLONE] **§7 "docker compose up works from a clean clone" FAILS, and
+> it fails before it starts.** Cloned 51cac7d to a fresh directory and ran
+> `docker compose config` (non-destructive; the running warehouse was not touched):
+> **exit 1**, `env file .../.env not found`. `.env` is gitignored by design, and
+> docker-compose.yml:5 has `env_file: .env` with no `required: false` and no
+> default. Fix is one of: `env_file: [{path: .env, required: false}]` with
+> POSTGRES_* defaults inline, or a documented `cp .env.example .env` as step 0 of
+> the clean-clone path — but §7 says `docker compose up` works, so the first is
+> closer to the criterion.
+> [COMPOSE-NO-APP] and even fixed, `docker compose up` starts **postgres only**.
+>   There is no api service and no dashboard service in docker-compose.yml for a
+>   phase whose two deliverables are a FastAPI service and a Streamlit dashboard.
+>   app-engineer owns the file.
+>
+> WHAT I VERIFIED AS PASSING, so it is not re-litigated:
+>   * API on the BUNDLE path (nobody had run this; p17 ran Postgres only):
+>     /health 200 **"ok"**, kind=bundle — not degraded, because the bundle DOES carry
+>     model_c_work_queue. /metrics/executive, /claims/1 and /work-queue in all three
+>     declared modes (backtest, live_snapshot, heuristic) all 200. No 500s.
+>   * OpenAPI schema valid and generatable: 3.1.0, 6 paths, 15 component schemas,
+>     JSON-serialisable. §7 "API schema validated" met.
+>   * [BUNDLE-ABSENT] CLOSED: rcm_demo.duckdb is tracked, committed, not gitignored,
+>     8,400,896 bytes, and present in a fresh clone. The docstrings' present tense is
+>     now true.
+>   * SYNTHETIC-ID KEYING: no groupby on facility name or CCN anywhere in dashboard/.
+>     The only two groupbys are on sim_denial_category and (reason_code,
+>     analyst_action). The provider table is keyed on prvdr_num and says so on
+>     screen, with the 15:1 name figure in the column help.
+>   * MODEL C AS A NEGATIVE RESULT: work_queue.py:85 renders MODEL_C_HONESTY as
+>     st.error, and the capacity chart plots "largest denial first (no model)" at
+>     0.657 against the score at 0.610. Nothing implies otherwise.
+>   * MEMBERSHIP: work_queue.py:51-59 carries a correct, strongly-worded
+>     MEMBERSHIP_WARNING — which is passed as `banner_extra` and therefore currently
+>     renders NOTHING. It lands the moment [DASHBOARD-BLANK] is fixed.
+>     [MEMBERSHIP-UNDISCLOSED] stays open at the API: still no membership statement
+>     in the /work-queue payload, both modes.
+>   * [FIREWALL-CLAIM]: no surface describes §4.5 as an information barrier. Zero
+>     hits for firewall/information-barrier/"cannot see" in dashboard/ or src/api/.
+>     ml fixed the model-card sentence at 7c110c0.
+>   * No anomaly is called fraud anywhere; NOT_A_FRAUD_SIGNAL renders on both risky
+>     pages, and src/api/main.py:85 says "never a fraud signal".
+>   * ruff clean across the whole merged tree (161 files) after my commits.
+>
+> A CHECK I WROTE, RAN AND DELETED, recorded so it is not re-added: "every control
+> total must come from a DIFFERENT dataset". It reported two of the 17 — full +
+> partial = total denials, and denied + non-denied = open per bucket. Both are
+> additivity identities WITHIN one view, which is a real check. My rule was wrong,
+> so it is gone rather than weakened; the reasoning is in the file.
+- [x] FastAPI endpoints with schemas + version metadata
+- [x] Streamlit dashboard (5 pages, synthetic banner on all)
+- [x] DuckDB demo extract regenerated from clean source SHA
+  `ab2aa41541909a991877a8264a64e5856896599b`; independent final-artifact QA pending
+- [x] Docker Compose clean-clone start with exact 24-base-table / 9-view
+  PostgreSQL contract and dependency-aware readiness; independently QA accepted
+- [x] README, local and hosted screenshots, and demo walkthrough
 - [ ] ACCEPTANCE (qa-reviewer): full honesty pass + reconciliation pass
 
 ## Blocked / Questions for human
@@ -2329,6 +2996,16 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
      honesty pass.
 
 ## Done
+- [x] Phase 5 simulated-derived naming and work-queue membership disclosure —
+  app-engineer, `feat/phase5-provenance-disclosure`: renamed derived claim and
+  heuristic-queue values to `sim_*` at the SQL-view boundary; propagated the
+  names through the API, dashboard, committed demo bundle, provenance documents,
+  and leakage config. `PROCESS_METADATA_COLUMNS` is now a reasoned mapping, and
+  `/work-queue` states that membership is selected from simulated denial or open
+  A/R outcomes. Bundle regenerated from the dirty feature tree using fresh local
+  Postgres views and preserved committed model datasets. QA follow-up corrected
+  the stale public field names in the model-quality page, model card, and SQL
+  headers; the bundle remains explicitly non-final until clean-SHA regeneration.
 - [x] Test gate green on clean clone (qa-reviewer, merged to main bc2a7ab, pushed):
   smoke tests + pytest config; scope-expanded dependency fix (numpy<2.1 cap,
   [tool.uv] environments bounded to CPython 3.11–3.12, uv.lock committed,

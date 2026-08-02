@@ -43,7 +43,7 @@ select
     -- ---- denial + quality (SIMULATED) ----
     count(*) filter (where e.sim_denial_flag)                    as denied_claims,
     round(avg(case when e.sim_denial_flag then 1 else 0 end), 4)      as denial_rate,
-    round(avg(case when e.clean_claim_flag then 1 else 0 end), 4)     as clean_claim_rate,
+    round(avg(case when e.sim_clean_claim_flag then 1 else 0 end), 4) as clean_claim_rate,
     round(avg(case when e.sim_late_filing_flag then 1 else 0 end), 4) as late_filing_rate,
 
     -- ---- money (SIMULATED) ----

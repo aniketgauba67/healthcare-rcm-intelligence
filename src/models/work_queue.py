@@ -41,6 +41,17 @@ The tiers, in queue order:
 a recommendation not to appeal, and the difference between "we decided not to"
 and "it never appeared" matters when someone asks later why a claim was written
 off.
+
+**Every column this builds is declared** in `src/features/provenance.py:
+WORK_QUEUE_SCHEMA`, and `build_work_queue` checks itself against that declaration
+before returning. The reason is specific rather than procedural: this table used
+to publish `recoverable_amt`, which is `sim_denied_amount` copied out under a
+name with the simulated marker removed — one row per claim, next to a
+`recommended_action` telling an analyst the recovery was worth chasing. A
+dashboard renders those column names as its headers, so an unmarked simulated
+dollar amount becomes a user-visible claim about real money. Nothing caught it
+because nothing was checking this file; now the check runs inside the builder, so
+a column cannot leave here undeclared.
 """
 
 from __future__ import annotations
@@ -49,6 +60,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+
+from src.features.provenance import WORK_QUEUE_SCHEMA, assert_publishable
 
 TIER_ORDER: tuple[str, ...] = (
     "DEADLINE_CRITICAL",
@@ -171,28 +184,28 @@ def build_work_queue(
     as_of = pd.Timestamp(as_of or pd.to_datetime(frame[date_column]).max())
     queue = pd.DataFrame(index=frame.index)
     queue["claim_sk"] = frame["claim_sk"].to_numpy()
-    queue["p_overturn"] = np.asarray(probability, float)
-    queue["recoverable_amt"] = frame[recoverable_column].astype(float).to_numpy()
-    queue["expected_recovery_amt"] = (
-        queue["p_overturn"] * queue["recoverable_amt"] * economics.recovery_ratio
+    queue["sim_p_overturn"] = np.asarray(probability, float)
+    queue["sim_recoverable_amt"] = frame[recoverable_column].astype(float).to_numpy()
+    queue["sim_expected_recovery_amt"] = (
+        queue["sim_p_overturn"] * queue["sim_recoverable_amt"] * economics.recovery_ratio
     )
-    queue["expected_net_recovery"] = expected_net_recovery(
-        queue["p_overturn"], queue["recoverable_amt"], economics
+    queue["sim_expected_net_recovery"] = expected_net_recovery(
+        queue["sim_p_overturn"], queue["sim_recoverable_amt"], economics
     )
-    queue["days_to_deadline"] = (
+    queue["sim_days_to_deadline"] = (
         np.full(len(frame), economics.filing_window_days)
         if at_arrival
         else days_to_deadline(frame[date_column], as_of, economics).to_numpy()
     )
     queue["sim_denial_category"] = frame[category_column].to_numpy()
     queue["tier"] = assign_tier(
-        queue["days_to_deadline"], frame[category_column], economics
+        queue["sim_days_to_deadline"], frame[category_column], economics
     ).to_numpy()
-    queue.loc[queue["expected_net_recovery"] <= 0, "tier"] = np.where(
-        queue.loc[queue["expected_net_recovery"] <= 0, "tier"].isin(
+    queue.loc[queue["sim_expected_net_recovery"] <= 0, "tier"] = np.where(
+        queue.loc[queue["sim_expected_net_recovery"] <= 0, "tier"].isin(
             ["DEADLINE_CRITICAL", "MANDATORY_REVIEW", "EXPIRED"]
         ),
-        queue.loc[queue["expected_net_recovery"] <= 0, "tier"],
+        queue.loc[queue["sim_expected_net_recovery"] <= 0, "tier"],
         "BELOW_COST",
     )
 
@@ -201,8 +214,8 @@ def build_work_queue(
     # to expire goes first even if it is small. Everywhere else, money.
     queue["_within"] = np.where(
         queue["tier"] == "DEADLINE_CRITICAL",
-        queue["days_to_deadline"],
-        -queue["expected_net_recovery"],
+        queue["sim_days_to_deadline"],
+        -queue["sim_expected_net_recovery"],
     )
     queue = queue.sort_values(["tier_rank", "_within"], kind="mergesort").drop(columns=["_within"])
     queue["queue_position"] = np.arange(1, len(queue) + 1)
@@ -216,6 +229,10 @@ def build_work_queue(
         }
     )
     queue["as_of"] = as_of
+    # Inside the builder, not in a test that has to remember to look: every
+    # caller — model_c.py's two CSVs, the deadline-pressure sweep, a Phase 5
+    # dashboard — gets the guarantee by construction.
+    assert_publishable(queue.columns, WORK_QUEUE_SCHEMA)
     return queue.reset_index(drop=True)
 
 

@@ -16,8 +16,7 @@
 --     medicare_source_paid_amt (clm_pmt_amt), ncvrd_charge_amt, bene_deductible_amt
 --     (*length_of_stay_days is DERIVED in the fact but originates from SOURCE dates)
 --   DERIVED    (computed here from SOURCE/SIMULATED inputs):
---     claim_sk (warehouse surrogate), diagnosis_count, clean_claim_flag,
---     first_pass_paid_flag, ar_open_flag, ar_balance_amt, submission_year_month
+--     claim_sk (warehouse surrogate), diagnosis_count, submission_year_month
 --   REFERENCE  (official code-set display text, FY2023 vintage §2; DISPLAY-ONLY,
 --              never a grouping key — join on SOURCE codes, misses stay NULL):
 --     drg_desc (MS-DRG v40 title), prncpal_dgns_desc + admtg_dgns_desc (ICD-10-CM)
@@ -26,7 +25,9 @@
 --     sim_payer_id, sim_payer_name, sim_service_line_id/name, all denial fields,
 --     all sim money (allowed/paid/patient-resp/contractual/denied), all sim
 --     timeline dates + day-count intervals, late-filing flag, all pre-submission
---     auth/eligibility + documentation/coding facts, all operating-cost fields.
+--     auth/eligibility + documentation/coding facts, all operating-cost fields,
+--     sim_adjudicated, sim_clean_claim_flag, sim_first_pass_paid_flag,
+--     sim_ar_open_flag and sim_ar_balance_amt.
 --   SIMULATED-LINKAGE / DISPLAY-ONLY (CLAUDE.md §3.4, tasks.md crosswalk ruling):
 --     sim_facility_ccn, sim_facility_name, sim_facility_state, sim_facility_type.
 --     These come from sim_facility_crosswalk (a SEEDED RANDOM assignment, NOT a
@@ -44,7 +45,7 @@
 --
 -- Control query (must reconcile):
 --   select count(*) from vw_claim_enriched;                     -- = 20867
---   select count(*) from vw_claim_enriched where adjudicated;   -- = 20867 (1:1)
+--   select count(*) from vw_claim_enriched where sim_adjudicated; -- = 20867 (1:1)
 --   select count(*) filter (where sim_denial_flag) ...          -- = 2663
 --   Row count and every claim_sk must equal rcm.fact_inpatient_claim.
 -- ============================================================================
@@ -151,17 +152,17 @@ select
     oc.sim_appeal_cost,
     oc.sim_total_cost_to_collect,
 
-    -- ---- derived RCM flags (DERIVED) ----
-    true as adjudicated,   -- 1:1 by construction; explicit for the control query
+    -- ---- derived RCM flags from simulated adjudication (SIMULATED) ----
+    true as sim_adjudicated, -- 1:1 by construction; explicit for the control query
     -- clean claim = first-pass clean: adjudicated with no denial, no late filing,
     -- no eligibility failure, no duplicate flag. (Heuristic, quality funnel.)
     (not adj.sim_denial_flag
         and not adj.sim_late_filing_flag
         and not coalesce(ae.sim_eligibility_failed, false)
-        and not coalesce(dc.sim_duplicate_submission_flag, false)) as clean_claim_flag,
-    (adj.sim_payment_date is not null and not adj.sim_denial_flag) as first_pass_paid_flag,
-    (adj.sim_payment_date is null) as ar_open_flag,   -- not yet paid = outstanding
-    greatest(adj.sim_allowed_amount - adj.sim_paid_amount, 0) as ar_balance_amt,
+        and not coalesce(dc.sim_duplicate_submission_flag, false)) as sim_clean_claim_flag,
+    (adj.sim_payment_date is not null and not adj.sim_denial_flag) as sim_first_pass_paid_flag,
+    (adj.sim_payment_date is null) as sim_ar_open_flag, -- not yet paid = outstanding
+    greatest(adj.sim_allowed_amount - adj.sim_paid_amount, 0) as sim_ar_balance_amt,
 
     -- ---- REFERENCE display text (ICD-10-CM FY2023), DISPLAY-ONLY, never a key.
     -- Appended at the end of the select so `create or replace view` only ADDS

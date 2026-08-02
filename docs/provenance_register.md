@@ -188,14 +188,21 @@ Two honesty rules are enforced structurally, not just documented:
   `vw_work_queue_priority` as `sim_facility_name`. Rationale: `vw_claim_enriched`
   is the flattened matrix the Phase 4 feature store consumes and the §4 leakage
   blacklist matches on COLUMN NAMES, so aliasing the prefix away at the view
-  boundary would delete the provenance marker exactly where §4 depends on it.
+boundary would delete the provenance marker exactly where §4 depends on it.
+
+The same rule applies to simulated-derived outputs. `vw_claim_enriched` preserves
+`sim_adjudicated`, `sim_clean_claim_flag`, `sim_first_pass_paid_flag`,
+`sim_ar_open_flag`, and `sim_ar_balance_amt`; `vw_work_queue_priority` preserves
+`sim_action_type`, `sim_dollars_at_stake`, `sim_heuristic_priority_score`,
+`sim_priority_tier`, and `sim_appeal_levels`. The API, dashboard, and committed
+demo bundle use those same names, so no presentation layer removes the marker.
   Guarded by `tests/contracts/test_view_sim_prefix.py` (static) and
   `tests/integration/test_crosswalk_prefix_postgres.py` (live catalog).
 
 Two views are explicitly pre-Phase-4 scaffolds, self-declaring in every row:
 `vw_work_queue_priority` is a HEURISTIC PLACEHOLDER (`is_heuristic_placeholder`
-true, `heuristic_*` score — not a model, not a probability, not an Expected Net
-Recovery) and `vw_model_monitoring` is a DRIFT SCAFFOLD (`is_drift_scaffold`
+true, `sim_heuristic_priority_score` and `sim_priority_tier` — not a model, not a
+probability, not an Expected Net Recovery) and `vw_model_monitoring` is a DRIFT SCAFFOLD (`is_drift_scaffold`
 true — observed input distributions only, no score/prediction). Phase 4 Model A/C
 replace them.
 
@@ -208,12 +215,16 @@ clearly-labeled hypothetical intervention, and persists no intervention field.
 ## The committed Model A training matrix (Phase 4)
 
 `artifacts/features/model_a_training_matrix.parquet` (1.4 MB) with its sidecar
-`model_a_training_matrix.json`. **This is the only data file in the repository
-that is committed to git, and therefore the only one a reader can open from a
-clean clone with no database.** Everything else under `data/` and
-`models_artifacts/` is gitignored. It is registered here for that reason: it is
-the artifact most likely to be inspected out of context, so it is the one that
-can least afford to be unlabelled.
+`model_a_training_matrix.json`. **This is one of exactly two data files in the
+repository that are committed to git, and therefore openable from a clean clone
+with no database** — the other is the Phase 5 hosted-demo bundle registered in the
+next section. Until Phase 5 this sentence read "the only data file", which was
+true when written and false as soon as an 8.0 MB `.duckdb` was committed; a
+register that keeps a stale exclusivity claim is asserting something it no longer
+checks. Everything else under `data/` and `models_artifacts/` is gitignored. Both
+are registered for the same reason: they are the artifacts most likely to be
+inspected out of context, so they are the ones that can least afford to be
+unlabelled.
 
 | Property | Value |
 |---|---|
@@ -288,8 +299,8 @@ dropped before any estimator sees the matrix:*
 | `sim_denial_flag` | SIMULATED | the label. On `forbidden_features`; never a feature |
 | `split` | DERIVED | `train`/`test`, from `sim_submission_date` against the `split.cut` in `config/model.yaml` |
 
-Two naming decisions in that last table are deliberate and are recorded here
-rather than left to be re-derived:
+Three naming decisions here are deliberate and are recorded rather than left to
+be re-derived:
 
 - **`sim_overall_prior_denial_rate` carries the prefix** (renamed from
   `overall_prior_denial_rate`, 2026-07-28). It is computed entirely from
@@ -298,11 +309,34 @@ rather than left to be re-derived:
   would read to an outsider as a real Medicare book denial rate. Its Model C
   counterpart `sim_overall_prior_overturn_rate` was renamed with it.
 - **`split` does not carry the prefix, and is the one column here whose name
-  does not follow its input.** It is a modelling fold label, not a fact about a
-  claim, and its name is fixed by the §4.1 leakage guard's discovery contract —
-  the guard reads the first of `{is_train, split, fold}` it finds, so renaming it
-  would blind the guard's temporal check. Classified DERIVED, with its input date
-  SIMULATED, and flagged here rather than silently prefixed or silently left.
+  does not follow its input.** It is a fold assignment — metadata about OUR
+  EXPERIMENT, not an attribute of a claim and not a statement about the simulated
+  world. §3.2 governs simulated values; a partition label is not one. Classified
+  DERIVED, with its input date SIMULATED, and flagged here rather than silently
+  prefixed or silently left.
+  This page previously justified it differently — that the §4.1 guard discovers
+  the column by name from `{is_train, split, fold}`, so a rename would blind the
+  temporal check. QA ruling C (2026-07-28) upheld the outcome and **rejected that
+  reasoning**, and the correction is recorded rather than swapped in silently: a
+  guard must never be the reason a correctness-improving rename cannot happen,
+  because that turns the safety net into a constraint on the code it protects.
+  The general form "we cannot rename X because a guard looks for it by name" must
+  always lose. Name-based discovery is tracked separately as `[SPLIT-DISCOVERY]`.
+- **`sim_log_denied_amount` (Model C) leads with the marker** (renamed from
+  `log_sim_denied_amount`, 2026-07-29). It is `log1p(sim_denied_amount)`, so §3.2
+  makes it a simulated column. The marker was present but INFIXED, which satisfies
+  the property §3.2 protects — nobody reads `log_sim_denied_amount` as a real
+  Medicare quantity — and it was twice ruled a naming preference on a MEASURED
+  exposure of zero. That measurement still held at the rename: Model C's frame is
+  not committed, `models_artifacts/` is gitignored, Model C publishes no SHAP, and
+  no work-queue or slice column carries the name. It was renamed anyway because it
+  was the last infixed name in either feature set, so the cost was one feature and
+  the gain is a rule with no exception list — `tests/features/
+  test_feature_marker_position.py` now states §3.2 literally at the feature layer.
+  Phase 5 adds a dashboard, an API and a demo extract, and an exception holds only
+  while every future author remembers it. Model C's frame is not a curated table
+  and appears in no table on this page or in `docs/data_dictionary.md`, which is
+  why this rename adds a note here and no row anywhere.
 
 ### Why it is committed, and how staleness is caught
 
@@ -327,3 +361,113 @@ runs produced manifest SHA-256 `d5c1ca88aa0786f7d39c7ac055b13c264654ea1a84ef9e75
 unchanged). A committed artifact that changed on every test run would train
 reviewers to ignore its diff, which is how a real content change slips through.
 The build time of record is the git commit date.
+
+## The committed hosted-demo bundle (Phase 5)
+
+`dashboard/demo_data/rcm_demo.duckdb` — **8,400,896 bytes (8.0 MB), 16 tables,
+71,813 rows**, committed to git via the `!dashboard/demo_data/*.duckdb` exception
+in `.gitignore`. CLAUDE.md §2 locks the hosted demo to a bundled Parquet/DuckDB
+extract rather than live Postgres, and this is that extract: it opens with no
+database, no network, no credentials and no environment variables.
+
+**It is the most exposed artifact in this repository.** The training matrix is a
+feature file that a reader has to go looking for; this is the file the deployed
+demo *is*. Anyone who clones the repo or visits the hosted app is reading it,
+usually without reading anything else — so it is the artifact least able to rely on
+context supplied elsewhere, and §3.3 is registered here in full rather than by
+pointing at code.
+
+| Property | Value |
+|---|---|
+| Path | `dashboard/demo_data/rcm_demo.duckdb` |
+| Size | 8,400,896 bytes (8.0 MB) |
+| Tables | 16 — 9 curated-view copies, 5 model outputs, 2 self-describing meta tables |
+| Rows | 71,813 across all tables |
+| Declaration | `src/demo/spec.py` — the single authority; the build refuses to write an undeclared table and refuses to omit a declared one |
+| Regeneration | `make demo-extract` (needs the PostgreSQL warehouse **and** the model artifacts) |
+| Opened | read-only, one cursor per thread (a hosted demo shares one process between viewers) |
+| Published-surface entry | `src/features/provenance.py`, glob `dashboard/demo_data/*.duckdb` |
+| Bundle's own register | the `demo_manifest` table, 14 rows — one per *data* dataset |
+| Build stamp | the `demo_build_info` table: git commit, branch, dirty-tree flag, reproducible UTC source-commit timestamp, source vintages |
+
+`make demo-extract` writes a complete candidate before replacing the published
+artifact. When every table schema and row multiset matches the existing bundle,
+the existing bytes are retained. This keeps the pinned SHA stable across honest
+no-op rebuilds despite DuckDB checkpoint padding that is not part of the logical
+data contract; any schema or row change replaces the artifact and requires a new
+pin.
+
+### Per-table classification
+
+Every table carries a §3.1 class and a declared `contains_simulated` flag. The
+flag is **declared, not inferred from column names**, because a table can be
+entirely simulated in substance while carrying no `sim_` column of its own — the
+three marked `sim: 0` below with `contains_simulated = True` are exactly that case,
+and a spelling-based rule would call them clean.
+
+| Table | Class | Rows | Cols | `sim_` cols | Contains simulated |
+|---|---|---|---|---|---|
+| `vw_claim_enriched` | MIXED | 20,867 | 77 | 48 | yes |
+| `vw_executive_rcm_summary` | MIXED | 109 | 24 | 7 | yes |
+| `vw_denial_root_cause` | SIMULATED | 34 | 16 | 7 | yes |
+| `vw_ar_aging` | SIMULATED | 5 | 10 | 1 | yes |
+| `vw_payer_performance` | SIMULATED | 5 | 22 | 10 | yes |
+| `vw_clean_claim_performance` | MIXED | 4,877 | 18 | 5 | yes |
+| `vw_work_queue_priority` | MIXED | 2,663 | 16 | 5 | yes |
+| `vw_data_quality_scorecard` | DERIVED | 15 | 10 | 0 | no |
+| `vw_model_monitoring` | SIMULATED | 981 | 6 | 0 | **yes** — drift here is drift in the simulation |
+| `model_a_scores` | DERIVED | 20,867 | 7 | 4 | yes |
+| `model_a_reason_codes` | DERIVED | 20,865 | 7 | 1 | yes |
+| `model_a_shap_global` | DERIVED | 39 | 5 | 2 | yes |
+| `model_c_work_queue` | DERIVED | 469 | 13 | 6 | yes |
+| `model_metrics` | DERIVED | 2 | 4 | 0 | **yes** — every metric scores a SIMULATED label |
+| `demo_manifest` | DERIVED | 14 | 8 | 0 | no |
+| `demo_build_info` | DERIVED | 1 | 8 | 0 | no |
+
+The nine `vw_` tables are `select * from rcm.vw_...` copies — **verbatim, never
+recomputed**. That is what makes §7's "dashboard totals reconcile to SQL control
+queries" a property of the pipeline instead of a claim somebody checked once: a
+page cannot hold a second definition of a KPI, because it never computes one.
+
+### What is real in this file, and what is not
+
+**Nothing downstream of claim submission is real.** The claim facts are official
+CMS *synthetic* Medicare records (SOURCE) containing no real patients. Every
+denial, appeal, payment, payment date, workflow event, operating cost and the
+entire multi-payer dimension is generated by this project's simulation layer
+(SIMULATED, §3.5 — Medicare FFS has exactly one payer, and the five archetypes in
+`vw_payer_performance` are invented and named after no real insurer).
+
+The real facility and provider names in `vw_claim_enriched` and
+`vw_clean_claim_performance` are **display-only** and **forbidden as a model
+feature** (§3.4). They arrive through a seeded crosswalk that maps 4,876 synthetic
+billing providers onto 2,857 real CCNs — 8:1 at worst by CCN, and **15:1 at worst
+by NAME**, since those CCNs carry only 2,816 distinct display names. The name is
+the key a dashboard is likelier to group on and it is the worse one, so every
+provider-level table here is keyed on the synthetic `prvdr_num`, never on
+`sim_facility_ccn` and never on `sim_facility_name`.
+
+**Reference-vintage skew.** The claims are vintage 2023-04 and their code sets
+match (ICD-10-CM/PCS FY2023, HCPCS 2023, MS-DRG v40 FY2023). The two crosswalk
+reference files do not: Hospital General Information is vintage 2026-04 and the
+Medicare Physician & Other Practitioners file is data year 2024 — roughly three
+years newer than the claims they decorate. A facility type or a provider specialty
+in this bundle is what a reference file recorded about three years *after* the
+claim was filed.
+
+### Artifact-specific notes
+
+1. **The release candidate was built from a clean working tree.** Its
+   `demo_build_info` row carries `git_tree_dirty = false` and exact source commit
+   `ab2aa41541909a991877a8264a64e5856896599b`. The artifact SHA-256 is
+   `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`.
+2. **`demo_manifest` describes 14 of the 16 tables, not all 16.** It omits itself
+   and `demo_build_info`. That is a deliberate stop to the self-reference, and it
+   is stated here because "the bundle ships its own register" is otherwise read as
+   total coverage. The two omitted tables are classified in the table above.
+3. **A `.duckdb` is opaque to the repository's text-based provenance checks.**
+   Rule 3 cannot read a binary, so registering the path alone would make rule 1
+   green while leaving rule 3 silent over the one file most likely to be read out
+   of context. `tests/features/test_demo_bundle_provenance.py` closes that by
+   opening the bundle and applying the §3.2 marker rule to the columns actually
+   in it — the check follows the file rather than stopping at its extension.

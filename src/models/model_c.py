@@ -61,6 +61,7 @@ from src.models.evaluate import (
     slice_metrics,
 )
 from src.models.preprocess import prepare_matrix
+from src.models.run_stamp import run_stamp
 from src.models.train import json_safe, write_provenance_readme
 from src.models.work_queue import (
     AppealEconomics,
@@ -432,6 +433,12 @@ def run_model_c(
 
     report: dict[str, Any] = {
         "model": "C — appeal success and expected net recovery",
+        # Model C's report carried NO run-stamp field of any kind, so nothing
+        # here could be pinned to a tree. Deliberately the git stamp only and no
+        # wall clock: a SHA is stable across runs on the same commit, so this
+        # directory's artifacts stay byte-identical run to run, which is a
+        # property qa measured and which a timestamp would quietly destroy.
+        "run_stamp": run_stamp(),
         "seed": seed,
         "provenance": "Targets and every sim_ feature are SIMULATED (CLAUDE.md §3). "
         "No real appeal outcomes exist in this project.",

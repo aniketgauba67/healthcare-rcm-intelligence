@@ -365,7 +365,7 @@ def live_matrices(live_truth):
             "tests/leakage/test_training_matrix_guard.py"
         )
     aligned = []
-    for source, matrix in discovered:
+    for source, matrix, declared in discovered:
         if "claim_sk" not in matrix.columns:
             pytest.fail(
                 f"{source} has no claim_sk column, so its features cannot be compared "
@@ -374,7 +374,7 @@ def live_matrices(live_truth):
         indexed = matrix.set_index("claim_sk").sort_index()
         shared = indexed.index.intersection(live_truth.index)
         assert len(shared) > 100, f"{source} shares only {len(shared)} claims with the warehouse"
-        aligned.append((source, indexed.loc[shared], shared))
+        aligned.append((source, indexed.loc[shared], shared, declared))
     return aligned
 
 
@@ -384,8 +384,10 @@ def test_no_feature_is_derived_from_a_forbidden_column(live_matrices, live_truth
     Calibration and the one known gap are documented in `tests/leakage/detectors.py`.
     """
     failures: list[str] = []
-    for source, matrix, shared in live_matrices:
-        features = matrix[[c for c in _feature_columns(matrix.reset_index()) if c in matrix]]
+    for source, matrix, shared, declared in live_matrices:
+        features = matrix[
+            [c for c in _feature_columns(matrix.reset_index(), declared) if c in matrix]
+        ]
         findings = detectors.dependency_findings(features, live_truth.loc[shared])
         failures += [f"{source}: {finding}" for finding in findings]
     assert not failures, "features derived from forbidden columns:\n" + "\n".join(failures)
@@ -400,10 +402,12 @@ def test_no_single_feature_beats_the_oracle(live_matrices, live_truth, live_labe
     below the ceiling, which no automatic threshold can safely reject.
     """
     failures: list[str] = []
-    for source, matrix, shared in live_matrices:
+    for source, matrix, shared, declared in live_matrices:
         y = live_label.loc[shared].to_numpy()
         ceiling = detectors.single_feature_auc(live_truth.loc[shared, "sim_latent_p"], y)
-        features = matrix[[c for c in _feature_columns(matrix.reset_index()) if c in matrix]]
+        features = matrix[
+            [c for c in _feature_columns(matrix.reset_index(), declared) if c in matrix]
+        ]
         with capsys.disabled():
             print(f"\n{source}\n{detectors.auc_report(features, y, ceiling)}")
         findings = detectors.label_auc_findings(features, y, ceiling)
