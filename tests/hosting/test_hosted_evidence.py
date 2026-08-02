@@ -13,7 +13,7 @@ HOSTED_GUIDE = REPO_ROOT / "docs" / "hosted_deployment.md"
 IMAGE_DIR = REPO_ROOT / "docs" / "images" / "hosted"
 SOURCE_SHA = "119828e8915044622faa65755a615375799df0fc"
 PUBLIC_URLS = (
-    "https://pzcgc7diz3azrawrcsxobm.streamlit.app/",
+    "https://3a3xhz4rrshqdjapzwflxg.streamlit.app/?embed=true",
     "https://healthcare-rcm-intelligence-api.onrender.com/ready",
     "https://healthcare-rcm-intelligence-api.onrender.com/docs",
 )

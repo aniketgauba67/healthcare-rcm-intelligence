@@ -10,7 +10,7 @@ clean-SHA release candidate is independently accepted and redeployed.
 
 | Surface | Public URL |
 |---|---|
-| Dashboard | <https://pzcgc7diz3azrawrcsxobm.streamlit.app/> |
+| Dashboard | <https://3a3xhz4rrshqdjapzwflxg.streamlit.app/?embed=true> |
 | API | <https://healthcare-rcm-intelligence-api.onrender.com> |
 | API documentation | <https://healthcare-rcm-intelligence-api.onrender.com/docs> |
 | API liveness | <https://healthcare-rcm-intelligence-api.onrender.com/live> |

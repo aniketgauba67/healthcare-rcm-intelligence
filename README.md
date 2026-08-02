@@ -92,7 +92,7 @@ Still required before Phase 5 acceptance:
 
 ## Live portfolio demo
 
-- [Live dashboard](https://pzcgc7diz3azrawrcsxobm.streamlit.app/)
+- [Live dashboard](https://3a3xhz4rrshqdjapzwflxg.streamlit.app/?embed=true)
 - [Live API readiness](https://healthcare-rcm-intelligence-api.onrender.com/ready)
 - [API documentation](https://healthcare-rcm-intelligence-api.onrender.com/docs)
 - [Hosted deployment guide and evidence](docs/hosted_deployment.md)
