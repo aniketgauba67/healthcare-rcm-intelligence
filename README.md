@@ -77,17 +77,17 @@ Implemented and currently under QA:
 
 - Versioned FastAPI endpoints and schemas
 - Five-page Streamlit analyst dashboard
-- DuckDB demo bundle, generated from a dirty tree and not a final release artifact
+- DuckDB demo bundle regenerated from clean source SHA `aabbb5073a841f7746c63018ef5638fb9b412fee`; pending final artifact QA
 - Provenance and simulated-data disclosure protections
 - Dashboard reconciliation reporting
 - Independently QA-approved clean-clone Docker Compose stack
 - Independently QA-approved local screenshots and demo walkthrough evidence
-- Zero-cost Neon, Render, and Streamlit deployment, pending independent QA
+- Independently QA-approved zero-cost Neon, Render, and Streamlit deployment
 
 Still required before Phase 5 acceptance:
 
-- Independent QA acceptance of the hosted deployment and its evidence
-- Final clean-SHA DuckDB bundle regeneration
+- Independent QA acceptance of the clean-SHA DuckDB bundle
+- Hosted redeployment and public verification with the clean bundle pin
 - Final Phase 5 QA acceptance
 
 ## Live portfolio demo
@@ -101,8 +101,9 @@ Still required before Phase 5 acceptance:
 
 These links are zero-cost hosted portfolio evidence. Render may sleep after
 inactivity, so the first API request can take about a minute. The services are
-not represented as production-grade or always-on, and the current DuckDB bundle
-is still dirty-tree generated and non-final.
+not represented as production-grade or always-on. They continue to serve the
+prior dirty-tree bundle until the clean-SHA release candidate is independently
+accepted and redeployed.
 
 ![Hosted dashboard overview](docs/images/hosted/streamlit-overview.png)
 
@@ -331,7 +332,7 @@ inventory, and closes that probe connection. This is intentionally independent
 of the cached connection serving application requests, because an already-open
 Unix file descriptor remains readable after its pathname is deleted. The default
 stack serves `/app/dashboard/demo_data/rcm_demo.duckdb`, pinned to SHA-256
-`ef9d8013d84f74133153033a5e68f950cf51cc5e1e559cf80175f93a94c3e7e0`.
+`abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7`.
 Unset or blank overrides retain those committed defaults.
 
 An approved replacement must set both `RCM_DEMO_BUNDLE` and its matching
@@ -426,8 +427,10 @@ docker compose down -v
 ```
 
 This is local demo packaging, not hosted deployment evidence or final Phase 5
-acceptance. The committed DuckDB bundle was generated from a dirty tree and
-remains non-final until it is regenerated from the final clean integration SHA.
+acceptance. The committed DuckDB release candidate was generated from clean
+source SHA `aabbb5073a841f7746c63018ef5638fb9b412fee` and records
+`git_tree_dirty=false`; independent artifact QA and hosted redeployment remain
+required before acceptance.
 
 ## Local demo evidence
 

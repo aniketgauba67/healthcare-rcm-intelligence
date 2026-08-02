@@ -455,15 +455,12 @@ years newer than the claims they decorate. A facility type or a provider special
 in this bundle is what a reference file recorded about three years *after* the
 claim was filed.
 
-### Known limitations of this artifact, recorded rather than resolved
+### Artifact-specific notes
 
-1. **The shipped bundle was built from a dirty working tree.** Its
-   `demo_build_info` row carries `git_tree_dirty = true` against commit
-   `e8f122f` (an ancestor of the branch, so the commit itself is pinnable — the
-   uncommitted deltas on top of it are not). The dashboard says so on screen
-   ("built from an UNCOMMITTED working tree") rather than showing a commit and
-   implying reproducibility. This is [SHA-STAMP] applied to the bundle: the stamp
-   exists and is honest about its own limits.
+1. **The release candidate was built from a clean working tree.** Its
+   `demo_build_info` row carries `git_tree_dirty = false` and exact source commit
+   `aabbb5073a841f7746c63018ef5638fb9b412fee`. The artifact SHA-256 is
+   `abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7`.
 2. **`demo_manifest` describes 14 of the 16 tables, not all 16.** It omits itself
    and `demo_build_info`. That is a deliberate stop to the self-reference, and it
    is stated here because "the bundle ships its own register" is otherwise read as

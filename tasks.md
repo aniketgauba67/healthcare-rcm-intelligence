@@ -2956,13 +2956,13 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 > partial = total denials, and denied + non-denied = open per bucket. Both are
 > additivity identities WITHIN one view, which is a real check. My rule was wrong,
 > so it is gone rather than weakened; the reasoning is in the file.
-- [ ] FastAPI endpoints with schemas + version metadata
-- [ ] Streamlit dashboard (5 pages, synthetic banner on all)
-- [ ] DuckDB/Parquet demo extract for hosted deployment
-- [ ] docker-compose clean-clone start; implementation complete on
-  `feat/phase5-docker-clean-clone`; QA corrections add an exact 24-base-table /
-  9-view initialization contract and dependency-aware readiness, pending re-review
-- [ ] README final, screenshots, demo script
+- [x] FastAPI endpoints with schemas + version metadata
+- [x] Streamlit dashboard (5 pages, synthetic banner on all)
+- [x] DuckDB demo extract regenerated from clean source SHA
+  `aabbb5073a841f7746c63018ef5638fb9b412fee`; independent final-artifact QA pending
+- [x] Docker Compose clean-clone start with exact 24-base-table / 9-view
+  PostgreSQL contract and dependency-aware readiness; independently QA accepted
+- [x] README, local and hosted screenshots, and demo walkthrough
 - [ ] ACCEPTANCE (qa-reviewer): full honesty pass + reconciliation pass
 
 ## Blocked / Questions for human

@@ -3,7 +3,8 @@
 This guide records the zero-cost portfolio deployment on Neon Free, Render Free,
 and Streamlit Community Cloud. The services are publicly reachable, but Phase 5
 remains under QA. This is not a production or always-on deployment, and the
-current DuckDB artifact is not the final release bundle.
+public services continue to serve the prior non-final DuckDB artifact until the
+clean-SHA release candidate is independently accepted and redeployed.
 
 ## Public services
 
@@ -155,7 +156,8 @@ best-effort availability rather than production service guarantees. No paid
 resource, payment method, paid disk, paid database, paid instance, or custom
 domain is used.
 
-Phase 5 remains under QA. The current DuckDB bundle still reports
-`git_tree_dirty=true` and remains non-final until it is deterministically
-regenerated from the final clean integration SHA, independently reviewed,
-redeployed, and accepted. Hosted evidence does not by itself complete Phase 5.
+Phase 5 remains under QA. The repository's clean-SHA bundle release candidate is
+pinned to `abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7`,
+records source SHA `aabbb5073a841f7746c63018ef5638fb9b412fee`, and reports
+`git_tree_dirty=false`. It still requires independent artifact review and hosted
+redeployment. Hosted evidence does not by itself complete Phase 5.

@@ -450,7 +450,7 @@ holds them.
 | Table | Columns | Notes |
 |---|---|---|
 | `demo_manifest` | `dataset`, `provenance`, `contains_simulated`, `grain`, `rows`, `columns`, `simulated_columns`, `note` | The bundle's own register, rendered on the dashboard's Model & data quality page. **14 rows, not 16** — it omits itself and `demo_build_info` to stop the self-reference. |
-| `demo_build_info` | `git_commit`, `git_branch`, `git_tree_dirty`, `built_at_utc`, `source_vintages`, `dataset_names`, `contains_simulated`, `notice` | The build stamp ([SHA-STAMP] applied to this artifact). The shipped bundle carries `git_tree_dirty = true`, and the dashboard displays "built from an UNCOMMITTED working tree" rather than showing a commit and implying reproducibility. |
+| `demo_build_info` | `git_commit`, `git_branch`, `git_tree_dirty`, `built_at_utc`, `source_vintages`, `dataset_names`, `contains_simulated`, `notice` | The build stamp ([SHA-STAMP] applied to this artifact). The release candidate carries source commit `aabbb5073a841f7746c63018ef5638fb9b412fee` and `git_tree_dirty = false`; the dashboard displays that clean generating identity. |
 
 ### Reading the columns
 

@@ -2,8 +2,9 @@
 
 This walkthrough demonstrates the accepted local Docker Compose workflow. It is
 not hosted-deployment evidence, and it does not grant final Phase 5 acceptance.
-The committed DuckDB bundle was generated from a dirty tree and remains a
-non-final artifact until clean-SHA regeneration.
+The committed DuckDB release candidate records clean source SHA
+`aabbb5073a841f7746c63018ef5638fb9b412fee` and `git_tree_dirty=false`; it still
+requires independent artifact QA and hosted redeployment.
 
 ## Prerequisites
 
@@ -61,13 +62,12 @@ dependency-aware dashboard readiness surface and also requires API readiness.
 6. **Work Queue.** Show Model C Expected Net Recovery, Model A prevention, and
    the heuristic scaffold as separate modes. Explain that the advanced model did
    not beat the logistic baseline and that the negative result is preserved.
-7. **Model & Data Quality.** Show bundle provenance, the dirty generating-tree
+7. **Model & Data Quality.** Show bundle provenance, the clean generating-tree
    disclosure, monitoring context, and the reconciliation table.
 8. **17/17 reconciliation.** Close on the explicit result: all 17 declared
    dashboard checks were evaluated and passed their independent control totals.
-   This verifies consistency inside the current bundle; it does not make the
-   dirty-tree bundle a final release artifact or validate outcomes against real
-   claims.
+   This verifies consistency inside the clean-SHA release candidate; it does not
+   validate outcomes against real claims or grant final Phase 5 acceptance.
 
 ## Suggested spoken walkthrough (5–8 minutes)
 
@@ -98,13 +98,13 @@ different analytical modes. Membership is not a neutral pre-outcome cohort, and
 the model comparison retains its unfavorable advanced-versus-baseline result.”
 
 **5:45–7:00 — Quality and reconciliation.** “The bundle records its generating
-commit and dirty-tree state. All 17 declared dashboard figures reconcile to
+commit and clean-tree state. All 17 declared dashboard figures reconcile to
 independent control totals. That is a QA result for this artifact, not evidence
 about real provider or payer performance.”
 
-**7:00–7:30 — Close.** “This is reproducible local demo evidence. Hosted
-deployment, clean-SHA bundle regeneration, and final Phase 5 acceptance remain
-open.”
+**7:00–7:30 — Close.** “This is reproducible local demo evidence. The free-tier
+hosted demo is live; clean-bundle hosted redeployment and final Phase 5 acceptance
+remain open.”
 
 ## Backend modes and limitations
 
@@ -120,8 +120,9 @@ fabricating zero metrics. Reconciliation uses `MISSING_INPUT` or `ERROR`, does
 not show 17/17 success, and monitoring cohorts are reported as unavailable.
 
 The dashboard’s role-like selector is a demonstration, not authentication or an
-access-control boundary. The current bundle is dirty-tree generated and non-final.
-This workflow is local only; no hosted deployment is claimed.
+access-control boundary. The current bundle is a clean-SHA release candidate
+pending independent artifact QA. This walkthrough is local evidence; the hosted
+deployment is documented separately.
 
 ## Stop or reset
 
@@ -144,7 +145,8 @@ All screenshots were captured on **2026-07-31** from the Docker image built from
 source SHA `9899c0417194906062daf97af956f9d4cef48c11`. “Bundle” below means the
 populated DuckDB application path; the same Compose stack also ran the required
 initialized PostgreSQL service. The SHA identifies the application source used
-for capture, not the older dirty-tree SHA recorded inside the non-final bundle.
+for capture. These historical screenshots predate the clean-SHA release candidate
+and therefore show the earlier bundle's dirty-tree disclosure.
 
 | Screenshot | Surface | Backend mode | Synthetic banner visible | Simulated-derived fields visible |
 |---|---|---|---:|---:|
