@@ -112,7 +112,6 @@ def build_stamp() -> dict[str, Any]:
         _git(
             "status",
             "--porcelain",
-            "--untracked-files=no",
             "--",
             ".",
             *(f":(exclude){path}" for path in BUILD_OUTPUT_PATHS),

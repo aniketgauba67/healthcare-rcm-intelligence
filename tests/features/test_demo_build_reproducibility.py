@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from typing import Any
 
 import duckdb
@@ -24,7 +25,6 @@ def test_build_stamp_uses_source_commit_time(monkeypatch) -> None:
     status_args = (
         "status",
         "--porcelain",
-        "--untracked-files=no",
         "--",
         ".",
         *(f":(exclude){path}" for path in demo_build.BUILD_OUTPUT_PATHS),
@@ -38,6 +38,41 @@ def test_build_stamp_uses_source_commit_time(monkeypatch) -> None:
     monkeypatch.setattr(demo_build, "_git", lambda *args: values[args])
 
     assert demo_build.build_stamp() == _stamp()
+
+
+def test_build_stamp_detects_untracked_source_but_exempts_outputs(monkeypatch, tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Phase 5 QA"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "phase5-qa@example.invalid"], cwd=repo, check=True
+    )
+    (repo / "tracked.py").write_text("VALUE = 1\n")
+    subprocess.run(["git", "add", "tracked.py"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "fixture"], cwd=repo, check=True)
+
+    bundle = repo / "dashboard" / "demo_data" / "rcm_demo.duckdb"
+    sidecar = bundle.parent / "README.md"
+    bundle.parent.mkdir(parents=True)
+    bundle.write_bytes(b"build output")
+    sidecar.write_text("build output\n")
+
+    monkeypatch.setattr(demo_build, "REPO_ROOT", repo)
+    monkeypatch.setattr(
+        demo_build,
+        "BUILD_OUTPUT_PATHS",
+        (
+            bundle.relative_to(repo).as_posix(),
+            sidecar.relative_to(repo).as_posix(),
+        ),
+    )
+
+    assert demo_build.build_stamp()["git_tree_dirty"] is False
+
+    (repo / "untracked_source.py").write_text("VALUE = 2\n")
+
+    assert demo_build.build_stamp()["git_tree_dirty"] is True
 
 
 def test_equivalent_bundle_writes_are_byte_identical(tmp_path) -> None:
