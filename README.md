@@ -77,7 +77,7 @@ Implemented and currently under QA:
 
 - Versioned FastAPI endpoints and schemas
 - Five-page Streamlit analyst dashboard
-- DuckDB demo bundle regenerated from clean source SHA `aabbb5073a841f7746c63018ef5638fb9b412fee`; pending final artifact QA
+- DuckDB demo bundle regenerated from clean source SHA `ab2aa41541909a991877a8264a64e5856896599b`; pending final artifact QA
 - Provenance and simulated-data disclosure protections
 - Dashboard reconciliation reporting
 - Independently QA-approved clean-clone Docker Compose stack
@@ -332,7 +332,7 @@ inventory, and closes that probe connection. This is intentionally independent
 of the cached connection serving application requests, because an already-open
 Unix file descriptor remains readable after its pathname is deleted. The default
 stack serves `/app/dashboard/demo_data/rcm_demo.duckdb`, pinned to SHA-256
-`abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7`.
+`66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`.
 Unset or blank overrides retain those committed defaults.
 
 An approved replacement must set both `RCM_DEMO_BUNDLE` and its matching
@@ -428,7 +428,7 @@ docker compose down -v
 
 This is local demo packaging, not hosted deployment evidence or final Phase 5
 acceptance. The committed DuckDB release candidate was generated from clean
-source SHA `aabbb5073a841f7746c63018ef5638fb9b412fee` and records
+source SHA `ab2aa41541909a991877a8264a64e5856896599b` and records
 `git_tree_dirty=false`; independent artifact QA and hosted redeployment remain
 required before acceptance.
 

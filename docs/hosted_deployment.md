@@ -157,7 +157,7 @@ resource, payment method, paid disk, paid database, paid instance, or custom
 domain is used.
 
 Phase 5 remains under QA. The repository's clean-SHA bundle release candidate is
-pinned to `abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7`,
-records source SHA `aabbb5073a841f7746c63018ef5638fb9b412fee`, and reports
+pinned to `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`,
+records source SHA `ab2aa41541909a991877a8264a64e5856896599b`, and reports
 `git_tree_dirty=false`. It still requires independent artifact review and hosted
 redeployment. Hosted evidence does not by itself complete Phase 5.

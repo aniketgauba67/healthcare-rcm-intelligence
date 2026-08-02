@@ -73,7 +73,7 @@ BUILD_INFO_TABLE = "demo_build_info"
 # The currently committed demo artifact. Final Phase 5 acceptance requires a
 # clean-SHA rebuild, and that rebuild must update this pin in the same commit as
 # the DuckDB file. An override exists for an explicitly configured replacement.
-EXPECTED_BUNDLE_SHA256 = "abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7"
+EXPECTED_BUNDLE_SHA256 = "66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95"
 BUNDLE_SHA256_ENV = "RCM_DEMO_BUNDLE_SHA256"
 MAX_READINESS_BUNDLE_BYTES = 64 * 1024 * 1024
 

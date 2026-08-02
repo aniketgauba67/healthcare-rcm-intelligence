@@ -2959,7 +2959,7 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 - [x] FastAPI endpoints with schemas + version metadata
 - [x] Streamlit dashboard (5 pages, synthetic banner on all)
 - [x] DuckDB demo extract regenerated from clean source SHA
-  `aabbb5073a841f7746c63018ef5638fb9b412fee`; independent final-artifact QA pending
+  `ab2aa41541909a991877a8264a64e5856896599b`; independent final-artifact QA pending
 - [x] Docker Compose clean-clone start with exact 24-base-table / 9-view
   PostgreSQL contract and dependency-aware readiness; independently QA accepted
 - [x] README, local and hosted screenshots, and demo walkthrough

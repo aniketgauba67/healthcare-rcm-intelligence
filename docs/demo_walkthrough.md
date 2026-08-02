@@ -3,7 +3,7 @@
 This walkthrough demonstrates the accepted local Docker Compose workflow. It is
 not hosted-deployment evidence, and it does not grant final Phase 5 acceptance.
 The committed DuckDB release candidate records clean source SHA
-`aabbb5073a841f7746c63018ef5638fb9b412fee` and `git_tree_dirty=false`; it still
+`ab2aa41541909a991877a8264a64e5856896599b` and `git_tree_dirty=false`; it still
 requires independent artifact QA and hosted redeployment.
 
 ## Prerequisites

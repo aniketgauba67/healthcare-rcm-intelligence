@@ -459,8 +459,8 @@ claim was filed.
 
 1. **The release candidate was built from a clean working tree.** Its
    `demo_build_info` row carries `git_tree_dirty = false` and exact source commit
-   `aabbb5073a841f7746c63018ef5638fb9b412fee`. The artifact SHA-256 is
-   `abf7853605bdd3dc439325d01831d3be85bcc863bfb046f4260a878d4d7189b7`.
+   `ab2aa41541909a991877a8264a64e5856896599b`. The artifact SHA-256 is
+   `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`.
 2. **`demo_manifest` describes 14 of the 16 tables, not all 16.** It omits itself
    and `demo_build_info`. That is a deliberate stop to the self-reference, and it
    is stated here because "the bundle ships its own register" is otherwise read as
