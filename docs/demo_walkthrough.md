@@ -1,10 +1,10 @@
 # Local Phase 5 Demo Walkthrough
 
 This walkthrough demonstrates the accepted local Docker Compose workflow. It is
-not hosted-deployment evidence, and it does not grant final Phase 5 acceptance.
-The committed DuckDB release candidate records clean source SHA
-`ab2aa41541909a991877a8264a64e5856896599b` and `git_tree_dirty=false`; it still
-requires independent artifact QA and hosted redeployment.
+local reproducibility evidence rather than hosted-deployment evidence. The final
+committed DuckDB artifact records clean source SHA
+`ab2aa41541909a991877a8264a64e5856896599b` and `git_tree_dirty=false`; it passed
+independent artifact QA and is deployed to the public portfolio services.
 
 ## Prerequisites
 
@@ -102,9 +102,9 @@ commit and clean-tree state. All 17 declared dashboard figures reconcile to
 independent control totals. That is a QA result for this artifact, not evidence
 about real provider or payer performance.”
 
-**7:00–7:30 — Close.** “This is reproducible local demo evidence. The free-tier
-hosted demo is live; clean-bundle hosted redeployment and final Phase 5 acceptance
-remain open.”
+**7:00–7:30 — Close.** “This is reproducible local demo evidence. The accepted
+clean bundle is also live on the free-tier hosted demo. Those services are
+portfolio-scale rather than production-grade or always-on.”
 
 ## Backend modes and limitations
 
@@ -120,9 +120,9 @@ fabricating zero metrics. Reconciliation uses `MISSING_INPUT` or `ERROR`, does
 not show 17/17 success, and monitoring cohorts are reported as unavailable.
 
 The dashboard’s role-like selector is a demonstration, not authentication or an
-access-control boundary. The current bundle is a clean-SHA release candidate
-pending independent artifact QA. This walkthrough is local evidence; the hosted
-deployment is documented separately.
+access-control boundary. The current bundle is the independently accepted final
+clean-SHA artifact. This walkthrough is local evidence; the hosted deployment is
+documented separately.
 
 ## Stop or reset
 

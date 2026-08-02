@@ -1,10 +1,9 @@
 # Zero-Cost Hosted Deployment
 
-This guide records the zero-cost portfolio deployment on Neon Free, Render Free,
-and Streamlit Community Cloud. The services are publicly reachable, but Phase 5
-remains under QA. This is not a production or always-on deployment, and the
-public services continue to serve the prior non-final DuckDB artifact until the
-clean-SHA release candidate is independently accepted and redeployed.
+This guide records the independently QA-accepted zero-cost portfolio deployment
+on Neon Free, Render Free, and Streamlit Community Cloud. The public services
+serve the final clean-SHA DuckDB artifact. This remains portfolio-scale hosting,
+not a production or always-on deployment.
 
 ## Public services
 
@@ -16,9 +15,9 @@ clean-SHA release candidate is independently accepted and redeployed.
 | API liveness | <https://healthcare-rcm-intelligence-api.onrender.com/live> |
 | API readiness | <https://healthcare-rcm-intelligence-api.onrender.com/ready> |
 
-All public checks in this document were run against branch
-`feat/phase5-hosted-deployment` at source SHA
-`119828e8915044622faa65755a615375799df0fc` on 2026-08-01. The screenshots are
+The current services deploy from `main`. The screenshot evidence was captured
+from the pre-release deployment branch at source SHA
+`119828e8915044622faa65755a615375799df0fc` on 2026-08-01; it remains historical
 free-tier portfolio evidence, not proof of production availability.
 
 ## Architecture
@@ -55,7 +54,7 @@ PostgreSQL version and non-secret object counts.
 
 ## Render Free API settings
 
-Create one **Web Service** from `feat/phase5-hosted-deployment` with:
+Create one **Web Service** from `main` with:
 
 | Setting | Value |
 |---|---|
@@ -92,7 +91,7 @@ Create one public app with:
 | Setting | Value |
 |---|---|
 | Repository | `aniketgauba67/healthcare-rcm-intelligence` |
-| Branch | `feat/phase5-hosted-deployment` |
+| Branch | `main` |
 | Entrypoint | `dashboard/app.py` |
 | Python | 3.11 |
 
@@ -148,7 +147,7 @@ hostnames, account identifiers, and secrets are intentionally absent.
 
 ![Neon schema contract](images/hosted/neon-schema-contract.png)
 
-### Free-tier limitations and remaining release gates
+### Free-tier limitations and release status
 
 Render Free may sleep after inactivity, so its first request can take about a
 minute. Streamlit Community Cloud and Neon Free also provide portfolio-scale,
@@ -156,8 +155,8 @@ best-effort availability rather than production service guarantees. No paid
 resource, payment method, paid disk, paid database, paid instance, or custom
 domain is used.
 
-Phase 5 remains under QA. The repository's clean-SHA bundle release candidate is
-pinned to `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`,
-records source SHA `ab2aa41541909a991877a8264a64e5856896599b`, and reports
-`git_tree_dirty=false`. It still requires independent artifact review and hosted
-redeployment. Hosted evidence does not by itself complete Phase 5.
+Phase 5 is independently QA-accepted. The final clean-SHA bundle is pinned to
+`66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`, records
+source SHA `ab2aa41541909a991877a8264a64e5856896599b`, and reports
+`git_tree_dirty=false`. Local clean-clone, artifact, and public hosted checks all
+passed before acceptance.

@@ -44,12 +44,14 @@ def test_public_links_and_release_limitations_are_documented() -> None:
         assert url in guide
 
     combined = f"{readme}\n{guide}"
-    assert "Phase 5 remains under QA" in combined
+    assert "Phase 5 is independently QA-accepted" in combined
     assert "not production-grade or always-on" in readme
     assert "not accepted or deployed" not in readme
-    assert "hosted portfolio demo is live" in normalized_readme
+    assert "zero-cost hosted portfolio deployment is live" in normalized_readme
     assert "git_tree_dirty=false" in guide
-    assert "clean-SHA release candidate" in combined
+    assert "final clean-SHA" in combined
+    assert "Phase 5 remains under QA" not in combined
+    assert "pending final artifact QA" not in combined
     assert "No paid resource" in normalized_guide
 
 

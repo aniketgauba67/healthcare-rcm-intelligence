@@ -1,17 +1,16 @@
 # Healthcare RCM Intelligence Platform
 
-> **Status:** Phases 1–4 of 5 are complete and QA-accepted. Phase 5's
-> API/dashboard/demo integration is in active QA. Clean-clone Docker packaging
-> and local demo evidence are independently QA-approved and integrated. A
-> zero-cost hosted portfolio deployment is live and awaiting independent QA;
-> clean-SHA bundle regeneration and final Phase 5 acceptance remain open.
+> **Status:** All five phases are complete and independently QA-accepted. The
+> zero-cost hosted portfolio deployment is live with the final clean-SHA DuckDB
+> artifact. The hosted services are portfolio-scale, not production-grade or
+> always-on.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
-Phase 4 supplies explainable machine-learning models. Phase 5 is integrating
-those models with a FastAPI scoring service, a Streamlit analyst dashboard, and
-a runnable demo bundle. The free-tier hosted demo is available, but Phase 5 is
-not yet accepted and the deployment is not production-grade or always-on.
+Phase 4 supplies explainable machine-learning models. Phase 5 integrates those
+models with a FastAPI scoring service, a Streamlit analyst dashboard, and a
+reproducible demo bundle. The independently accepted free-tier hosted demo is
+available, but it is not production-grade or always-on.
 
 ## Why this project exists
 
@@ -68,27 +67,18 @@ Implemented and QA-accepted:
 - Expected Net Recovery work-queue prioritization
 - Slice metrics and bootstrap confidence intervals
 
-### Phase 5 — API, dashboard, and packaging 🚧
+### Phase 5 — API, dashboard, and packaging ✅
 
-Phase 5 is in integration QA and is not accepted. The zero-cost hosted portfolio
-demo is live, but it is not production-grade or always-on.
-
-Implemented and currently under QA:
+Implemented and independently QA-accepted:
 
 - Versioned FastAPI endpoints and schemas
 - Five-page Streamlit analyst dashboard
-- DuckDB demo bundle regenerated from clean source SHA `ab2aa41541909a991877a8264a64e5856896599b`; pending final artifact QA
+- Final DuckDB bundle generated from clean source SHA `ab2aa41541909a991877a8264a64e5856896599b`, with SHA-256 `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95` and `git_tree_dirty=false`
 - Provenance and simulated-data disclosure protections
 - Dashboard reconciliation reporting
-- Independently QA-approved clean-clone Docker Compose stack
-- Independently QA-approved local screenshots and demo walkthrough evidence
-- Independently QA-approved zero-cost Neon, Render, and Streamlit deployment
-
-Still required before Phase 5 acceptance:
-
-- Independent QA acceptance of the clean-SHA DuckDB bundle
-- Hosted redeployment and public verification with the clean bundle pin
-- Final Phase 5 QA acceptance
+- Clean-clone Docker Compose stack
+- Local screenshots and demo walkthrough evidence
+- Zero-cost Neon, Render, and Streamlit deployment
 
 ## Live portfolio demo
 
@@ -101,9 +91,8 @@ Still required before Phase 5 acceptance:
 
 These links are zero-cost hosted portfolio evidence. Render may sleep after
 inactivity, so the first API request can take about a minute. The services are
-not represented as production-grade or always-on. They continue to serve the
-prior dirty-tree bundle until the clean-SHA release candidate is independently
-accepted and redeployed.
+not represented as production-grade or always-on. They serve the independently
+accepted clean-SHA bundle identified above.
 
 ![Hosted dashboard overview](docs/images/hosted/streamlit-overview.png)
 
@@ -426,11 +415,10 @@ For a destructive local reset, including the named PostgreSQL volume:
 docker compose down -v
 ```
 
-This is local demo packaging, not hosted deployment evidence or final Phase 5
-acceptance. The committed DuckDB release candidate was generated from clean
-source SHA `ab2aa41541909a991877a8264a64e5856896599b` and records
-`git_tree_dirty=false`; independent artifact QA and hosted redeployment remain
-required before acceptance.
+This is local reproducibility evidence, separate from the hosted deployment
+evidence below. The committed final DuckDB artifact was generated from clean
+source SHA `ab2aa41541909a991877a8264a64e5856896599b`, records
+`git_tree_dirty=false`, and passed independent artifact QA.
 
 ## Local demo evidence
 
@@ -443,7 +431,7 @@ results or work-queue outputs.
 
 The [zero-cost hosted deployment guide](docs/hosted_deployment.md) records the
 Neon Free, Render Free, and Streamlit Community Cloud architecture and its
-credential-handling rules. Public URLs are not claimed until hosted QA passes.
+credential-handling rules. The public URLs were verified during hosted QA.
 
 These images came from the integrated local Docker Compose stack. They are local
 reproducibility evidence, not hosted-deployment evidence.
@@ -587,8 +575,8 @@ The interrupted time-series example is explicitly labeled illustrative and does 
 - [x] Phase 1: ingestion, validation, warehouse, and reference data
 - [x] Phase 2: reproducible adjudication simulation
 - [x] Phase 3: analytics views and statistical analysis
-- [ ] Phase 4: explainable denial and appeal modeling
-- [ ] Phase 5: FastAPI, Streamlit, demo extract, and deployment packaging
+- [x] Phase 4: explainable denial and appeal modeling
+- [x] Phase 5: FastAPI, Streamlit, demo extract, and deployment packaging
 
 ## Limitations
 
