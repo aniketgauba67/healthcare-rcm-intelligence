@@ -54,6 +54,21 @@ DASHBOARD = REPO_ROOT / "dashboard"
 PAGES = DASHBOARD / "pages"
 
 #: Rendered in one interpreter each, driven by streamlit's own AppTest harness.
+#:
+#: TIMEOUT, MEASURED — do not re-tune this number without re-measuring.
+#: The FIRST page rendered on a cold environment costs far more than the rest:
+#: measured 271.13s for ar_recovery.py against ~1.0s for each page after it, the
+#: difference being one-time interpreter, import and cache warm-up rather than
+#: anything about the page. A 240s default_timeout sat UNDER that cold cost, so
+#: this harness failed on a cold machine for timing rather than for anything it
+#: is meant to detect — including its own negative controls, which is how a gate
+#: gets written off as flaky and then ignored. That is the failure mode that let
+#: the missing §6 banner survive on all five pages for a full session.
+#: 450s leaves ~65% margin over the measured cold cost. The outer
+#: subprocess timeout below stays strictly larger so the inner timeout is what
+#: reports, with a readable message, rather than the subprocess being killed.
+_APPTEST_TIMEOUT_SECONDS = 450
+
 _RUNNER = """
 import json, sys, warnings
 warnings.filterwarnings("ignore")
@@ -62,7 +77,7 @@ from streamlit.testing.v1 import AppTest
 page, out, role = sys.argv[1], sys.argv[2], sys.argv[3]
 result = {"page": page}
 try:
-    app = AppTest.from_file(page, default_timeout=240)
+    app = AppTest.from_file(page, default_timeout=__APPTEST_TIMEOUT__)
     app.session_state["role"] = role
     app.run()
     result["exceptions"] = [e.value.splitlines()[0][:200] for e in app.exception]
@@ -90,14 +105,16 @@ def _page_files() -> list[pathlib.Path]:
 def _render(page: pathlib.Path, tmp_path: pathlib.Path, role: str = "Analyst") -> dict:
     """Run one page in its own interpreter and return what it put on screen."""
     runner = tmp_path / "render_one_page.py"
-    runner.write_text(_RUNNER)
+    runner.write_text(_RUNNER.replace("__APPTEST_TIMEOUT__", str(_APPTEST_TIMEOUT_SECONDS)))
     out = tmp_path / f"{page.stem}.json"
     completed = subprocess.run(
         [sys.executable, str(runner), str(page.relative_to(REPO_ROOT)), str(out), role],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
-        timeout=600,
+        # Strictly larger than _APPTEST_TIMEOUT_SECONDS so the inner AppTest
+        # timeout is what reports; see the measurement note above.
+        timeout=_APPTEST_TIMEOUT_SECONDS + 150,
         env={"PYTHONPATH": str(REPO_ROOT), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
     )
     if not out.is_file():
