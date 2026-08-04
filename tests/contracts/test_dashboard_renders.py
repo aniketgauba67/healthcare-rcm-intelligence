@@ -55,19 +55,26 @@ PAGES = DASHBOARD / "pages"
 
 #: Rendered in one interpreter each, driven by streamlit's own AppTest harness.
 #:
-#: TIMEOUT, MEASURED — do not re-tune this number without re-measuring.
-#: The FIRST page rendered on a cold environment costs far more than the rest:
-#: measured 271.13s for ar_recovery.py against ~1.0s for each page after it, the
-#: difference being one-time interpreter, import and cache warm-up rather than
-#: anything about the page. A 240s default_timeout sat UNDER that cold cost, so
-#: this harness failed on a cold machine for timing rather than for anything it
-#: is meant to detect — including its own negative controls, which is how a gate
-#: gets written off as flaky and then ignored. That is the failure mode that let
-#: the missing §6 banner survive on all five pages for a full session.
-#: 450s leaves ~65% margin over the measured cold cost. The outer
-#: subprocess timeout below stays strictly larger so the inner timeout is what
-#: reports, with a readable message, rather than the subprocess being killed.
-_APPTEST_TIMEOUT_SECONDS = 450
+#: TIMEOUT, MEASURED — and a cautionary tale about measuring on a sick machine.
+#: The FIRST page rendered costs more than the rest: 21.48s for ar_recovery.py
+#: against ~1.2s for each page after it, the difference being one-time
+#: interpreter, import and cache warm-up rather than anything about the page.
+#: 240s is therefore ~11x margin and is correct. Do not raise it: a larger value
+#: only delays how long a genuinely hung page takes to report.
+#:
+#: It was briefly raised to 450s on the strength of a 271.13s reading for that
+#: same test. That reading was wrong by 12.6x. It came from a broken .venv whose
+#: `ruff` binary would not start at all, a four-day-old orphaned `uv run
+#: streamlit` server holding the uv environment lock, an iCloud sync daemon at
+#: 88% CPU over the repo, and a Time Machine backup — all at once. The same
+#: contamination made two of this file's negative controls appear to fail under
+#: deterministic ordering, which was filed as an order-dependence defect and
+#: later withdrawn: they pass in isolation and in suite context on a healthy
+#: toolchain.
+#: The lesson worth keeping is not the number. It is that a timing measurement
+#: taken while the toolchain is degraded is not evidence, and a test suite is
+#: exactly the instrument least able to tell you its own environment is sick.
+_APPTEST_TIMEOUT_SECONDS = 240
 
 _RUNNER = """
 import json, sys, warnings
