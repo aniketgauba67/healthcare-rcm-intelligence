@@ -2975,7 +2975,11 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 - [x] DuckDB demo extract regenerated from clean source SHA
   `ab2aa41541909a991877a8264a64e5856896599b`; independent final-artifact QA
   accepted with SHA-256
-  `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`
+  `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`.
+  SUPERSEDED by the bundle-column `sim_` marker rename: the pinned artifact is
+  now `559022e2fc27461fb874294eca1a6ba39149367afe7b2e49f9b43c2ccc7e8896` from
+  clean source SHA `01b1a623b22a5d3295087ace8995025ced0d462d`, and it has NOT
+  been re-accepted by QA or re-validated on the hosted demo.
 - [x] Docker Compose clean-clone start with exact 24-base-table / 9-view
   PostgreSQL contract and dependency-aware readiness; independently QA accepted
 - [x] README, local and hosted screenshots, and demo walkthrough

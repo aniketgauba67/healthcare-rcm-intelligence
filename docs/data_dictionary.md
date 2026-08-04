@@ -450,7 +450,7 @@ holds them.
 | Table | Columns | Notes |
 |---|---|---|
 | `demo_manifest` | `dataset`, `provenance`, `contains_simulated`, `grain`, `rows`, `columns`, `simulated_columns`, `note` | The bundle's own register, rendered on the dashboard's Model & data quality page. **14 rows, not 16** — it omits itself and `demo_build_info` to stop the self-reference. |
-| `demo_build_info` | `git_commit`, `git_branch`, `git_tree_dirty`, `built_at_utc`, `source_vintages`, `dataset_names`, `contains_simulated`, `notice` | The build stamp ([SHA-STAMP] applied to this artifact). The release candidate carries source commit `ab2aa41541909a991877a8264a64e5856896599b` and `git_tree_dirty = false`; the dashboard displays that clean generating identity. |
+| `demo_build_info` | `git_commit`, `git_branch`, `git_tree_dirty`, `built_at_utc`, `source_vintages`, `dataset_names`, `contains_simulated`, `notice` | The build stamp ([SHA-STAMP] applied to this artifact). The release candidate carries source commit `01b1a623b22a5d3295087ace8995025ced0d462d` and `git_tree_dirty = false`; the dashboard displays that clean generating identity. |
 
 ### Reading the columns
 

@@ -3,8 +3,10 @@
 This walkthrough demonstrates the accepted local Docker Compose workflow. It is
 local reproducibility evidence rather than hosted-deployment evidence. The final
 committed DuckDB artifact records clean source SHA
-`ab2aa41541909a991877a8264a64e5856896599b` and `git_tree_dirty=false`; it passed
-independent artifact QA and is deployed to the public portfolio services.
+`01b1a623b22a5d3295087ace8995025ced0d462d` and `git_tree_dirty=false`. The
+artifact that passed independent QA and is deployed to the public portfolio
+services was the previous one (`ab2aa415` / `66456ebf`); the current pin carries
+the bundle-column `sim_` marker rename and has not yet been re-validated there.
 
 ## Prerequisites
 

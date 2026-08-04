@@ -55,7 +55,7 @@ services:
     environment:
       RCM_DATA_SOURCE: bundle
       RCM_DEMO_BUNDLE: ${RCM_DEMO_BUNDLE:-/app/dashboard/demo_data/rcm_demo.duckdb}
-      RCM_DEMO_BUNDLE_SHA256: ${RCM_DEMO_BUNDLE_SHA256:-66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95}
+      RCM_DEMO_BUNDLE_SHA256: ${RCM_DEMO_BUNDLE_SHA256:-559022e2fc27461fb874294eca1a6ba39149367afe7b2e49f9b43c2ccc7e8896}
       POSTGRES_USER: ${POSTGRES_USER:-rcm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcm_demo_only}
       POSTGRES_DB: ${POSTGRES_DB:-rcm_warehouse}
@@ -91,7 +91,7 @@ services:
     environment:
       RCM_DATA_SOURCE: bundle
       RCM_DEMO_BUNDLE: ${RCM_DEMO_BUNDLE:-/app/dashboard/demo_data/rcm_demo.duckdb}
-      RCM_DEMO_BUNDLE_SHA256: ${RCM_DEMO_BUNDLE_SHA256:-66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95}
+      RCM_DEMO_BUNDLE_SHA256: ${RCM_DEMO_BUNDLE_SHA256:-559022e2fc27461fb874294eca1a6ba39149367afe7b2e49f9b43c2ccc7e8896}
       RCM_API_URL: http://api:8000
       RCM_API_READINESS_URL: http://api:8000/ready
       POSTGRES_USER: ${POSTGRES_USER:-rcm}

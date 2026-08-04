@@ -155,8 +155,14 @@ best-effort availability rather than production service guarantees. No paid
 resource, payment method, paid disk, paid database, paid instance, or custom
 domain is used.
 
-Phase 5 is independently QA-accepted. The final clean-SHA bundle is pinned to
-`66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`, records
-source SHA `ab2aa41541909a991877a8264a64e5856896599b`, and reports
-`git_tree_dirty=false`. Local clean-clone, artifact, and public hosted checks all
-passed before acceptance.
+Phase 5 is independently QA-accepted. That acceptance was granted on the final
+clean-SHA artifact `66456ebf` from source SHA `ab2aa415`, after local
+clean-clone, artifact, and public hosted checks all passed.
+
+The bundle pinned today is
+`559022e2fc27461fb874294eca1a6ba39149367afe7b2e49f9b43c2ccc7e8896`, records
+source SHA `01b1a623b22a5d3295087ace8995025ced0d462d`, and reports
+`git_tree_dirty=false`. It is the same pipeline and the same figures with the
+bundle-column `sim_` marker rename applied. It has NOT yet been re-accepted by
+QA or re-validated against the public hosted demo, so the hosted services may
+still be serving the previous artifact until they are redeployed.
