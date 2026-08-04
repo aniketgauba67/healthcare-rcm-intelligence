@@ -21,25 +21,25 @@ def test_missing_monitoring_columns_are_named() -> None:
     assert usable.empty
     assert reason
     assert "metric_kind" in reason
-    assert "metric_value" in reason
+    assert "sim_metric_value" in reason
 
 
 def test_partial_rows_keep_only_chartable_monitoring_content() -> None:
     frame = pd.DataFrame(
         [
             {
-                "submission_year_month": "2023-01",
+                "sim_submission_year_month": "2023-01",
                 "feature_name": "denial_rate",
                 "metric_kind": "outcome_rate",
-                "metric_value": 0.12,
-                "n_claims": 10,
+                "sim_metric_value": 0.12,
+                "sim_n_claims": 10,
             },
             {
-                "submission_year_month": "2023-02",
+                "sim_submission_year_month": "2023-02",
                 "feature_name": "denial_rate",
                 "metric_kind": None,
-                "metric_value": 0.13,
-                "n_claims": 12,
+                "sim_metric_value": 0.13,
+                "sim_n_claims": 12,
             },
         ]
     )

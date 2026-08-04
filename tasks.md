@@ -2048,6 +2048,20 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> IN PROGRESS (app-engineer-5, `fix/bundle-sim-markers`): turning the RED guard
+> `tests/contracts/test_bundle_column_provenance.py` (added in e59aba5) green by
+> renaming the 65 bundle columns the approved classification
+> `tests/contracts/bundle_column_provenance.yaml` marks SIMULATED but which ship
+> without the `sim_` marker — 57 view output columns across eight views and 8
+> columns in the model-artifact tables. Rename only: no figure may move.
+> WAREHOUSE WRITE ANNOUNCED: this task runs `make views` against the live local
+> Postgres to re-create all nine `rcm.vw_*` views with the renamed output
+> columns, then rebuilds the committed demo bundle and re-pins its SHA-256 in the
+> seven locations that record it. Generator calibration parameters
+> (`config/simulation.yaml`, `src/simulation/generator.py`) and ML feature/report
+> names (`src/features/appeal.py`, `src/models/model_c.py`) are a DIFFERENT
+> vocabulary and are deliberately untouched.
+
 > FIRST BLOCKER GROUP CLOSED by ml-engineer on `feat/phase5-matrix-guard`,
 > pending independent QA. The matrix writer now distinguishes a genuine first
 > write from an existing artifact whose repository, HEAD, committed manifest, or

@@ -46,7 +46,13 @@ from src.demo.source import DataSourceError, get_source
 #: here and unclassified there.
 DATASETS = tuple(sorted(spec.DATASETS_BY_NAME))
 MONITORING_COLUMNS = frozenset(
-    {"submission_year_month", "feature_name", "metric_kind", "metric_value", "n_claims"}
+    {
+        "sim_submission_year_month",
+        "feature_name",
+        "metric_kind",
+        "sim_metric_value",
+        "sim_n_claims",
+    }
 )
 
 
@@ -124,7 +130,7 @@ def model_metrics(model: str) -> dict[str, Any]:
             f"{sorted(frame['model'])}. Run `make train` / `make train-appeal` and rebuild "
             "the bundle with `make demo-extract`."
         )
-    return json.loads(match.iloc[0]["metrics_json"])
+    return json.loads(match.iloc[0]["sim_metrics_json"])
 
 
 def usable_model_monitoring(frame: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
@@ -142,7 +148,7 @@ def usable_model_monitoring(frame: pd.DataFrame) -> tuple[pd.DataFrame, str | No
         )
 
     usable = frame.dropna(
-        subset=["submission_year_month", "feature_name", "metric_kind", "metric_value"]
+        subset=["sim_submission_year_month", "feature_name", "metric_kind", "sim_metric_value"]
     ).copy()
     if usable.empty:
         return usable, (

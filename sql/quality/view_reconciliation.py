@@ -51,12 +51,12 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     # ---- executive summary reconciles to the book ----
     (
         "executive:sum_claims==fact",
-        "select case when (select sum(claims_submitted) from {s}vw_executive_rcm_summary) "
+        "select case when (select sum(sim_claims_submitted) from {s}vw_executive_rcm_summary) "
         "= (select count(*) from {s}fact_inpatient_claim) then 0 else 1 end",
     ),
     (
         "executive:sum_denied==adjudication_denied",
-        "select case when (select sum(denied_claims) from {s}vw_executive_rcm_summary) "
+        "select case when (select sum(sim_denied_claims) from {s}vw_executive_rcm_summary) "
         "= (select count(*) from {s}sim_claim_adjudication where sim_denial_flag) then 0 else 1 end",
     ),
     (
@@ -67,18 +67,19 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     # ---- denial root cause ----
     (
         "denial_root_cause:sum_denials==denied",
-        "select case when (select sum(denial_count) from {s}vw_denial_root_cause) "
+        "select case when (select sum(sim_denial_count) from {s}vw_denial_root_cause) "
         "= (select count(*) from {s}sim_claim_adjudication where sim_denial_flag) then 0 else 1 end",
     ),
     (
         "denial_root_cause:full+partial==denials",
-        "select case when (select sum(full_denials + partial_denials) from {s}vw_denial_root_cause) "
-        "= (select sum(denial_count) from {s}vw_denial_root_cause) then 0 else 1 end",
+        "select case when (select sum(sim_full_denials + sim_partial_denials) "
+        "from {s}vw_denial_root_cause) "
+        "= (select sum(sim_denial_count) from {s}vw_denial_root_cause) then 0 else 1 end",
     ),
     # ---- AR aging ----
     (
         "ar_aging:sum_open==unpaid",
-        "select case when (select sum(open_claims) from {s}vw_ar_aging) "
+        "select case when (select sum(sim_open_claims) from {s}vw_ar_aging) "
         "= (select count(*) from {s}vw_claim_enriched where sim_ar_open_flag) then 0 else 1 end",
     ),
     (
@@ -87,14 +88,14 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     ),
     (
         "ar_aging:denied+nondenied==open",
-        "select coalesce(sum(case when open_claims "
-        "<> denied_open_claims + nondenied_open_claims then 1 else 0 end), 0) "
+        "select coalesce(sum(case when sim_open_claims "
+        "<> sim_denied_open_claims + sim_nondenied_open_claims then 1 else 0 end), 0) "
         "from {s}vw_ar_aging",
     ),
     # ---- payer performance ----
     (
         "payer:sum_claims==fact",
-        "select case when (select sum(claims) from {s}vw_payer_performance) "
+        "select case when (select sum(sim_claims) from {s}vw_payer_performance) "
         "= (select count(*) from {s}fact_inpatient_claim) then 0 else 1 end",
     ),
     (
@@ -105,7 +106,7 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     # ---- clean claim performance (grain = synthetic provider; keying ruling) ----
     (
         "clean_claim:sum_provider_claims==fact",
-        "select case when (select sum(provider_claims) from {s}vw_clean_claim_performance) "
+        "select case when (select sum(sim_provider_claims) from {s}vw_clean_claim_performance) "
         "= (select count(*) from {s}fact_inpatient_claim) then 0 else 1 end",
     ),
     (
@@ -127,7 +128,7 @@ VIEW_RECONCILIATION_CHECKS: list[tuple[str, str]] = [
     # ---- model monitoring (drift scaffold) ----
     (
         "model_monitoring:denial_rate_n==fact",
-        "select case when (select sum(n_claims) from {s}vw_model_monitoring "
+        "select case when (select sum(sim_n_claims) from {s}vw_model_monitoring "
         "where feature_name = 'denial_rate') "
         "= (select count(*) from {s}fact_inpatient_claim) then 0 else 1 end",
     ),

@@ -137,10 +137,10 @@ def _json_safe(value: Any) -> Any:
 #: 40-claim month like a 400-claim one, which is how a book-level denial rate
 #: quietly becomes a different number from the one the control query returns.
 _SUMMABLE = (
-    "claims_submitted",
-    "denied_claims",
-    "clean_claims",
-    "first_pass_paid_claims",
+    "sim_claims_submitted",
+    "sim_denied_claims",
+    "sim_clean_claims",
+    "sim_first_pass_paid_claims",
     "billed_charge_amt",
     "medicare_source_paid_amt",
     "sim_allowed_amt",
@@ -148,8 +148,8 @@ _SUMMABLE = (
     "sim_denied_amt",
     "sim_appeal_recovered_amt",
     "sim_cost_to_collect",
-    "claims_appealed",
-    "claims_overturned",
+    "sim_claims_appealed",
+    "sim_claims_overturned",
 )
 
 
@@ -164,14 +164,14 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
     totals = {
         name: float(monthly[name].fillna(0).sum()) for name in _SUMMABLE if name in monthly.columns
     }
-    claims = totals.get("claims_submitted", 0.0)
-    appealed = totals.get("claims_appealed", 0.0)
+    claims = totals.get("sim_claims_submitted", 0.0)
+    appealed = totals.get("sim_claims_appealed", 0.0)
 
     def rate(numerator: str, denominator: float) -> float:
         return round(totals.get(numerator, 0.0) / denominator, 6) if denominator else 0.0
 
-    payments = monthly.get("avg_days_to_payment")
-    weights = monthly.get("claims_submitted")
+    payments = monthly.get("sim_avg_days_to_payment")
+    weights = monthly.get("sim_claims_submitted")
     if payments is not None and weights is not None:
         mask = payments.notna()
         avg_days = (
@@ -182,15 +182,15 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
     else:
         avg_days = 0.0
 
-    months = monthly["submission_year_month"].astype(str)
+    months = monthly["sim_submission_year_month"].astype(str)
     return {
         "period_from": months.min(),
         "period_to": months.max(),
         "claims_submitted": int(claims),
-        "denied_claims": int(totals.get("denied_claims", 0.0)),
-        "denial_rate": rate("denied_claims", claims),
-        "clean_claim_rate": rate("clean_claims", claims),
-        "first_pass_paid_rate": rate("first_pass_paid_claims", claims),
+        "denied_claims": int(totals.get("sim_denied_claims", 0.0)),
+        "denial_rate": rate("sim_denied_claims", claims),
+        "clean_claim_rate": rate("sim_clean_claims", claims),
+        "first_pass_paid_rate": rate("sim_first_pass_paid_claims", claims),
         "sim_net_collection_rate": (
             round(totals.get("sim_paid_amt", 0.0) / totals["sim_allowed_amt"], 6)
             if totals.get("sim_allowed_amt")
@@ -204,7 +204,7 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
         "avg_days_to_payment": round(avg_days, 2),
         "claims_appealed": int(appealed),
         "appeal_overturn_rate": (
-            round(totals.get("claims_overturned", 0.0) / appealed, 6) if appealed else 0.0
+            round(totals.get("sim_claims_overturned", 0.0) / appealed, 6) if appealed else 0.0
         ),
     }
 
@@ -213,17 +213,19 @@ def executive_control_totals(monthly: pd.DataFrame) -> dict[str, Any]:
     """The control query this response must satisfy, returned with the answer.
 
     `sql/quality/view_reconciliation.py` asserts
-    `sum(claims_submitted) == count(*) from fact_inpatient_claim` and
-    `sum(denied_claims) == count(*) from sim_claim_adjudication where sim_denial_flag`.
+    `sum(sim_claims_submitted) == count(*) from fact_inpatient_claim` and
+    `sum(sim_denied_claims) == count(*) from sim_claim_adjudication where
+    sim_denial_flag`.
     Restating the totals beside the KPIs lets a caller reconcile without a
     database, which is the only form of the check a hosted demo can offer.
     """
     return {
         "control_query": (
-            "select sum(claims_submitted), sum(denied_claims) from rcm.vw_executive_rcm_summary"
+            "select sum(sim_claims_submitted), sum(sim_denied_claims) "
+            "from rcm.vw_executive_rcm_summary"
         ),
-        "sum_claims_submitted": int(monthly["claims_submitted"].fillna(0).sum()),
-        "sum_denied_claims": int(monthly["denied_claims"].fillna(0).sum()),
+        "sum_claims_submitted": int(monthly["sim_claims_submitted"].fillna(0).sum()),
+        "sum_denied_claims": int(monthly["sim_denied_claims"].fillna(0).sum()),
         "months": int(len(monthly)),
         "note": (
             "These must equal count(*) from rcm.fact_inpatient_claim and count(*) from "

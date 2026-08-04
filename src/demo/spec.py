@@ -91,7 +91,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "are SOURCE (the one real Medicare payer); every other amount and "
             "every rate is SIMULATED or DERIVED from SIMULATED."
         ),
-        order_by="submission_year_month",
+        order_by="sim_submission_year_month",
     ),
     _view(
         "vw_denial_root_cause",
@@ -104,7 +104,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "project-authored taxonomy text, not licensed X12 wording. ~1,222 of "
             "2,663 denials carry driver 'baseline', i.e. deliberate label noise."
         ),
-        order_by="denial_count desc",
+        order_by="sim_denial_count desc",
     ),
     _view(
         "vw_ar_aging",
@@ -112,9 +112,9 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
         grain="one row per A/R aging bucket; 5 rows (a spine, so empty buckets stay visible)",
         note=(
             "Ages SIMULATED unpaid claims against a snapshot taken from the "
-            "latest simulated activity date. source_billed_at_risk_amt is the "
-            "SOURCE billed charge; sim_ar_balance_amt is simulated allowed less "
-            "simulated paid."
+            "latest simulated activity date. sim_source_billed_at_risk_amt is "
+            "the SOURCE billed charge; sim_ar_balance_amt is simulated allowed "
+            "less simulated paid."
         ),
         order_by="bucket_sort",
     ),
@@ -127,7 +127,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "has ONE payer. No archetype is modelled on or named after a real "
             "insurer. Any page or export built on this MUST carry the banner."
         ),
-        order_by="claims desc",
+        order_by="sim_claims desc",
     ),
     _view(
         "vw_clean_claim_performance",
@@ -138,9 +138,9 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "CCN — the crosswalk multiplexes 4,876 synthetic providers onto "
             "2,857 real CCNs (worst 8:1), so a CCN grouping would merge up to "
             "eight distinct synthetic hospitals. sim_display_facility_* are "
-            "display-only. provider_claims accompanies every rate."
+            "display-only. sim_provider_claims accompanies every rate."
         ),
-        order_by="provider_claims desc",
+        order_by="sim_provider_claims desc",
     ),
     _view(
         "vw_work_queue_priority",
@@ -175,7 +175,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "NO model score and NO prediction; every row carries "
             "is_drift_scaffold. Drift here is drift in the simulation."
         ),
-        order_by="submission_year_month, feature_name",
+        order_by="sim_submission_year_month, feature_name",
     ),
 )
 

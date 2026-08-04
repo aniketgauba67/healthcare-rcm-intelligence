@@ -241,7 +241,7 @@ def build_model_a_datasets(explain: bool = True) -> dict[str, pd.DataFrame]:
     # a decile cut computed over in-sample rows would be a different cut.
     test_scores = scores.loc[scores["fold"] == "test", "sim_denial_risk"]
     threshold = float(test_scores.quantile(0.90))
-    scores["top_decile_flag"] = scores["sim_denial_risk"] >= threshold
+    scores["sim_top_decile_flag"] = scores["sim_denial_risk"] >= threshold
 
     datasets = {"model_a_scores": scores}
     if not explain:
@@ -336,18 +336,20 @@ def _model_a_explanations(
             records.append(
                 {
                     "claim_sk": int(claim_sk[row]),
-                    "driver_rank": rank,
+                    "sim_driver_rank": rank,
                     "feature": feature,
                     "sim_shap_contribution": contribution,
-                    "direction": "raises risk" if contribution > 0 else "lowers risk",
-                    "reason_code": code,
-                    "analyst_action": action,
+                    "sim_direction": "raises risk" if contribution > 0 else "lowers risk",
+                    "sim_reason_code": code,
+                    "sim_analyst_action": action,
                 }
             )
 
     # Both value columns carry the marker: a SHAP importance is an attribution of
     # a model fitted on a SIMULATED label, so it moves when the simulation moves.
-    # `feature`, `reason_code` and `analyst_action` do not — they are our mapping.
+    # sim_reason_code and sim_analyst_action carry it too: the mapping table is
+    # ours, but what they say is a statement about a predicted SIMULATED denial.
+    # `feature` stays bare — it names a feature column rather than a value.
     global_importance = result.global_importance.rename(
         columns={"mean_abs_shap": "sim_mean_abs_shap", "share": "sim_share_of_importance"}
     )
@@ -416,7 +418,7 @@ def build_metrics_dataset() -> dict[str, pd.DataFrame]:
                 "model": model,
                 "generated_at_utc": str(payload.get("generated_at_utc", "")),
                 "provenance": str(payload.get("provenance", "")),
-                "metrics_json": json.dumps(payload),
+                "sim_metrics_json": json.dumps(payload),
             }
         )
     return {"model_metrics": pd.DataFrame.from_records(records)}

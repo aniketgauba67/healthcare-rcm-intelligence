@@ -16,7 +16,7 @@
 -- Sources:      rcm.vw_claim_enriched + rcm.sim_appeals (appeal-state context).
 -- Provenance:   keys/provider = SOURCE (synthetic); payer/denial/amounts/dates =
 --               SIMULATED; sim_heuristic_priority_score, sim_priority_tier,
---               sim_action_type, sim_appeal_levels and age_days = DERIVED.
+--               sim_action_type, sim_appeal_levels and sim_age_days = SIMULATED.
 --
 -- HONESTY:      Payer shown is SIMULATED (§3.5). A queued claim is a work item,
 --               never a fraud flag. The heuristic deliberately uses only dollars
@@ -55,7 +55,7 @@ actionable as (
         e.sim_ar_open_flag,
         e.sim_denied_amount,
         e.sim_ar_balance_amt,
-        (s.as_of_date - e.sim_submission_date)             as age_days,
+        (s.as_of_date - e.sim_submission_date)             as sim_age_days,
         ap.sim_appeal_levels,
         ap.any_overturned,
         -- dollars at stake: denied amount if denied, else outstanding AR balance
@@ -72,7 +72,7 @@ scored as (
         -- Purely mechanical; NOT a learned or calibrated score.
         round(
             sim_dollars_at_stake
-            * (1 + least(greatest(age_days, 0), 365) / 365.0)
+            * (1 + least(greatest(sim_age_days, 0), 365) / 365.0)
         , 2) as sim_heuristic_priority_score,
         case
             when sim_denial_flag and coalesce(sim_appeal_levels, 0) = 0 then 'DENIAL_REWORK'
@@ -93,7 +93,7 @@ select
     sim_denial_category,
     sim_denial_type,
     sim_ar_open_flag,
-    age_days,
+    sim_age_days,
     round(sim_dollars_at_stake, 2)     as sim_dollars_at_stake,
     sim_heuristic_priority_score,
     ntile(4) over (order by sim_heuristic_priority_score desc) as sim_priority_tier,

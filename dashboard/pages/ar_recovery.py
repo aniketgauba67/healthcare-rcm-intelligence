@@ -96,20 +96,20 @@ aging_issue = _unavailable_reason(
     aging,
     label="A/R aging data",
     required={
-        "aging_bucket",
+        "sim_aging_bucket",
         "bucket_sort",
-        "open_claims",
-        "denied_open_claims",
+        "sim_open_claims",
+        "sim_denied_open_claims",
         "sim_ar_balance_amt",
-        "source_billed_at_risk_amt",
-        "avg_days_outstanding",
-        "max_days_outstanding",
+        "sim_source_billed_at_risk_amt",
+        "sim_avg_days_outstanding",
+        "sim_max_days_outstanding",
     },
     non_null={
-        "open_claims",
+        "sim_open_claims",
         "sim_ar_balance_amt",
-        "source_billed_at_risk_amt",
-        "max_days_outstanding",
+        "sim_source_billed_at_risk_amt",
+        "sim_max_days_outstanding",
     },
 )
 if aging_issue:
@@ -123,7 +123,7 @@ else:
         [
             Kpi(
                 "Open claims",
-                f"{int(aging['open_claims'].sum()):,}",
+                f"{int(aging['sim_open_claims'].sum()):,}",
                 "SIMULATED",
                 "A claim is open because the simulation never paid it.",
             ),
@@ -135,14 +135,16 @@ else:
             ),
             Kpi(
                 "Billed at risk",
-                money(float(aging["source_billed_at_risk_amt"].sum())),
-                "SOURCE",
+                money(float(aging["sim_source_billed_at_risk_amt"].sum())),
+                # SOURCE dollars, but summed over a population the simulation put
+                # at risk, so the figure is a statement about the simulated world.
+                "SIMULATED",
                 "The CMS billed charge on those claims — real published dollars attached to a "
                 "simulated non-payment.",
             ),
             Kpi(
                 "Oldest open claim",
-                f"{int(aging['max_days_outstanding'].max()):,} days",
+                f"{int(aging['sim_max_days_outstanding'].max()):,} days",
                 "SIMULATED",
                 "Measured against a snapshot taken from the latest simulated activity date.",
             ),
@@ -156,17 +158,17 @@ else:
         .mark_bar()
         .encode(
             x=alt.X(
-                "aging_bucket:N",
-                sort=list(aging.sort_values("bucket_sort")["aging_bucket"]),
+                "sim_aging_bucket:N",
+                sort=list(aging.sort_values("bucket_sort")["sim_aging_bucket"]),
                 title="Days outstanding",
             ),
             y=alt.Y("sim_ar_balance_amt:Q", title="Simulated A/R balance ($)"),
             tooltip=[
-                alt.Tooltip("aging_bucket:N", title="Bucket"),
-                alt.Tooltip("open_claims:Q", title="Open claims", format=","),
-                alt.Tooltip("denied_open_claims:Q", title="of which denied", format=","),
+                alt.Tooltip("sim_aging_bucket:N", title="Bucket"),
+                alt.Tooltip("sim_open_claims:Q", title="Open claims", format=","),
+                alt.Tooltip("sim_denied_open_claims:Q", title="of which denied", format=","),
                 alt.Tooltip("sim_ar_balance_amt:Q", title="A/R balance", format="$,.0f"),
-                alt.Tooltip("avg_days_outstanding:Q", title="Avg days", format=",.0f"),
+                alt.Tooltip("sim_avg_days_outstanding:Q", title="Avg days", format=",.0f"),
             ],
         )
         .properties(height=280)
@@ -199,15 +201,15 @@ payer_issue = _unavailable_reason(
     label="Payer-performance data",
     required={
         "sim_payer_name",
-        "claims",
-        "realized_claim_share",
-        "denial_rate",
-        "clean_claim_rate",
+        "sim_claims",
+        "sim_realized_claim_share",
+        "sim_denial_rate",
+        "sim_clean_claim_rate",
         "sim_net_collection_rate",
-        "late_filing_rate",
-        "avg_days_to_payment",
-        "median_days_to_payment",
-        "appeal_overturn_rate",
+        "sim_late_filing_rate",
+        "sim_avg_days_to_payment",
+        "sim_median_days_to_payment",
+        "sim_appeal_overturn_rate",
         "sim_cost_to_collect",
     },
 )
@@ -220,13 +222,13 @@ else:
     measure = st.selectbox(
         "Compare payers on",
         [
-            ("Denial rate", "denial_rate", "percent"),
-            ("Clean-claim rate", "clean_claim_rate", "percent"),
+            ("Denial rate", "sim_denial_rate", "percent"),
+            ("Clean-claim rate", "sim_clean_claim_rate", "percent"),
             ("Net collection rate", "sim_net_collection_rate", "percent"),
-            ("Late filing rate", "late_filing_rate", "percent"),
-            ("Avg days to payment", "avg_days_to_payment", "number"),
-            ("Median days to payment", "median_days_to_payment", "number"),
-            ("Appeal overturn rate", "appeal_overturn_rate", "percent"),
+            ("Late filing rate", "sim_late_filing_rate", "percent"),
+            ("Avg days to payment", "sim_avg_days_to_payment", "number"),
+            ("Median days to payment", "sim_median_days_to_payment", "number"),
+            ("Appeal overturn rate", "sim_appeal_overturn_rate", "percent"),
             ("Cost to collect ($)", "sim_cost_to_collect", "money"),
         ],
         format_func=lambda option: option[0],
@@ -245,8 +247,8 @@ else:
             ),
             tooltip=[
                 alt.Tooltip("sim_payer_name:N", title="Payer (invented)"),
-                alt.Tooltip("claims:Q", title="Claims", format=","),
-                alt.Tooltip("realized_claim_share:Q", title="Share of book", format=".1%"),
+                alt.Tooltip("sim_claims:Q", title="Claims", format=","),
+                alt.Tooltip("sim_realized_claim_share:Q", title="Share of book", format=".1%"),
                 alt.Tooltip(
                     f"{measure_column}:Q",
                     title=measure_label,
@@ -278,11 +280,11 @@ executive_issue = _unavailable_reason(
     executive,
     label="Appeal-recovery data",
     required={
-        "month_start",
+        "sim_month_start",
         "sim_appeal_recovered_amt",
         "sim_denied_amt",
-        "claims_appealed",
-        "claims_overturned",
+        "sim_claims_appealed",
+        "sim_claims_overturned",
     },
     non_null={"sim_appeal_recovered_amt", "sim_denied_amt"},
 )
@@ -294,8 +296,8 @@ if executive_issue:
 else:
     recovered = float(executive["sim_appeal_recovered_amt"].fillna(0).sum())
     denied = float(executive["sim_denied_amt"].fillna(0).sum())
-    appealed = int(executive["claims_appealed"].fillna(0).sum())
-    overturned = int(executive["claims_overturned"].fillna(0).sum())
+    appealed = int(executive["sim_claims_appealed"].fillna(0).sum())
+    overturned = int(executive["sim_claims_overturned"].fillna(0).sum())
 
     kpi_row(
         [
@@ -323,17 +325,17 @@ else:
     control_query(reconcile.sql_for("Denial prevention — Appeals overturned"))
 
     monthly_recovery = executive[
-        ["month_start", "sim_denied_amt", "sim_appeal_recovered_amt"]
-    ].melt("month_start", var_name="measure", value_name="amount")
+        ["sim_month_start", "sim_denied_amt", "sim_appeal_recovered_amt"]
+    ].melt("sim_month_start", var_name="measure", value_name="amount")
     recovery_chart = (
         alt.Chart(monthly_recovery)
         .mark_area(opacity=0.6)
         .encode(
-            x=alt.X("month_start:T", title="Claim submission month"),
+            x=alt.X("sim_month_start:T", title="Claim submission month"),
             y=alt.Y("amount:Q", title="Simulated dollars", stack=None),
             color=alt.Color("measure:N", title="Measure", scale=alt.Scale(scheme="set2")),
             tooltip=[
-                alt.Tooltip("month_start:T", title="Month"),
+                alt.Tooltip("sim_month_start:T", title="Month"),
                 alt.Tooltip("measure:N", title="Measure"),
                 alt.Tooltip("amount:Q", title="Dollars", format="$,.0f"),
             ],

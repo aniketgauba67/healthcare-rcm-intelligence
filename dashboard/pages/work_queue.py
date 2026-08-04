@@ -331,7 +331,7 @@ if not data.has("model_a_reason_codes"):
 else:
     reasons = data.load("model_a_reason_codes")
     test_fold = data.model_a_test_fold()
-    flagged = test_fold.loc[test_fold["top_decile_flag"]].sort_values(
+    flagged = test_fold.loc[test_fold["sim_top_decile_flag"]].sort_values(
         "sim_denial_risk", ascending=False
     )
 
@@ -377,7 +377,7 @@ else:
             ),
         )
         claim_row = flagged.loc[flagged["claim_sk"] == choice].iloc[0]
-        drivers = reasons.loc[reasons["claim_sk"] == choice].sort_values("driver_rank")
+        drivers = reasons.loc[reasons["claim_sk"] == choice].sort_values("sim_driver_rank")
 
         left, right = st.columns([2, 3])
         with left:
@@ -395,18 +395,18 @@ else:
                     alt.Chart(drivers)
                     .mark_bar()
                     .encode(
-                        y=alt.Y("feature:N", sort=alt.SortField("driver_rank"), title=None),
+                        y=alt.Y("feature:N", sort=alt.SortField("sim_driver_rank"), title=None),
                         x=alt.X("sim_shap_contribution:Q", title="SHAP contribution (log-odds)"),
                         color=alt.Color(
-                            "direction:N", title="Direction", scale=alt.Scale(scheme="set2")
+                            "sim_direction:N", title="Direction", scale=alt.Scale(scheme="set2")
                         ),
                         tooltip=[
                             alt.Tooltip("feature:N", title="Feature"),
                             alt.Tooltip(
                                 "sim_shap_contribution:Q", title="Contribution", format=".4f"
                             ),
-                            alt.Tooltip("reason_code:N", title="Reason code"),
-                            alt.Tooltip("analyst_action:N", title="Action"),
+                            alt.Tooltip("sim_reason_code:N", title="Reason code"),
+                            alt.Tooltip("sim_analyst_action:N", title="Action"),
                         ],
                     )
                     .properties(height=200)
@@ -415,12 +415,22 @@ else:
 
         if not drivers.empty:
             dataframe(
-                drivers[["driver_rank", "reason_code", "feature", "direction", "analyst_action"]],
+                drivers[
+                    [
+                        "sim_driver_rank",
+                        "sim_reason_code",
+                        "feature",
+                        "sim_direction",
+                        "sim_analyst_action",
+                    ]
+                ],
                 emitter=PAGE_EMITTER,
                 column_config={
-                    "driver_rank": st.column_config.NumberColumn("#", format="%d"),
-                    "analyst_action": st.column_config.TextColumn(
-                        "Recommended action", width="large"
+                    "sim_driver_rank": st.column_config.NumberColumn(
+                        "Driver rank (simulated)", format="%d"
+                    ),
+                    "sim_analyst_action": st.column_config.TextColumn(
+                        "Recommended action (simulated)", width="large"
                     ),
                 },
             )
@@ -433,8 +443,8 @@ else:
     else:
         st.markdown("**Which reason codes drive the flagged population**")
         top_reasons = (
-            reasons.loc[reasons["driver_rank"] <= 3]
-            .groupby(["reason_code", "analyst_action"], as_index=False)
+            reasons.loc[reasons["sim_driver_rank"] <= 3]
+            .groupby(["sim_reason_code", "sim_analyst_action"], as_index=False)
             .agg(claims=("claim_sk", "nunique"))
             .nlargest(12, "claims")
         )
@@ -442,11 +452,11 @@ else:
             alt.Chart(top_reasons)
             .mark_bar()
             .encode(
-                y=alt.Y("reason_code:N", sort="-x", title="Reason code"),
+                y=alt.Y("sim_reason_code:N", sort="-x", title="Reason code"),
                 x=alt.X("claims:Q", title="Claims with this in their top 3 drivers"),
                 tooltip=[
-                    alt.Tooltip("reason_code:N"),
-                    alt.Tooltip("analyst_action:N", title="Action"),
+                    alt.Tooltip("sim_reason_code:N"),
+                    alt.Tooltip("sim_analyst_action:N", title="Action"),
                     alt.Tooltip("claims:Q", format=","),
                 ],
             )
@@ -493,7 +503,7 @@ else:
             "sim_dollars_at_stake",
             "sim_action_type",
             "sim_denial_category",
-            "age_days",
+            "sim_age_days",
             "sim_priority_tier",
             "is_heuristic_placeholder",
         )

@@ -401,26 +401,31 @@ pin.
 
 Every table carries a §3.1 class and a declared `contains_simulated` flag. The
 flag is **declared, not inferred from column names**, because a table can be
-entirely simulated in substance while carrying no `sim_` column of its own — the
-three marked `sim: 0` below with `contains_simulated = True` are exactly that case,
-and a spelling-based rule would call them clean.
+entirely simulated in substance while carrying no `sim_` column of its own. Three
+tables below used to be exactly that case; the bundle-column rename
+(`tests/contracts/bundle_column_provenance.yaml`, enforced by
+`tests/contracts/test_bundle_column_provenance.py`) has since given the simulated
+columns in `vw_model_monitoring` and `model_metrics` their marker. The declared
+flag stays the authority regardless: a spelling-based rule would have called both
+clean for as long as the marker was missing, which is the whole reason the flag
+is asserted rather than inferred.
 
 | Table | Class | Rows | Cols | `sim_` cols | Contains simulated |
 |---|---|---|---|---|---|
-| `vw_claim_enriched` | MIXED | 20,867 | 77 | 48 | yes |
-| `vw_executive_rcm_summary` | MIXED | 109 | 24 | 7 | yes |
-| `vw_denial_root_cause` | SIMULATED | 34 | 16 | 7 | yes |
-| `vw_ar_aging` | SIMULATED | 5 | 10 | 1 | yes |
-| `vw_payer_performance` | SIMULATED | 5 | 22 | 10 | yes |
-| `vw_clean_claim_performance` | MIXED | 4,877 | 18 | 5 | yes |
-| `vw_work_queue_priority` | MIXED | 2,663 | 16 | 5 | yes |
+| `vw_claim_enriched` | MIXED | 20,867 | 77 | 49 | yes |
+| `vw_executive_rcm_summary` | MIXED | 109 | 24 | 22 | yes |
+| `vw_denial_root_cause` | SIMULATED | 34 | 16 | 15 | yes |
+| `vw_ar_aging` | SIMULATED | 5 | 10 | 9 | yes |
+| `vw_payer_performance` | SIMULATED | 5 | 22 | 22 | yes |
+| `vw_clean_claim_performance` | MIXED | 4,877 | 18 | 14 | yes |
+| `vw_work_queue_priority` | MIXED | 2,663 | 16 | 6 | yes |
 | `vw_data_quality_scorecard` | DERIVED | 15 | 10 | 0 | no |
-| `vw_model_monitoring` | SIMULATED | 981 | 6 | 0 | **yes** — drift here is drift in the simulation |
-| `model_a_scores` | DERIVED | 20,867 | 7 | 4 | yes |
-| `model_a_reason_codes` | DERIVED | 20,865 | 7 | 1 | yes |
-| `model_a_shap_global` | DERIVED | 39 | 5 | 2 | yes |
+| `vw_model_monitoring` | SIMULATED | 981 | 6 | 3 | **yes** — drift here is drift in the simulation |
+| `model_a_scores` | DERIVED | 20,867 | 7 | 5 | yes |
+| `model_a_reason_codes` | DERIVED | 20,865 | 7 | 5 | yes |
+| `model_a_shap_global` | DERIVED | 39 | 5 | 4 | yes |
 | `model_c_work_queue` | DERIVED | 469 | 13 | 6 | yes |
-| `model_metrics` | DERIVED | 2 | 4 | 0 | **yes** — every metric scores a SIMULATED label |
+| `model_metrics` | DERIVED | 2 | 4 | 1 | **yes** — every metric scores a SIMULATED label |
 | `demo_manifest` | DERIVED | 14 | 8 | 0 | no |
 | `demo_build_info` | DERIVED | 1 | 8 | 0 | no |
 

@@ -320,14 +320,14 @@ history; queue membership itself is restricted to simulated denials or open A/R.
 | View | Grain | Provenance summary |
 |---|---|---|
 | `vw_claim_enriched` | one inpatient claim (`claim_sk`), 20,867 rows | MIXED, labeled per column in-header: SOURCE (CMS RIF fields, incl. real billed charge + the one real Medicare paid amount), DERIVED (length-of-stay, flags), REFERENCE (`drg_desc` and code descriptions, display-only), SIMULATED (all `sim_*` adjudication/timeline/money **and the `sim_facility_*` linkage columns, display-only, prefix preserved on output**). |
-| `vw_executive_rcm_summary` | one submission month (`YYYY-MM`) | MIXED: billed + Medicare-paid = SOURCE; allowed/paid/denied amounts + denial/clean/first-pass rates = DERIVED from SIMULATED. |
-| `vw_denial_root_cause` | (denial_category, CARC group, driver_mechanism), denied only | SIMULATED throughout. CARC group used as a LABEL only (§3.7), not from any AMA/CMS description file. |
-| `vw_ar_aging` | one AR aging bucket (0-30…120+) | DERIVED from SIMULATED timeline + money; "open" = no simulated payment posted. |
-| `vw_payer_performance` | one simulated payer (`sim_payer_id`), 5 rows | **100% SIMULATED (§3.5)** — payer dimension is invented; every dashboard/export on this view MUST carry the simulated-data banner. |
-| `vw_clean_claim_performance` | one SYNTHETIC billing provider (`prvdr_num`), ~4,877 rows | DERIVED from SIMULATED; keyed on synthetic `prvdr_num` (mandatory), `sim_display_facility_ccn`/`_name`/`_state` display-only. |
-| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `sim_heuristic_priority_score` and `sim_priority_tier`, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only. |
+| `vw_executive_rcm_summary` | one submission month (`sim_submission_year_month`, `YYYY-MM`) | MIXED: `billed_charge_amt` + `medicare_source_paid_amt` = SOURCE and stay bare; every count, rate, timing and appeal measure is SIMULATED and carries `sim_`. |
+| `vw_denial_root_cause` | (denial_category, CARC group, driver_mechanism), denied only | SIMULATED throughout, so every measure carries `sim_` (`sim_denial_count`, `sim_share_of_denials`, `sim_full_denials`, `sim_partial_denials`, `sim_claims_appealed`, `sim_appeal_rate`, `sim_claims_overturned`, `sim_overturn_rate_of_appealed`). CARC group used as a LABEL only (§3.7), not from any AMA/CMS description file; `carc_category_label` is REFERENCE and stays bare. |
+| `vw_ar_aging` | one AR aging bucket (0-30…120+) | SIMULATED timeline + money; "open" = no simulated payment posted. Every measure carries `sim_`, including `sim_source_billed_at_risk_amt` — SOURCE dollars summed over a population the simulation put at risk. `bucket_sort` is PROCESS display order and stays bare. |
+| `vw_payer_performance` | one simulated payer (`sim_payer_id`), 5 rows | **100% SIMULATED (§3.5)** — payer dimension is invented; every dashboard/export on this view MUST carry the simulated-data banner. All 22 output columns carry `sim_`, including `sim_source_billed_amt`: the dollars are SOURCE but grouping them by an invented payer makes the figure a statement about the simulated world. |
+| `vw_clean_claim_performance` | one SYNTHETIC billing provider (`prvdr_num`), ~4,877 rows | MIXED; keyed on synthetic `prvdr_num` (mandatory, SOURCE), `sim_display_facility_ccn`/`_name`/`_state` display-only. Volumes and rates are SIMULATED and carry `sim_`; `source_billed_amt` is SOURCE billed charge per provider and stays bare. |
+| `vw_work_queue_priority` | one actionable claim (`claim_sk`) | HEURISTIC PLACEHOLDER, not a model — `sim_heuristic_priority_score` and `sim_priority_tier`, `is_heuristic_placeholder` always true; Phase 4 Model A/C replace it. `sim_facility_name` display-only, `sim_age_days` measured from the simulated submission date. |
 | `vw_data_quality_scorecard` | one named DQ check (`check_id`) | DERIVED data-quality metadata; each row also carries the provenance class of the data under test. |
-| `vw_model_monitoring` | (submission_month, feature_name) | DRIFT SCAFFOLD, no model exists — `is_drift_scaffold` always true; observed input distributions only, no score/prediction/probability. |
+| `vw_model_monitoring` | (`sim_submission_year_month`, `feature_name`) | DRIFT SCAFFOLD, no model exists — `is_drift_scaffold` always true; observed input distributions only, no score/prediction/probability. The period, cohort size and value are SIMULATED (`sim_submission_year_month`, `sim_n_claims`, `sim_metric_value`); `feature_name`, `metric_kind` and `is_drift_scaffold` are PROCESS labels and stay bare. |
 
 EDA notebooks (`notebooks/01`–`06`, `make`-independent, re-runnable top-to-bottom
 against live PG via `notebooks/analytics_common.py`) read these views + the
@@ -454,12 +454,16 @@ holds them.
 
 ### Reading the columns
 
-`contains_simulated` is **declared, not inferred from spellings.** `vw_model_monitoring`
-and `model_metrics` hold no `sim_`-prefixed column and are both simulated in
-substance — drift in the first is drift in the simulation, and every metric in the
-second scores a simulated label. A rule that read column names would call both
-clean, which is why §3.2's marker identifies simulated *columns* while the *table*
-flag is asserted by `src/demo/spec.py`.
+`contains_simulated` is **declared, not inferred from spellings.** The declaration
+is still the authority on the *table*, and §3.2's marker on the *column*, but the
+example this section used to give is gone: `vw_model_monitoring` and
+`model_metrics` once held no `sim_`-prefixed column while being simulated in
+substance, and the bundle-column rename
+(`tests/contracts/bundle_column_provenance.yaml`) has since marked those columns
+— `sim_metric_value`, `sim_n_claims`, `sim_metrics_json`. The two-level design is
+what let the gap be found rather than argued about: a table can be simulated in
+substance with no marked column of its own, so the *table* flag is asserted by
+`src/demo/spec.py` and never inferred from a spelling.
 
 Within a table, the §3.2 marker is a **prefix** test and not a substring one:
 `medicare_source_paid_amt` in `vw_executive_rcm_summary` is SOURCE — the one real

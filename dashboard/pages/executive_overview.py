@@ -164,25 +164,27 @@ st.caption(
 st.subheader("Monthly trend")
 
 trend = monthly.copy()
-trend["month"] = pd.to_datetime(trend["month_start"])
+trend["month"] = pd.to_datetime(trend["sim_month_start"])
 
 metric_choice = st.selectbox(
     "Measure",
     [
-        ("Denial rate (SIMULATED)", "denial_rate", True),
-        ("Clean-claim rate (SIMULATED)", "clean_claim_rate", True),
-        ("First-pass paid rate (SIMULATED)", "first_pass_paid_rate", True),
-        ("Claims submitted (SOURCE)", "claims_submitted", False),
+        ("Denial rate (SIMULATED)", "sim_denial_rate", True),
+        ("Clean-claim rate (SIMULATED)", "sim_clean_claim_rate", True),
+        ("First-pass paid rate (SIMULATED)", "sim_first_pass_paid_rate", True),
+        # Per MONTH this is a count over simulated submission dates, not a SOURCE
+        # fact — only the book-level total equals count(*) over the CMS fact.
+        ("Claims submitted (SIMULATED)", "sim_claims_submitted", False),
         ("Billed charges (SOURCE)", "billed_charge_amt", False),
         ("Simulated denied dollars", "sim_denied_amt", False),
-        ("Avg days to payment (SIMULATED)", "avg_days_to_payment", False),
+        ("Avg days to payment (SIMULATED)", "sim_avg_days_to_payment", False),
         ("Cost to collect (SIMULATED)", "sim_cost_to_collect", False),
     ],
     format_func=lambda option: option[0],
 )
 label, column, is_rate = metric_choice
 
-chart_frame = trend[["month", column, "claims_submitted"]].dropna(subset=[column])
+chart_frame = trend[["month", column, "sim_claims_submitted"]].dropna(subset=[column])
 chart = (
     alt.Chart(chart_frame)
     .mark_line(point=alt.OverlayMarkDef(size=18))
@@ -197,7 +199,7 @@ chart = (
         tooltip=[
             alt.Tooltip("month:T", title="Month"),
             alt.Tooltip(f"{column}:Q", title=label, format=".3f" if is_rate else ",.0f"),
-            alt.Tooltip("claims_submitted:Q", title="Claims that month", format=","),
+            alt.Tooltip("sim_claims_submitted:Q", title="Claims that month", format=","),
         ],
     )
     .properties(height=320)

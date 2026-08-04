@@ -10,16 +10,22 @@
 --
 -- Sources:      rcm.vw_claim_enriched (sim_ar_open_flag, sim_ar_balance_amt).
 -- Provenance:   SIMULATED timeline + money. Columns:
---                 aging_bucket, bucket_sort            = DERIVED
---                 open_claims, denied_open, nondenied_open = DERIVED from SIMULATED
---                 sim_ar_balance_amt, sim_billed_at_risk  = SIMULATED / SOURCE billed
---                 avg_days_outstanding                 = DERIVED from SIMULATED dates
+--                 sim_aging_bucket                     = SIMULATED (bucket of a
+--                                                        simulated submission date)
+--                 bucket_sort                          = PROCESS (display order)
+--                 sim_open_claims, sim_denied_open_claims,
+--                 sim_nondenied_open_claims            = SIMULATED counts
+--                 sim_ar_balance_amt,
+--                 sim_source_billed_at_risk_amt        = SIMULATED (SOURCE billed
+--                                                        summed over a simulated
+--                                                        at-risk population)
+--                 sim_avg/min/max_days_outstanding     = SIMULATED (simulated dates)
 --
 -- HONESTY:      This ages SIMULATED unpaid claims; the aging economics are not
 --               real. Open AR here is almost entirely FULL denials (1,906 of
 --               1,911) that were allowed a positive amount but paid $0, so
 --               sim_ar_balance_amt (= allowed - paid) is the unpaid expected
---               reimbursement sitting in AR. source_billed_at_risk_amt is shown
+--               reimbursement sitting in AR. sim_source_billed_at_risk_amt is shown
 --               alongside it (billed >= allowed) so both lenses are visible.
 --               EXPECTED SHAPE: in this simulated book every unpaid claim is a
 --               never-paid full denial, and denied claims stop in 2023, so
@@ -30,7 +36,7 @@
 --               visible rather than hidden.
 --
 -- Control query (must reconcile):
---   select sum(open_claims) from rcm.vw_ar_aging;      -- = 1911 (all unpaid claims)
+--   select sum(sim_open_claims) from rcm.vw_ar_aging;  -- = 1911 (all unpaid claims)
 --   equals: select count(*) from rcm.vw_claim_enriched where sim_ar_open_flag;
 --   select count(*) from rcm.vw_ar_aging;              -- = 5 (spine: all buckets)
 -- ============================================================================
@@ -78,16 +84,16 @@ spine(aging_bucket, bucket_sort) as (
     values ('0-30', 1), ('31-60', 2), ('61-90', 3), ('91-120', 4), ('120+', 5)
 )
 select
-    spine.aging_bucket,
+    spine.aging_bucket                                      as sim_aging_bucket,
     spine.bucket_sort,
-    count(b.claim_sk)                                       as open_claims,
-    count(b.claim_sk) filter (where b.sim_denial_flag)      as denied_open_claims,
-    count(b.claim_sk) filter (where not b.sim_denial_flag)  as nondenied_open_claims,
+    count(b.claim_sk)                                       as sim_open_claims,
+    count(b.claim_sk) filter (where b.sim_denial_flag)      as sim_denied_open_claims,
+    count(b.claim_sk) filter (where not b.sim_denial_flag)  as sim_nondenied_open_claims,
     round(coalesce(sum(b.sim_ar_balance_amt), 0), 2)        as sim_ar_balance_amt,
-    round(coalesce(sum(b.billed_charge_amt), 0), 2)         as source_billed_at_risk_amt,
-    round(avg(b.days_outstanding), 1)                       as avg_days_outstanding,
-    min(b.days_outstanding)                                 as min_days_outstanding,
-    max(b.days_outstanding)                                 as max_days_outstanding
+    round(coalesce(sum(b.billed_charge_amt), 0), 2)         as sim_source_billed_at_risk_amt,
+    round(avg(b.days_outstanding), 1)                       as sim_avg_days_outstanding,
+    min(b.days_outstanding)                                 as sim_min_days_outstanding,
+    max(b.days_outstanding)                                 as sim_max_days_outstanding
 from spine
 left join bucketed b on b.bucket_sort = spine.bucket_sort
 group by spine.aging_bucket, spine.bucket_sort;

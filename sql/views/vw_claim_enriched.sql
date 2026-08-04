@@ -15,8 +15,10 @@
 --     clm_utlztn_day_cnt, billed_charge_amt (clm_tot_chrg_amt),
 --     medicare_source_paid_amt (clm_pmt_amt), ncvrd_charge_amt, bene_deductible_amt
 --     (*length_of_stay_days is DERIVED in the fact but originates from SOURCE dates)
---   DERIVED    (computed here from SOURCE/SIMULATED inputs):
---     claim_sk (warehouse surrogate), diagnosis_count, submission_year_month
+--   DERIVED    (computed here from SOURCE inputs only):
+--     claim_sk (warehouse surrogate), diagnosis_count
+--     (sim_submission_year_month is SIMULATED — it is the month of the simulated
+--      submission date — and therefore carries the marker, §3.2)
 --   REFERENCE  (official code-set display text, FY2023 vintage §2; DISPLAY-ONLY,
 --              never a grouping key — join on SOURCE codes, misses stay NULL):
 --     drg_desc (MS-DRG v40 title), prncpal_dgns_desc + admtg_dgns_desc (ICD-10-CM)
@@ -115,7 +117,7 @@ select
     adj.sim_days_to_adjudication,
     adj.sim_days_to_payment,
     adj.sim_late_filing_flag,
-    to_char(adj.sim_submission_date, 'YYYY-MM') as submission_year_month, -- DERIVED
+    to_char(adj.sim_submission_date, 'YYYY-MM') as sim_submission_year_month, -- SIMULATED
 
     -- ---- simulated money (SIMULATED) ----
     adj.sim_allowed_amount,

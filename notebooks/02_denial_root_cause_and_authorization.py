@@ -62,15 +62,15 @@ rc = pd.read_sql(
     """
     select sim_denial_category, sim_denial_carc_group, carc_category_label,
            sim_denial_driver_mechanism,
-           denial_count, share_of_denials, appeal_rate, overturn_rate_of_appealed,
-           sim_denied_amt
-    from rcm.vw_denial_root_cause order by denial_count desc
+           sim_denial_count, sim_share_of_denials, sim_appeal_rate,
+           sim_overturn_rate_of_appealed, sim_denied_amt
+    from rcm.vw_denial_root_cause order by sim_denial_count desc
 """,
     engine,
 )
 print(rc.head(12).to_string(index=False))
-baseline = int(rc.loc[rc.sim_denial_driver_mechanism == "baseline", "denial_count"].sum())
-tot = int(rc.denial_count.sum())
+baseline = int(rc.loc[rc.sim_denial_driver_mechanism == "baseline", "sim_denial_count"].sum())
+tot = int(rc.sim_denial_count.sum())
 print(
     f"\nINSIGHT 4: of {tot:,} simulated denials, {baseline:,} ({baseline / tot:.1%}) carry "
     f"driver 'baseline' — irreducible label noise with no mechanism signal "

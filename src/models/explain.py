@@ -219,8 +219,13 @@ def explain_tree_model(
         .reset_index(drop=True)
     )
     grouped["share"] = grouped["mean_abs_shap"] / grouped["mean_abs_shap"].sum()
-    grouped["reason_code"] = [REASON_CODES.get(f, ("UNMAPPED", ""))[0] for f in grouped["feature"]]
-    grouped["analyst_action"] = [
+    # The reason code and the action are statements about a prediction of a
+    # SIMULATED denial, so they carry the marker (§3.2) even though the mapping
+    # table itself is project-authored.
+    grouped["sim_reason_code"] = [
+        REASON_CODES.get(f, ("UNMAPPED", ""))[0] for f in grouped["feature"]
+    ]
+    grouped["sim_analyst_action"] = [
         REASON_CODES.get(f, ("", "-- no mapped action --"))[1] for f in grouped["feature"]
     ]
 
@@ -255,9 +260,11 @@ def claim_waterfall(
         .head(top_n)
         .reset_index(drop=True)
     )
-    rolled["direction"] = np.where(rolled["shap"] > 0, "raises risk", "lowers risk")
-    rolled["reason_code"] = [REASON_CODES.get(f, ("UNMAPPED", ""))[0] for f in rolled["feature"]]
-    rolled["analyst_action"] = [
+    rolled["sim_direction"] = np.where(rolled["shap"] > 0, "raises risk", "lowers risk")
+    rolled["sim_reason_code"] = [
+        REASON_CODES.get(f, ("UNMAPPED", ""))[0] for f in rolled["feature"]
+    ]
+    rolled["sim_analyst_action"] = [
         REASON_CODES.get(f, ("", "-- no mapped action --"))[1] for f in rolled["feature"]
     ]
     return rolled.drop(columns=["abs_shap"])

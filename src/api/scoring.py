@@ -364,7 +364,7 @@ def _published_recovery_ratio(default: float = 0.8156) -> float:
     try:
         source = get_source()
         metrics = json.loads(
-            source.frame("model_metrics").set_index("model").loc["C", "metrics_json"]
+            source.frame("model_metrics").set_index("model").loc["C", "sim_metrics_json"]
         )
         return float(metrics["economics"]["recovery_ratio_fit_fold"])
     except Exception:  # noqa: BLE001 - a missing bundle must not break scoring
@@ -382,7 +382,7 @@ def category_overturn_rates() -> dict[str, float]:
 
     frame = get_source().frame("vw_denial_root_cause")
     grouped = frame.groupby("sim_denial_category", as_index=False).agg(
-        appealed=("claims_appealed", "sum"), overturned=("claims_overturned", "sum")
+        appealed=("sim_claims_appealed", "sum"), overturned=("sim_claims_overturned", "sum")
     )
     rates = {}
     for row in grouped.itertuples():

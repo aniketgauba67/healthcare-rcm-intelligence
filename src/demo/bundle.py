@@ -362,11 +362,11 @@ class Bundle:
 
     def model_metrics(self, model: str) -> dict[str, Any]:
         """One model's metrics.json, exactly as the training run wrote it."""
-        frame = self.query('select metrics_json from "model_metrics" where model = ?', [model])
+        frame = self.query('select sim_metrics_json from "model_metrics" where model = ?', [model])
         if frame.empty:
             available = sorted(self.query('select model from "model_metrics"')["model"])
             raise KeyError(f"no metrics for model {model!r} in the bundle. Available: {available}")
-        return json.loads(frame.iloc[0]["metrics_json"])
+        return json.loads(frame.iloc[0]["sim_metrics_json"])
 
     def close(self) -> None:
         self._connection.close()

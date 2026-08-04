@@ -192,13 +192,13 @@ forbidden_derived_features:
   sim_action_type: vw_work_queue_priority, a CASE on sim_denial_flag; encodes the label
   sim_appeal_levels: count over sim_appeals; non-zero implies a denial
 
-# vw_work_queue_priority.age_days is DELIBERATELY NOT on the list above, recorded
+# vw_work_queue_priority.sim_age_days is DELIBERATELY NOT on the list above, recorded
 # here because an unexplained omission from a blacklist reads as an oversight.
 # It is `as_of_date - sim_submission_date`: a monotone function of the
 # point-in-time boundary plus one global constant. sim_submission_date is the
 # boundary itself and is permitted, and features derived from it are live and
 # legitimate (sim_days_service_to_submission, sim_filing_headroom_days,
-# sim_submission_month). Blocking age_days would bar a column that is
+# sim_submission_month). Blocking sim_age_days would bar a column that is
 # informationally identical to columns Model A already uses. What is
 # label-bearing about that view is MEMBERSHIP in it — the where clause selects
 # denied-or-open-AR claims — and membership is not a column, so no blacklist

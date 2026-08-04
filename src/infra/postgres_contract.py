@@ -55,8 +55,8 @@ REQUIRED_COLUMNS: Mapping[str, tuple[str, ...]] = {
     "fact_inpatient_claim": ("claim_sk", "clm_id", "provider_key"),
     "sim_claim_adjudication": ("claim_sk", "sim_denial_flag", "sim_paid_amount"),
     "vw_claim_enriched": ("claim_sk", "sim_denial_flag", "sim_ar_open_flag"),
-    "vw_executive_rcm_summary": ("submission_year_month", "claims_submitted"),
-    "vw_model_monitoring": ("feature_name", "metric_kind", "metric_value"),
+    "vw_executive_rcm_summary": ("sim_submission_year_month", "sim_claims_submitted"),
+    "vw_model_monitoring": ("feature_name", "metric_kind", "sim_metric_value"),
     "vw_work_queue_priority": ("claim_sk", "sim_priority_tier"),
 }
 

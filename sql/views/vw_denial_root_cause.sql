@@ -14,7 +14,8 @@
 --                 carc_category_label = project-authored taxonomy label from
 --                   ref_carc (DERIVED, §3.7 — NOT copyrighted X12 text); display
 --                   only, 1:1 with carc_group so the grain is unchanged.
---                 all counts, shares, amounts, appeal/overturn rates = DERIVED from SIMULATED.
+--                 all counts, shares, amounts, appeal/overturn rates = SIMULATED
+--                   and therefore `sim_` prefixed (§3.2).
 --
 -- HONESTY:      These are SIMULATED denials (the CMS synthetic claims contain no
 --               denials). Roughly a third of simulated denials are pure label
@@ -24,8 +25,8 @@
 --               never an accusation of fraud.
 --
 -- Control query (must reconcile):
---   select sum(denial_count) from rcm.vw_denial_root_cause;   -- = 2663 (all denials)
---   select sum(denial_count) filter (where sim_denial_driver_mechanism='baseline')
+--   select sum(sim_denial_count) from rcm.vw_denial_root_cause;   -- = 2663 (all denials)
+--   select sum(sim_denial_count) filter (where sim_denial_driver_mechanism='baseline')
 --     from rcm.vw_denial_root_cause;                          -- = 1222 (label-noise-ish)
 -- ============================================================================
 
@@ -48,10 +49,10 @@ select
     d.sim_denial_carc_group,               -- CARC code as LABEL only (§3.7)
     d.sim_denial_driver_mechanism,
 
-    count(*)                                                        as denial_count,
-    round(count(*)::numeric / (select n from total), 4)            as share_of_denials,
-    count(*) filter (where d.sim_denial_type = 'FULL')             as full_denials,
-    count(*) filter (where d.sim_denial_type = 'PARTIAL')          as partial_denials,
+    count(*)                                                        as sim_denial_count,
+    round(count(*)::numeric / (select n from total), 4)            as sim_share_of_denials,
+    count(*) filter (where d.sim_denial_type = 'FULL')             as sim_full_denials,
+    count(*) filter (where d.sim_denial_type = 'PARTIAL')          as sim_partial_denials,
 
     -- money at stake (SIMULATED)
     round(sum(d.sim_denied_amount), 2)                             as sim_denied_amt,
@@ -61,12 +62,12 @@ select
     round(sum(d.sim_denial_rework_cost), 2)                        as sim_rework_cost,
 
     -- appeal behaviour for this root-cause bucket (SIMULATED)
-    count(*) filter (where ap.appealed)                            as claims_appealed,
-    round(avg(case when ap.appealed then 1 else 0 end), 4)        as appeal_rate,
-    count(*) filter (where ap.overturned)                          as claims_overturned,
+    count(*) filter (where ap.appealed)                            as sim_claims_appealed,
+    round(avg(case when ap.appealed then 1 else 0 end), 4)        as sim_appeal_rate,
+    count(*) filter (where ap.overturned)                          as sim_claims_overturned,
     round(
         count(*) filter (where ap.overturned)::numeric
-        / nullif(count(*) filter (where ap.appealed), 0), 4)      as overturn_rate_of_appealed,
+        / nullif(count(*) filter (where ap.appealed), 0), 4)      as sim_overturn_rate_of_appealed,
     round(coalesce(sum(ap.recovered_amt), 0), 2)                   as sim_recovered_amt,
 
     -- CARC display label (project-authored taxonomy, DERIVED §3.7; NOT X12 text),

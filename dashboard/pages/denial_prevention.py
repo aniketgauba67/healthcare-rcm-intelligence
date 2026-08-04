@@ -86,10 +86,10 @@ st.subheader("Where the denials come from")
 by_category = (
     root_cause.groupby("sim_denial_category", as_index=False)
     .agg(
-        denials=("denial_count", "sum"),
+        denials=("sim_denial_count", "sum"),
         denied_amt=("sim_denied_amt", "sum"),
-        appealed=("claims_appealed", "sum"),
-        overturned=("claims_overturned", "sum"),
+        appealed=("sim_claims_appealed", "sum"),
+        overturned=("sim_claims_overturned", "sum"),
     )
     .sort_values("denials", ascending=False)
 )
@@ -189,8 +189,8 @@ min_claims = st.slider(
     ),
 )
 ranked = (
-    providers.loc[providers["provider_claims"] >= min_claims]
-    .sort_values(["denial_rate", "provider_claims"], ascending=[False, False])
+    providers.loc[providers["sim_provider_claims"] >= min_claims]
+    .sort_values(["sim_denial_rate", "sim_provider_claims"], ascending=[False, False])
     .head(50)
 )
 
@@ -199,12 +199,12 @@ dataframe(
     ranked[
         [
             "prvdr_num",
-            "provider_claims",
-            "denial_rate",
-            "clean_claim_rate",
-            "first_pass_paid_rate",
-            "late_filing_rate",
-            "rework_rate",
+            "sim_provider_claims",
+            "sim_denial_rate",
+            "sim_clean_claim_rate",
+            "sim_first_pass_paid_rate",
+            "sim_late_filing_rate",
+            "sim_rework_rate",
             "sim_rework_cost",
             "sim_display_facility_name",
             "sim_display_facility_state",
@@ -217,12 +217,20 @@ dataframe(
             "prvdr_num (the key)",
             help="The SYNTHETIC billing provider id. This is what every row is grouped on.",
         ),
-        "provider_claims": st.column_config.NumberColumn("Claims", format="%d"),
-        "denial_rate": st.column_config.NumberColumn("Denial rate", format="percent"),
-        "clean_claim_rate": st.column_config.NumberColumn("Clean claim", format="percent"),
-        "first_pass_paid_rate": st.column_config.NumberColumn("First-pass paid", format="percent"),
-        "late_filing_rate": st.column_config.NumberColumn("Late filing", format="percent"),
-        "rework_rate": st.column_config.NumberColumn("Rework", format="percent"),
+        "sim_provider_claims": st.column_config.NumberColumn("Claims (simulated)", format="%d"),
+        "sim_denial_rate": st.column_config.NumberColumn(
+            "Denial rate (simulated)", format="percent"
+        ),
+        "sim_clean_claim_rate": st.column_config.NumberColumn(
+            "Clean claim (simulated)", format="percent"
+        ),
+        "sim_first_pass_paid_rate": st.column_config.NumberColumn(
+            "First-pass paid (simulated)", format="percent"
+        ),
+        "sim_late_filing_rate": st.column_config.NumberColumn(
+            "Late filing (simulated)", format="percent"
+        ),
+        "sim_rework_rate": st.column_config.NumberColumn("Rework (simulated)", format="percent"),
         "sim_rework_cost": st.column_config.NumberColumn("Simulated rework cost", format="dollar"),
         "sim_display_facility_name": st.column_config.TextColumn(
             "Facility name (DISPLAY ONLY)",
@@ -302,7 +310,7 @@ with left:
                 alt.Tooltip("feature:N", title="Feature"),
                 alt.Tooltip("sim_mean_abs_shap:Q", title="Mean |SHAP|", format=".4f"),
                 alt.Tooltip("sim_share_of_importance:Q", title="Share", format=".1%"),
-                alt.Tooltip("reason_code:N", title="Reason code"),
+                alt.Tooltip("sim_reason_code:N", title="Reason code"),
             ],
         )
         .properties(height=380)

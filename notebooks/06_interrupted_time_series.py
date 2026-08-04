@@ -92,8 +92,9 @@ print(
 # %%
 engine = get_engine()
 monthly = pd.read_sql(
-    "select submission_year_month, claims_submitted, denial_rate, clean_claim_rate "
-    "from rcm.vw_executive_rcm_summary order by submission_year_month",
+    "select sim_submission_year_month, sim_claims_submitted, sim_denial_rate, "
+    "sim_clean_claim_rate "
+    "from rcm.vw_executive_rcm_summary order by sim_submission_year_month",
     engine,
 ).reset_index(drop=True)
 monthly["time"] = np.arange(len(monthly))
@@ -101,11 +102,12 @@ cut = len(monthly) // 2
 monthly["level"] = (monthly.time >= cut).astype(int)
 monthly["time_since"] = np.where(monthly.time >= cut, monthly.time - cut, 0)
 print(
-    f"{len(monthly)} months, {monthly.submission_year_month.iloc[0]}..{monthly.submission_year_month.iloc[-1]}; "
-    f"HYPOTHETICAL cut at {monthly.submission_year_month.iloc[cut]} (illustrative only)"
+    f"{len(monthly)} months, {monthly.sim_submission_year_month.iloc[0]}.."
+    f"{monthly.sim_submission_year_month.iloc[-1]}; "
+    f"HYPOTHETICAL cut at {monthly.sim_submission_year_month.iloc[cut]} (illustrative only)"
 )
 
-mr = segmented_its(monthly, "denial_rate")
+mr = segmented_its(monthly, "sim_denial_rate")
 tbl = pd.DataFrame({"coef": mr.params, "p_value": mr.pvalues}).round(4)
 print(tbl.to_string())
 sig = (mr.pvalues[["level", "time_since"]] < 0.05).any()

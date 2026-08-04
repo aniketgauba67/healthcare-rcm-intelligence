@@ -9,9 +9,10 @@ WHY A SECOND PATH AND NOT A SECOND OPINION
 A check that recomputes a figure the same way it was computed the first time
 proves only that the code is deterministic. So every row below derives its
 control value from a DIFFERENT dataset than the figure: the executive view's
-`sum(claims_submitted)` is checked against `count(*)` over `vw_claim_enriched`,
-the A/R view's `sum(open_claims)` against the enriched view's `ar_open_flag`, the
-denial mix's `sum(denial_count)` against the enriched view again. Those are the
+`sum(sim_claims_submitted)` is checked against `count(*)` over
+`vw_claim_enriched`, the A/R view's `sum(sim_open_claims)` against the enriched
+view's `sim_ar_open_flag`, the denial mix's `sum(sim_denial_count)` against the
+enriched view again. Those are the
 same relationships `sql/quality/view_reconciliation.py` asserts in PostgreSQL —
 this is that gate re-expressed over the shipped bundle, which is the only form of
 it a hosted demo with no database can offer.
@@ -133,10 +134,10 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="Executive overview — Claims submitted",
         page="Executive overview",
-        dashboard=lambda f: float(_executive(f)["claims_submitted"].sum()),
+        dashboard=lambda f: float(_executive(f)["sim_claims_submitted"].sum()),
         control=lambda f: float(len(_claims(f))),
         control_sql=(
-            "select (select sum(claims_submitted) from rcm.vw_executive_rcm_summary)\n"
+            "select (select sum(sim_claims_submitted) from rcm.vw_executive_rcm_summary)\n"
             "     = (select count(*) from rcm.fact_inpatient_claim) as reconciles;"
         ),
         datasets=("vw_executive_rcm_summary", "vw_claim_enriched"),
@@ -144,10 +145,10 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="Executive overview — Denied claims",
         page="Executive overview",
-        dashboard=lambda f: float(_executive(f)["denied_claims"].sum()),
+        dashboard=lambda f: float(_executive(f)["sim_denied_claims"].sum()),
         control=lambda f: float(_claims(f)["sim_denial_flag"].fillna(False).astype(bool).sum()),
         control_sql=(
-            "select (select sum(denied_claims) from rcm.vw_executive_rcm_summary)\n"
+            "select (select sum(sim_denied_claims) from rcm.vw_executive_rcm_summary)\n"
             "     = (select count(*) from rcm.sim_claim_adjudication where sim_denial_flag)\n"
             "  as reconciles;"
         ),
@@ -157,14 +158,14 @@ CHECKS: tuple[Check, ...] = (
         figure="Executive overview — Denial rate",
         page="Executive overview",
         dashboard=lambda f: float(
-            _executive(f)["denied_claims"].sum() / _executive(f)["claims_submitted"].sum()
+            _executive(f)["sim_denied_claims"].sum() / _executive(f)["sim_claims_submitted"].sum()
         ),
         control=lambda f: float(
             _claims(f)["sim_denial_flag"].fillna(False).astype(bool).sum() / len(_claims(f))
         ),
         control_sql=(
             "-- summed numerator over summed denominator, NOT a mean of monthly rates\n"
-            "select sum(denied_claims)::numeric / sum(claims_submitted)\n"
+            "select sum(sim_denied_claims)::numeric / sum(sim_claims_submitted)\n"
             "  from rcm.vw_executive_rcm_summary;"
         ),
         tolerance=1e-9,
@@ -186,10 +187,10 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="Denial prevention — Denials in the mix table",
         page="Denial prevention",
-        dashboard=lambda f: float(f["vw_denial_root_cause"]["denial_count"].sum()),
+        dashboard=lambda f: float(f["vw_denial_root_cause"]["sim_denial_count"].sum()),
         control=lambda f: float(_claims(f)["sim_denial_flag"].fillna(False).astype(bool).sum()),
         control_sql=(
-            "select (select sum(denial_count) from rcm.vw_denial_root_cause)\n"
+            "select (select sum(sim_denial_count) from rcm.vw_denial_root_cause)\n"
             "     = (select count(*) from rcm.sim_claim_adjudication where sim_denial_flag)\n"
             "  as reconciles;"
         ),
@@ -199,12 +200,13 @@ CHECKS: tuple[Check, ...] = (
         figure="Denial prevention — Full + partial denials",
         page="Denial prevention",
         dashboard=lambda f: float(
-            f["vw_denial_root_cause"]["full_denials"].sum()
-            + f["vw_denial_root_cause"]["partial_denials"].sum()
+            f["vw_denial_root_cause"]["sim_full_denials"].sum()
+            + f["vw_denial_root_cause"]["sim_partial_denials"].sum()
         ),
-        control=lambda f: float(f["vw_denial_root_cause"]["denial_count"].sum()),
+        control=lambda f: float(f["vw_denial_root_cause"]["sim_denial_count"].sum()),
         control_sql=(
-            "select sum(full_denials + partial_denials) = sum(denial_count) as reconciles\n"
+            "select sum(sim_full_denials + sim_partial_denials) = sum(sim_denial_count)\n"
+            "    as reconciles\n"
             "  from rcm.vw_denial_root_cause;"
         ),
         datasets=("vw_denial_root_cause",),
@@ -212,11 +214,11 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="Denial prevention — Appeals overturned",
         page="Denial prevention",
-        dashboard=lambda f: float(f["vw_denial_root_cause"]["claims_overturned"].sum()),
-        control=lambda f: float(_executive(f)["claims_overturned"].sum()),
+        dashboard=lambda f: float(f["vw_denial_root_cause"]["sim_claims_overturned"].sum()),
+        control=lambda f: float(_executive(f)["sim_claims_overturned"].sum()),
         control_sql=(
-            "select (select sum(claims_overturned) from rcm.vw_denial_root_cause)\n"
-            "     = (select sum(claims_overturned) from rcm.vw_executive_rcm_summary)\n"
+            "select (select sum(sim_claims_overturned) from rcm.vw_denial_root_cause)\n"
+            "     = (select sum(sim_claims_overturned) from rcm.vw_executive_rcm_summary)\n"
             "  as reconciles;"
         ),
         datasets=("vw_denial_root_cause", "vw_executive_rcm_summary"),
@@ -224,10 +226,10 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="A/R & recovery — Open claims in the aging spine",
         page="A/R & recovery",
-        dashboard=lambda f: float(f["vw_ar_aging"]["open_claims"].sum()),
+        dashboard=lambda f: float(f["vw_ar_aging"]["sim_open_claims"].sum()),
         control=lambda f: float(_claims(f)["sim_ar_open_flag"].fillna(False).astype(bool).sum()),
         control_sql=(
-            "select (select sum(open_claims) from rcm.vw_ar_aging)\n"
+            "select (select sum(sim_open_claims) from rcm.vw_ar_aging)\n"
             "     = (select count(*) from rcm.vw_claim_enriched where sim_ar_open_flag)\n"
             "  as reconciles;"
         ),
@@ -246,17 +248,18 @@ CHECKS: tuple[Check, ...] = (
         page="A/R & recovery",
         dashboard=lambda f: float(
             (
-                f["vw_ar_aging"]["open_claims"]
-                - f["vw_ar_aging"]["denied_open_claims"]
-                - f["vw_ar_aging"]["nondenied_open_claims"]
+                f["vw_ar_aging"]["sim_open_claims"]
+                - f["vw_ar_aging"]["sim_denied_open_claims"]
+                - f["vw_ar_aging"]["sim_nondenied_open_claims"]
             )
             .abs()
             .sum()
         ),
         control=lambda f: 0.0,
         control_sql=(
-            "select coalesce(sum(case when open_claims\n"
-            "       <> denied_open_claims + nondenied_open_claims then 1 else 0 end), 0)\n"
+            "select coalesce(sum(case when sim_open_claims\n"
+            "       <> sim_denied_open_claims + sim_nondenied_open_claims\n"
+            "       then 1 else 0 end), 0)\n"
             "  from rcm.vw_ar_aging;"
         ),
         datasets=("vw_ar_aging",),
@@ -264,10 +267,10 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="A/R & recovery — Claims across the five simulated payers",
         page="A/R & recovery",
-        dashboard=lambda f: float(f["vw_payer_performance"]["claims"].sum()),
+        dashboard=lambda f: float(f["vw_payer_performance"]["sim_claims"].sum()),
         control=lambda f: float(len(_claims(f))),
         control_sql=(
-            "select (select sum(claims) from rcm.vw_payer_performance)\n"
+            "select (select sum(sim_claims) from rcm.vw_payer_performance)\n"
             "     = (select count(*) from rcm.fact_inpatient_claim) as reconciles;"
         ),
         datasets=("vw_payer_performance", "vw_claim_enriched"),
@@ -275,10 +278,10 @@ CHECKS: tuple[Check, ...] = (
     Check(
         figure="Denial prevention — Claims across synthetic providers",
         page="Denial prevention",
-        dashboard=lambda f: float(f["vw_clean_claim_performance"]["provider_claims"].sum()),
+        dashboard=lambda f: float(f["vw_clean_claim_performance"]["sim_provider_claims"].sum()),
         control=lambda f: float(len(_claims(f))),
         control_sql=(
-            "select (select sum(provider_claims) from rcm.vw_clean_claim_performance)\n"
+            "select (select sum(sim_provider_claims) from rcm.vw_clean_claim_performance)\n"
             "     = (select count(*) from rcm.fact_inpatient_claim) as reconciles;"
         ),
         datasets=("vw_clean_claim_performance", "vw_claim_enriched"),

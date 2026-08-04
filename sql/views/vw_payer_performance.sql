@@ -13,11 +13,13 @@
 -- Sources:      rcm.vw_claim_enriched + rcm.sim_appeals.
 -- Provenance:   SIMULATED throughout. sim_payer_name/mix_share/timely_filing_days
 --               are SIMULATED dimension attributes; all volumes, rates, amounts,
---               timing and appeal measures are DERIVED from SIMULATED data.
+--               timing and appeal measures are SIMULATED and `sim_` prefixed
+--               (§3.2). That includes sim_source_billed_amt: the money is SOURCE
+--               but grouping it by a simulated payer makes the figure simulated.
 --
 -- Control query (must reconcile):
---   select sum(claims) from rcm.vw_payer_performance;         -- = 20867
---   select sum(denied_claims) from rcm.vw_payer_performance;  -- = 2663
+--   select sum(sim_claims) from rcm.vw_payer_performance;         -- = 20867
+--   select sum(sim_denied_claims) from rcm.vw_payer_performance;  -- = 2663
 --   round(sum(sim_payer_mix_share_config)::numeric,2) documents the design mix.
 -- ============================================================================
 
@@ -36,18 +38,20 @@ select
     max(e.sim_timely_filing_days) as sim_timely_filing_days,     -- SIMULATED filing window
 
     -- ---- volume + realized mix ----
-    count(*)                                                     as claims,
+    count(*)                                                     as sim_claims,
     round(count(*)::numeric
-          / sum(count(*)) over (), 4)                            as realized_claim_share,
+          / sum(count(*)) over (), 4)                            as sim_realized_claim_share,
 
     -- ---- denial + quality (SIMULATED) ----
-    count(*) filter (where e.sim_denial_flag)                    as denied_claims,
-    round(avg(case when e.sim_denial_flag then 1 else 0 end), 4)      as denial_rate,
-    round(avg(case when e.sim_clean_claim_flag then 1 else 0 end), 4) as clean_claim_rate,
-    round(avg(case when e.sim_late_filing_flag then 1 else 0 end), 4) as late_filing_rate,
+    count(*) filter (where e.sim_denial_flag)                    as sim_denied_claims,
+    round(avg(case when e.sim_denial_flag then 1 else 0 end), 4)      as sim_denial_rate,
+    round(avg(case when e.sim_clean_claim_flag then 1 else 0 end), 4) as sim_clean_claim_rate,
+    round(avg(case when e.sim_late_filing_flag then 1 else 0 end), 4) as sim_late_filing_rate,
 
-    -- ---- money (SIMULATED) ----
-    round(sum(e.billed_charge_amt), 2)                          as source_billed_amt,
+    -- ---- money ----
+    -- SOURCE billed charges, but grouped by a SIMULATED payer, so the grouping
+    -- makes the figure a statement about the simulated world (§3.5): sim_ prefixed.
+    round(sum(e.billed_charge_amt), 2)                          as sim_source_billed_amt,
     round(sum(e.sim_allowed_amount), 2)                         as sim_allowed_amt,
     round(sum(e.sim_paid_amount), 2)                            as sim_paid_amt,
     round(sum(e.sim_paid_amount)
@@ -57,15 +61,15 @@ select
 
     -- ---- timing (SIMULATED) ----
     round(avg(e.sim_days_to_payment)
-          filter (where e.sim_days_to_payment is not null), 1)  as avg_days_to_payment,
+          filter (where e.sim_days_to_payment is not null), 1)  as sim_avg_days_to_payment,
     round((percentile_cont(0.5) within group (order by e.sim_days_to_payment)
-          filter (where e.sim_days_to_payment is not null))::numeric, 1) as median_days_to_payment,
-    round(avg(e.sim_days_to_adjudication), 1)                   as avg_days_to_adjudication,
+          filter (where e.sim_days_to_payment is not null))::numeric, 1) as sim_median_days_to_payment,
+    round(avg(e.sim_days_to_adjudication), 1)                   as sim_avg_days_to_adjudication,
 
     -- ---- appeals (SIMULATED) ----
-    count(*) filter (where ap.claim_sk is not null)             as claims_appealed,
+    count(*) filter (where ap.claim_sk is not null)             as sim_claims_appealed,
     round(avg(case when ap.any_overturned then 1 else 0 end)
-          filter (where ap.claim_sk is not null), 4)            as appeal_overturn_rate,
+          filter (where ap.claim_sk is not null), 4)            as sim_appeal_overturn_rate,
     round(coalesce(sum(ap.recovered_amt), 0), 2)                as sim_appeal_recovered_amt,
 
     -- ---- cost to collect (SIMULATED) ----

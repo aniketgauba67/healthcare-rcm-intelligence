@@ -85,7 +85,7 @@ WORK_QUEUE_COLUMNS = [
     "sim_denial_category",
     "sim_denial_type",
     "sim_ar_open_flag",
-    "age_days",
+    "sim_age_days",
     "sim_dollars_at_stake",
     "sim_heuristic_priority_score",
     "sim_priority_tier",

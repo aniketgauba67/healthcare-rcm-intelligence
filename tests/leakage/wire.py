@@ -185,6 +185,6 @@ def frame_like(columns: list[str], n: int = 40, seed: int = 20260729) -> pd.Data
         frame["claim_sk"] = np.arange(1, n + 1)
     if "clm_id" in frame.columns:
         frame["clm_id"] = [f"-{10000930037831 + i}" for i in range(n)]
-    if "submission_year_month" in frame.columns:
-        frame["submission_year_month"] = [f"2023-{(i % 12) + 1:02d}" for i in range(n)]
+    if "sim_submission_year_month" in frame.columns:
+        frame["sim_submission_year_month"] = [f"2023-{(i % 12) + 1:02d}" for i in range(n)]
     return frame
