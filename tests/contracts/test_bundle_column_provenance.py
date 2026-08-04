@@ -85,103 +85,121 @@ def test_every_declared_class_is_valid_and_carries_a_real_reason() -> None:
 
 
 # --------------------------------------------------------------------------
-# The three properties that matter.
+# The three checks, as FUNCTIONS.
+#
+# They are functions rather than inline test bodies for one reason: the controls
+# below drive these exact functions. An earlier version of this file
+# re-implemented the matching inline in each control, which meant the controls
+# verified the RE-IMPLEMENTATION and not the production check. Proved by
+# mutation: with all three checks neutered and all three defects live in the
+# bundle, that version still reported 8 passed. Found by qa-reviewer-p20 on
+# independent review. A control that cannot fail when the thing it controls is
+# broken is decoration, and this file exists to end exactly that class of defect.
+# --------------------------------------------------------------------------
+
+
+def unclassified_columns(bundle: dict[str, list[str]], declared: dict) -> list[str]:
+    """Bare bundle columns nobody has classified. A new one fails the build."""
+    return sorted(
+        f"{table}.{column}"
+        for table, columns in bundle.items()
+        for column in columns
+        if not column.startswith(MARKER) and column not in declared.get(table, {})
+    )
+
+
+def unmarked_simulated_columns(bundle: dict[str, list[str]], declared: dict) -> list[str]:
+    """Columns classified SIMULATED that ship without the marker."""
+    return sorted(
+        f"{table}.{column} -- {entry['why']}"
+        for table, columns in declared.items()
+        for column, entry in columns.items()
+        if entry["class"] in REQUIRES_MARKER
+        and column in bundle.get(table, [])
+        and not column.startswith(MARKER)
+    )
+
+
+def falsely_marked_columns(bundle: dict[str, list[str]], declared: dict) -> list[str]:
+    """Columns carrying the marker that are not simulated. Over-marking is a defect."""
+    return sorted(
+        f"{table}.{MARKER}{column} is classified {entry['class']}: {entry['why']}"
+        for table, columns in declared.items()
+        for column, entry in columns.items()
+        if entry["class"] in FORBIDS_MARKER and f"{MARKER}{column}" in bundle.get(table, [])
+    )
+
+
+# --------------------------------------------------------------------------
+# The three properties, measured against the artifact that actually ships.
 # --------------------------------------------------------------------------
 
 
 def test_every_bare_bundle_column_is_classified() -> None:
-    """A new unmarked column fails the build until a human says what it is."""
-    declared = _declaration()["tables"]
-    missing: list[str] = []
-    for table, columns in _bundle_columns().items():
-        for column in columns:
-            if column.startswith(MARKER):
-                continue  # self-declaring: the marker IS the classification
-            if column not in declared.get(table, {}):
-                missing.append(f"{table}.{column}")
+    missing = unclassified_columns(_bundle_columns(), _declaration()["tables"])
     assert not missing, (
         "these bundle columns carry no `sim_` marker and no classification, so nobody has "
         "decided whether they are simulated:\n  "
-        + "\n  ".join(sorted(missing))
+        + "\n  ".join(missing)
         + f"\nClassify each in {DECLARATION.name} before shipping the bundle."
     )
 
 
 def test_every_simulated_column_carries_the_marker() -> None:
     """The finding this file exists for, in its most direct form."""
-    unmarked: list[str] = []
-    bundle = _bundle_columns()
-    for table, columns in _declaration()["tables"].items():
-        for column, entry in columns.items():
-            if entry["class"] not in REQUIRES_MARKER:
-                continue
-            if column in bundle.get(table, []) and not column.startswith(MARKER):
-                unmarked.append(f"{table}.{column} -- {entry['why']}")
+    unmarked = unmarked_simulated_columns(_bundle_columns(), _declaration()["tables"])
     assert not unmarked, (
         "these columns are classified SIMULATED but ship WITHOUT the `sim_` marker, so a "
-        "reader opening the public bundle sees them as real:\n  " + "\n  ".join(sorted(unmarked))
+        "reader opening the public bundle sees them as real:\n  " + "\n  ".join(unmarked)
     )
 
 
 def test_nothing_unsimulated_is_falsely_marked() -> None:
-    """Over-marking is a defect too: if `sim_` is everywhere it means nothing."""
-    bundle = _bundle_columns()
-    falsely: list[str] = []
-    for table, columns in _declaration()["tables"].items():
-        for column, entry in columns.items():
-            if entry["class"] not in FORBIDS_MARKER:
-                continue
-            if f"{MARKER}{column}" in bundle.get(table, []):
-                falsely.append(
-                    f"{table}.{MARKER}{column} is classified {entry['class']}: {entry['why']}"
-                )
+    falsely = falsely_marked_columns(_bundle_columns(), _declaration()["tables"])
     assert not falsely, (
-        "these columns carry the simulated marker but are not simulated:\n  "
-        + "\n  ".join(sorted(falsely))
+        "these columns carry the simulated marker but are not simulated:\n  " + "\n  ".join(falsely)
     )
 
 
 # --------------------------------------------------------------------------
-# Controls. A guard never shown to fail is not evidence.
+# Controls. Each drives the PRODUCTION function above against a scratch input
+# holding a known defect, so neutering that function fails its control too.
 # --------------------------------------------------------------------------
+
+_SCRATCH_DECLARED = {
+    "vw_x": {
+        "denial_rate": {"class": "SIMULATED", "why": "rate over the simulated denial flag"},
+        "billed_charge_amt": {"class": "SOURCE", "why": "billed charge amount from CMS"},
+    }
+}
 
 
 def test_the_classification_check_rejects_an_unclassified_column() -> None:
-    declared = {"vw_ar_aging": {"aging_bucket": {"class": "SIMULATED", "why": "a b c d"}}}
-    bundle = {"vw_ar_aging": ["aging_bucket", "smuggled_in_later"]}
-    missing = [
-        f"{t}.{c}"
-        for t, cols in bundle.items()
-        for c in cols
-        if not c.startswith(MARKER) and c not in declared.get(t, {})
-    ]
-    assert missing == ["vw_ar_aging.smuggled_in_later"]
+    bundle = {"vw_x": ["denial_rate", "billed_charge_amt", "smuggled_in_later"]}
+    assert unclassified_columns(bundle, _SCRATCH_DECLARED) == ["vw_x.smuggled_in_later"]
+
+
+def test_the_classification_check_is_silent_when_everything_is_declared() -> None:
+    bundle = {"vw_x": ["denial_rate", "billed_charge_amt", "sim_anything_marked"]}
+    assert unclassified_columns(bundle, _SCRATCH_DECLARED) == []
 
 
 def test_the_marker_check_rejects_an_unmarked_simulated_column() -> None:
-    declared = {
-        "vw_x": {"denial_rate": {"class": "SIMULATED", "why": "rate over the simulated flag"}}
-    }
-    bundle = {"vw_x": ["denial_rate"]}
-    unmarked = [
-        f"{t}.{c}"
-        for t, cols in declared.items()
-        for c, e in cols.items()
-        if e["class"] in REQUIRES_MARKER and c in bundle.get(t, []) and not c.startswith(MARKER)
-    ]
-    assert unmarked == ["vw_x.denial_rate"]
+    found = unmarked_simulated_columns({"vw_x": ["denial_rate"]}, _SCRATCH_DECLARED)
+    assert len(found) == 1 and found[0].startswith("vw_x.denial_rate")
+
+
+def test_the_marker_check_is_silent_once_the_column_is_marked() -> None:
+    assert unmarked_simulated_columns({"vw_x": ["sim_denial_rate"]}, _SCRATCH_DECLARED) == []
 
 
 def test_the_over_marking_check_rejects_a_falsely_marked_source_column() -> None:
-    declared = {"vw_x": {"billed_charge_amt": {"class": "SOURCE", "why": "billed charge from CMS"}}}
-    bundle = {"vw_x": ["sim_billed_charge_amt"]}
-    falsely = [
-        f"{t}.{MARKER}{c}"
-        for t, cols in declared.items()
-        for c, e in cols.items()
-        if e["class"] in FORBIDS_MARKER and f"{MARKER}{c}" in bundle.get(t, [])
-    ]
-    assert falsely == ["vw_x.sim_billed_charge_amt"]
+    found = falsely_marked_columns({"vw_x": ["sim_billed_charge_amt"]}, _SCRATCH_DECLARED)
+    assert len(found) == 1 and found[0].startswith("vw_x.sim_billed_charge_amt")
+
+
+def test_the_over_marking_check_is_silent_on_a_correctly_bare_source_column() -> None:
+    assert falsely_marked_columns({"vw_x": ["billed_charge_amt"]}, _SCRATCH_DECLARED) == []
 
 
 def test_the_reason_check_rejects_a_thin_reason() -> None:
