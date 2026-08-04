@@ -22,6 +22,47 @@ from the pre-release deployment branch at source SHA
 `119828e8915044622faa65755a615375799df0fc` on 2026-08-01; it remains historical
 free-tier portfolio evidence, not proof of production availability.
 
+## Where the demo data comes from, and one documented deviation
+
+CLAUDE.md §2 locks the demo data path to the bundled DuckDB extract rather than a
+live warehouse. **Every value a visitor sees still comes from that bundle.** The
+dashboard opens the committed artifact directly; the API serves it too; neither
+reads application data from PostgreSQL.
+
+There is one deviation from the plain reading of that rule, and it is recorded
+here rather than left for someone to discover:
+
+**The hosted API health-checks a PostgreSQL instance before it reports ready.**
+When `RCM_REQUIRE_POSTGRES_READY` is set, `/ready` runs `validate_postgres_contract()`,
+which confirms the `rcm` schema exists with the expected 24 base tables and 9
+views and that the views are queryable. It fails closed if they are not.
+
+What that instance is, stated precisely:
+
+- **It holds no data.** Schema and views only — no claims, no beneficiaries, no
+  simulated adjudication rows. Nothing a visitor sees originates there.
+- **It is read-only in this path.** The contract check issues `select` statements
+  against the catalog. The one script that writes DDL,
+  `scripts/initialize_hosted_postgres.py`, is run by an operator and is not
+  reachable from any public surface.
+- **No credentials are in this repository.** `DATABASE_URL` is supplied by the
+  provider's secret control at run time. The database is not exposed by any
+  public endpoint of this project, though it is a hosted service and is
+  reachable by anyone holding that connection string — which is why the string
+  never enters git.
+
+**Why it is there rather than removed:** it is what makes readiness meaningful.
+Without it `/ready` reports success whenever the process is alive, which tells a
+caller nothing about whether the deployment is correctly provisioned. Keeping the
+check means a half-provisioned deployment announces itself instead of serving
+quietly from a stale artifact.
+
+**Why the rule is worded the way it is:** the point of the locked decision is
+that no *visitor-facing value* is ever read from a live warehouse, so a demo
+cannot silently start showing something other than the audited artifact. A
+schema-only liveness probe does not touch that property. The rule now says so
+explicitly instead of appearing to be contradicted.
+
 ## Architecture
 
 - **Neon Free PostgreSQL:** the initialized `rcm` schema, 24 base tables, and 9

@@ -25,7 +25,7 @@ makes the project credible in interviews.
 | Claims source | CMS Synthetic Medicare Enrollment, FFS Claims & PDE (modern schema, ICD-10). NOT DE-SynPUF. |
 | Code vintage | ICD-10-CM/PCS and HCPCS matching the synthetic data's period. Never mix ICD-9 references. |
 | Dashboard | Streamlit only. No Power BI, no Next.js. |
-| Demo data path | Hosted demo runs off bundled Parquet/DuckDB extract, NOT live Postgres. |
+| Demo data path | All demo DATA comes from the bundled Parquet/DuckDB extract, never from live Postgres. DOCUMENTED DEVIATION: the hosted API also health-checks a schema-only Postgres before reporting ready — no rows, no credentials in the repo. See `docs/hosted_deployment.md`. |
 | Dependency mgmt | `uv` with pinned versions in `pyproject.toml` / `uv.lock`. |
 | Python | 3.11+ with type hints on all public functions. |
 | Warehouse | PostgreSQL 16 via docker-compose for local dev. |
