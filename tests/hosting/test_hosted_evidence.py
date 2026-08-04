@@ -36,23 +36,45 @@ EXPECTED_IMAGES = (
 def test_public_links_and_release_limitations_are_documented() -> None:
     readme = README.read_text()
     guide = HOSTED_GUIDE.read_text()
-    normalized_readme = " ".join(readme.split())
-    normalized_guide = " ".join(guide.split())
+
+    # Normalize away line wrapping AND markdown blockquote markers before matching.
+    # These assertions are about what the page SAYS, not how it is laid out; a
+    # sentence wrapped across two `>` lines is the same sentence.
+    def _flat(text: str) -> str:
+        return " ".join(line.lstrip("> ").strip() for line in text.splitlines()).replace("  ", " ")
+
+    normalized_readme = " ".join(_flat(readme).split())
+    normalized_guide = " ".join(_flat(guide).split())
 
     for url in PUBLIC_URLS:
         assert url in readme
         assert url in guide
 
-    combined = f"{readme}\n{guide}"
-    assert "Phase 5 is independently QA-accepted" in combined
-    assert "not production-grade or always-on" in readme
-    assert "not accepted or deployed" not in readme
-    assert "zero-cost hosted portfolio deployment is live" in normalized_readme
+    # LIMITATIONS MUST BE DISCLOSED. These are the honest-framing requirements and
+    # they stay.
+    assert "not production-grade or always-on" in normalized_readme
     assert "git_tree_dirty=false" in guide
-    assert "final clean-SHA" in combined
-    assert "Phase 5 remains under QA" not in combined
-    assert "pending final artifact QA" not in combined
     assert "No paid resource" in normalized_guide
+
+    # ATTRIBUTION, NOT VERDICT.
+    #
+    # This block used to require the README to SAY "Phase 5 is independently
+    # QA-accepted" and to forbid the strings "Phase 5 remains under QA", "pending
+    # final artifact QA" and "not accepted or deployed". That is a test asserting
+    # the absence of caution, and it had teeth: correcting the status claim to
+    # something accurate made this file RED, so the test would have argued for
+    # keeping an overstatement on a public artifact. A gate may require a claim to
+    # be SUPPORTED. It must never require the claim to be POSITIVE.
+    #
+    # What is worth enforcing is that "QA-accepted" never appears unqualified. The
+    # phrase means an internal review by this project's own reviewer agent, and a
+    # reader cannot know that unless the page says so.
+    if "QA-accepted" in normalized_readme or "QA accepted" in normalized_readme:
+        assert "internal review process, not an audit by an outside party" in normalized_readme, (
+            "the README claims QA acceptance without saying what that means. It is an internal "
+            "review by this project's own agent, not third-party assurance, and an unqualified "
+            "claim on a public page reads as the latter."
+        )
 
 
 def test_hosted_screenshot_manifest_is_complete_and_images_are_distinct() -> None:

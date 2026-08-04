@@ -1,9 +1,11 @@
 # Zero-Cost Hosted Deployment
 
-This guide records the independently QA-accepted zero-cost portfolio deployment
-on Neon Free, Render Free, and Streamlit Community Cloud. The public services
-serve the final clean-SHA DuckDB artifact. This remains portfolio-scale hosting,
-not a production or always-on deployment.
+This guide records the zero-cost portfolio deployment on Neon Free, Render Free,
+and Streamlit Community Cloud. It was reviewed and accepted on 2026-08-01 by this
+project's own QA-reviewer agent — an internal review process, not an audit by an
+outside party. The public services serve the artifact accepted then; see the
+pinned-bundle note below, because that artifact has since been superseded. This
+remains portfolio-scale hosting, not a production or always-on deployment.
 
 ## Public services
 
@@ -155,9 +157,16 @@ best-effort availability rather than production service guarantees. No paid
 resource, payment method, paid disk, paid database, paid instance, or custom
 domain is used.
 
-Phase 5 is independently QA-accepted. That acceptance was granted on the final
-clean-SHA artifact `66456ebf` from source SHA `ab2aa415`, after local
-clean-clone, artifact, and public hosted checks all passed.
+Phase 5 was QA-accepted on 2026-08-01 by this project's own QA-reviewer agent,
+working from a separate branch and re-running each measurement rather than
+accepting the implementer's report. That is an internal review process, not an
+audit by an outside party. The acceptance was granted on clean-SHA artifact
+`66456ebf` from source SHA `ab2aa415`, after local clean-clone, artifact, and
+public hosted checks all passed.
+
+That acceptance does NOT extend to the artifact pinned today. A later audit found
+the accepted bundle shipped simulated columns without their `sim_` marker, which
+is why it was rebuilt.
 
 The bundle pinned today is
 `559022e2fc27461fb874294eca1a6ba39149367afe7b2e49f9b43c2ccc7e8896`, records

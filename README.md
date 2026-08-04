@@ -1,16 +1,25 @@
 # Healthcare RCM Intelligence Platform
 
-> **Status:** All five phases are complete and independently QA-accepted. The
-> zero-cost hosted portfolio deployment is live with the final clean-SHA DuckDB
-> artifact. The hosted services are portfolio-scale, not production-grade or
+> **Status:** All five phases are complete. Each phase was reviewed against its
+> definition of done by this project's own QA-reviewer agent, working from a
+> separate branch and re-running every measurement rather than accepting the
+> implementer's report — that is what "QA-accepted" means here. It is an internal
+> review process, not an audit by an outside party.
+>
+> **The currently pinned demo artifact has NOT been re-accepted.** Phase 5
+> acceptance on 2026-08-01 covered bundle `66456ebf`. That bundle shipped
+> simulated columns without their `sim_` marker, which a later audit caught; the
+> pinned artifact is now `559022e2`, and it awaits both a QA pass and hosted
+> re-validation. The hosted services are portfolio-scale, not production-grade or
 > always-on.
 
 An end-to-end healthcare revenue-cycle intelligence platform built on official CMS synthetic Medicare claims. The project ingests and validates source data, builds a PostgreSQL analytics warehouse, adds a transparently simulated adjudication layer, computes revenue-cycle KPIs, and performs statistical analysis across denials, payment timing, appeals, workflow events, and operational costs.
 
 Phase 4 supplies explainable machine-learning models. Phase 5 integrates those
 models with a FastAPI scoring service, a Streamlit analyst dashboard, and a
-reproducible demo bundle. The independently accepted free-tier hosted demo is
-available, but it is not production-grade or always-on.
+reproducible demo bundle. The free-tier hosted demo is available, but it is not
+production-grade or always-on, and it currently serves the previously accepted
+bundle rather than the newer pinned one.
 
 ## Why this project exists
 
@@ -69,7 +78,8 @@ Implemented and QA-accepted:
 
 ### Phase 5 — API, dashboard, and packaging ✅
 
-Implemented and independently QA-accepted:
+Implemented, and QA-accepted on 2026-08-01 against bundle `66456ebf` — see the
+status note at the top for what that review was and what it no longer covers:
 
 - Versioned FastAPI endpoints and schemas
 - Five-page Streamlit analyst dashboard
@@ -91,8 +101,9 @@ Implemented and independently QA-accepted:
 
 These links are zero-cost hosted portfolio evidence. Render may sleep after
 inactivity, so the first API request can take about a minute. The services are
-not represented as production-grade or always-on. They serve the independently
-accepted clean-SHA bundle identified above.
+not represented as production-grade or always-on. They currently serve bundle
+`66456ebf`, the artifact accepted on 2026-08-01, not the newer pinned
+`559022e2` — the two differ, and the difference is the `sim_` marker rename.
 
 ![Hosted dashboard overview](docs/images/hosted/streamlit-overview.png)
 
