@@ -36,6 +36,10 @@ FIREWALL_DOC_PATH = REPO_ROOT / "docs" / "simulated_forbidden_columns.md"
 
 Model = Literal["A", "C"]
 
+#: CLAUDE.md §3.2 marker. Matching strips it from both the blacklist entry and
+#: the candidate column so an entry names the QUANTITY, not one of its spellings.
+SIM_MARKER = "sim_"
+
 # A backticked span that looks like a SQL identifier: starts with a letter, ends
 # with a letter or digit. The trailing-character rule is what keeps the prose
 # token `sim_` (from "Neither is a `sim_` column") out of the parsed sets.
@@ -216,6 +220,16 @@ def forbidden_columns(model: Model = "A", config: Mapping | None = None) -> froz
     return (union - permitted) | frozenset(model_c.get("forbidden_features") or [])
 
 
+def _unmarked(name: str) -> str:
+    """The name with its simulated marker removed, for matching purposes only.
+
+    `sim_dollars_at_stake` and `dollars_at_stake` are the same quantity wearing
+    different labels, and the blacklist must catch both regardless of which
+    spelling the config happens to hold.
+    """
+    return name[len(SIM_MARKER) :] if name.startswith(SIM_MARKER) else name
+
+
 def _offenders(columns: Iterable[str], blacklist: frozenset[str]) -> dict[str, str]:
     """Map each offending column to the forbidden name that caught it.
 
@@ -223,15 +237,35 @@ def _offenders(columns: Iterable[str], blacklist: frozenset[str]) -> dict[str, s
     or `log_sim_paid_amount` is a forbidden column wearing a hat. Substring
     matching is intentionally blunt — a false positive costs a rename, a false
     negative ships a leak.
+
+    MARKER-INSENSITIVE, and this direction is the one that bit us. Matching is
+    done on the name with any leading `sim_` stripped from BOTH sides. Without
+    that, protection is one-directional and silently depends on which spelling
+    the config happens to hold:
+
+        config `dollars_at_stake`      catches `sim_dollars_at_stake`  (substring)
+        config `sim_dollars_at_stake`  catches `dollars_at_stake`      (NOT a
+                                       substring — the entry is LONGER than the
+                                       column, so nothing matches)
+
+    The §3.2 marker rename moved every `forbidden_derived_features` entry to the
+    prefixed spelling, which quietly left the bare names unguarded. Nothing was
+    exploiting it, because the views were renamed in the same change — but a
+    blacklist whose coverage depends on a spelling is the placeholder defect that
+    opened Phase 4, and it would have been invisible until something reintroduced
+    a bare name. Stripping the marker makes the entry mean the QUANTITY rather
+    than one of its two labels.
     """
     hits: dict[str, str] = {}
+    bare_blacklist = {forbidden: _unmarked(forbidden) for forbidden in blacklist}
     for column in columns:
         lowered = column.lower()
         if lowered in blacklist:
             hits[column] = lowered
             continue
-        for forbidden in blacklist:
-            if forbidden in lowered:
+        bare_column = _unmarked(lowered)
+        for forbidden, bare_forbidden in bare_blacklist.items():
+            if bare_forbidden and bare_forbidden in bare_column:
                 hits[column] = forbidden
                 break
     return hits
