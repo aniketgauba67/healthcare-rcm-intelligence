@@ -159,9 +159,19 @@ DenialScoreRequest = _denial_request_model()
 
 
 class ReasonCode(BaseModel):
-    reason_code: str
+    """A reason code and its action, marked because both describe a SIMULATED denial.
+
+    `src/models/explain.py` emits `sim_reason_code` / `sim_analyst_action` and the
+    demo bundle ships them marked. The mapping table is project-authored, but what
+    a reason code SAYS is a statement about a predicted simulated denial, so the
+    wire has to spell it the same way the explainer and the bundle do. `feature`
+    stays bare: it names a feature column rather than asserting anything about a
+    claim.
+    """
+
+    sim_reason_code: str
     feature: str
-    analyst_action: str
+    sim_analyst_action: str
 
 
 class DenialScoreResponse(BaseModel):
@@ -340,22 +350,35 @@ class WorkQueueResponse(BaseModel):
 
 
 class ExecutiveMetricsResponse(BaseModel):
-    period_from: str
-    period_to: str
-    claims_submitted: int
-    denied_claims: int
-    denial_rate: float
-    clean_claim_rate: float
-    first_pass_paid_rate: float
+    """Book-level KPIs. Every count, rate and timing figure keeps its `sim_` marker.
+
+    `source_billed_charge_amt` is the one money figure that does not: it sums the
+    CMS billed charge, which is SOURCE.
+
+    `sim_period_from` / `sim_period_to` are marked too, which is a judgement the
+    original eight did not force. They are the min and max of the view's
+    `sim_submission_year_month`, so the window this response describes is bounded
+    by when the SIMULATION decided claims were submitted, not by anything in the
+    CMS file. The view already marks the same quantity per month as
+    `sim_month_start`.
+    """
+
+    sim_period_from: str
+    sim_period_to: str
+    sim_claims_submitted: int
+    sim_denied_claims: int
+    sim_denial_rate: float
+    sim_clean_claim_rate: float
+    sim_first_pass_paid_rate: float
     sim_net_collection_rate: float
     source_billed_charge_amt: float
     sim_allowed_amt: float
     sim_paid_amt: float
     sim_denied_amt: float
     sim_cost_to_collect: float
-    avg_days_to_payment: float
-    claims_appealed: int
-    appeal_overturn_rate: float
+    sim_avg_days_to_payment: float
+    sim_claims_appealed: int
+    sim_appeal_overturn_rate: float
     monthly: list[dict[str, Any]] = Field(default_factory=list)
     reconciliation: dict[str, Any] = Field(
         description=(

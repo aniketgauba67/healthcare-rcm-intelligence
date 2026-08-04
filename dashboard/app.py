@@ -136,9 +136,11 @@ def landing() -> None:
         [
             Kpi(
                 "Claims in the book",
-                f"{totals['claims_submitted']:,}",
-                "SOURCE",
-                "CMS synthetic inpatient claims. Real published file, no real patients.",
+                f"{totals['sim_claims_submitted']:,}",
+                "SIMULATED",
+                "Counted by SIMULATED submission month. The claims underneath are CMS "
+                "synthetic inpatient records — a real published file, no real patients — "
+                "and the total reconciles to count(*) over that fact.",
             ),
             Kpi(
                 "Billed charges",
@@ -148,7 +150,7 @@ def landing() -> None:
             ),
             Kpi(
                 "Denial rate",
-                percent(totals["denial_rate"], 2),
+                percent(totals["sim_denial_rate"], 2),
                 "SIMULATED",
                 "Denials do not exist in the CMS files. Every one is generated here.",
             ),

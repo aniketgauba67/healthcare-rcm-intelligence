@@ -27,9 +27,16 @@ from dashboard.disclosures import API_SIMULATED_NOTICE
 
 API_VERSION = "1.0.0"
 
-#: Fields that are simulated but whose names do not start with `sim_`, because
-#: they are model outputs over a simulated label rather than columns copied from
-#: the warehouse. Declared, because the prefix rule cannot see them.
+#: Simulated quantities whose names do not start with `sim_`. Declared, because
+#: the prefix rule cannot see them.
+#:
+#: NOTHING ON THE WIRE MATCHES THIS SET TODAY, and that is the intended end state
+#: rather than a reason to delete it. These are the pre-rename spellings of four
+#: model outputs; the schemas now publish `sim_denial_risk`,
+#: `sim_denial_risk_uncalibrated`, `sim_p_overturn` and `sim_expected_net_recovery`,
+#: so the prefix rule sees them without help. The set is kept as a tripwire: if a
+#: bare spelling ever comes back, the disclosure still reports it instead of
+#: silently omitting it, which is exactly the failure `/metrics/executive` had.
 _SIMULATED_UNPREFIXED: frozenset[str] = frozenset(
     {
         "denial_risk",

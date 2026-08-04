@@ -331,7 +331,7 @@ def top_reason_codes(features: dict[str, Any], limit: int = 3) -> list[dict[str,
         if value is None or bool(value) is not risky_value:
             continue
         code, action = REASON_CODES.get(name, ("UNMAPPED", "-- no mapped action --"))
-        hits.append({"reason_code": code, "feature": name, "analyst_action": action})
+        hits.append({"sim_reason_code": code, "feature": name, "sim_analyst_action": action})
         if len(hits) >= limit:
             break
     return hits

@@ -113,13 +113,39 @@ def test_the_reason_code_naming_agrees_between_the_api_and_the_explainer() -> No
 
 
 def test_the_check_is_driven_by_the_view_and_fires_on_a_stripped_marker() -> None:
-    """Feed the real check a view that marks a field the model publishes bare."""
+    """Feed the real check a view that marks a field a model publishes bare.
+
+    UPDATED BY THE FIX, on this control's own written instruction ("if that is a
+    fix rather than a rename, update this control"). It previously asserted that
+    `ExecutiveMetricsResponse` still published a bare `denial_rate`, which was
+    true only while the defect was present — so once the response model was fixed
+    the control could not pass, and no fix could ever be green.
+
+    Its PURPOSE is unchanged and is the reason it is not simply deleted: prove
+    the check is driven by the view SQL and would fire, so the two tests above
+    cannot pass vacuously if the parser goes blind. It now proves that against a
+    synthetic bare field instead of against the production defect.
+    """
     view_columns = set(view_output_columns(VIEWS_DIR / "vw_executive_rcm_summary.sql"))
     assert "sim_denial_rate" in view_columns, (
         "the parser stopped seeing the view's marked columns, so the check above would "
         "pass vacuously. That is the failure mode this control exists for."
     )
-    assert "denial_rate" in _model_fields("ExecutiveMetricsResponse"), (
-        "the response model no longer publishes the bare name; if that is a fix rather "
-        "than a rename, update this control."
+
+    # The real check's logic, run against a model that still strips the marker.
+    published = ["period_note", "denial_rate", "sim_denial_rate"]
+    stripped = [
+        f"Synthetic.{field}"
+        for field in published
+        if not field.startswith(MARKER) and f"{MARKER}{field}" in view_columns
+    ]
+    assert stripped == ["Synthetic.denial_rate"], (
+        "the stripped-marker check no longer fires on a field the view marks and a model "
+        "publishes bare, so the two tests above prove nothing."
+    )
+
+    # And the production model must now be on the marked side of that same test.
+    assert "sim_denial_rate" in _model_fields("ExecutiveMetricsResponse"), (
+        "the response model does not publish the marked name, so the fix this control "
+        "was updated for is not actually in place."
     )

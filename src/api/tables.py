@@ -160,6 +160,17 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
     the view's totals by construction — which is what makes the §7 reconciliation
     ("dashboard totals reconcile to SQL control queries") a property of the code
     rather than a thing somebody checked once.
+
+    THE OUTPUT KEYS CARRY THE MARKER, and that is load-bearing rather than
+    cosmetic. A roll-up of `sim_denied_claims` over `sim_claims_submitted` is
+    still a statement about the simulated adjudication layer, so it keeps the
+    marker the view earned. Publishing it as a bare `denial_rate` beside a marked
+    `sim_net_collection_rate` in the same object was worse than leaving every
+    field bare: `meta.notice` tells the caller that `sim_`-prefixed fields are
+    simulated, so inside a mixed object an absent marker stops being silence and
+    becomes an assertion that the field is real. `simulated_fields()` in
+    `src/api/provenance.py` measures the marker off these keys, so marking them
+    here is also what makes `meta.simulated_fields` report them.
     """
     totals = {
         name: float(monthly[name].fillna(0).sum()) for name in _SUMMABLE if name in monthly.columns
@@ -184,13 +195,13 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
 
     months = monthly["sim_submission_year_month"].astype(str)
     return {
-        "period_from": months.min(),
-        "period_to": months.max(),
-        "claims_submitted": int(claims),
-        "denied_claims": int(totals.get("sim_denied_claims", 0.0)),
-        "denial_rate": rate("sim_denied_claims", claims),
-        "clean_claim_rate": rate("sim_clean_claims", claims),
-        "first_pass_paid_rate": rate("sim_first_pass_paid_claims", claims),
+        "sim_period_from": months.min(),
+        "sim_period_to": months.max(),
+        "sim_claims_submitted": int(claims),
+        "sim_denied_claims": int(totals.get("sim_denied_claims", 0.0)),
+        "sim_denial_rate": rate("sim_denied_claims", claims),
+        "sim_clean_claim_rate": rate("sim_clean_claims", claims),
+        "sim_first_pass_paid_rate": rate("sim_first_pass_paid_claims", claims),
         "sim_net_collection_rate": (
             round(totals.get("sim_paid_amt", 0.0) / totals["sim_allowed_amt"], 6)
             if totals.get("sim_allowed_amt")
@@ -201,9 +212,9 @@ def build_executive_summary(monthly: pd.DataFrame) -> dict[str, Any]:
         "sim_paid_amt": round(totals.get("sim_paid_amt", 0.0), 2),
         "sim_denied_amt": round(totals.get("sim_denied_amt", 0.0), 2),
         "sim_cost_to_collect": round(totals.get("sim_cost_to_collect", 0.0), 2),
-        "avg_days_to_payment": round(avg_days, 2),
-        "claims_appealed": int(appealed),
-        "appeal_overturn_rate": (
+        "sim_avg_days_to_payment": round(avg_days, 2),
+        "sim_claims_appealed": int(appealed),
+        "sim_appeal_overturn_rate": (
             round(totals.get("sim_claims_overturned", 0.0) / appealed, 6) if appealed else 0.0
         ),
     }
@@ -218,15 +229,23 @@ def executive_control_totals(monthly: pd.DataFrame) -> dict[str, Any]:
     sim_denial_flag`.
     Restating the totals beside the KPIs lets a caller reconcile without a
     database, which is the only form of the check a hosted demo can offer.
+
+    The two sums and `sim_months` carry the marker for the same reason the KPIs
+    above do, one level deeper: `simulated_fields()` walks nested payloads, so a
+    bare simulated figure inside `reconciliation` is omitted from
+    `meta.simulated_fields` exactly as a bare top-level one would be. `sim_months`
+    is the row count of a view whose grain is the SIMULATED submission month, so
+    it states how long the simulated book runs. `control_query` and `note`
+    describe OUR check rather than the simulated world and stay bare.
     """
     return {
         "control_query": (
             "select sum(sim_claims_submitted), sum(sim_denied_claims) "
             "from rcm.vw_executive_rcm_summary"
         ),
-        "sum_claims_submitted": int(monthly["sim_claims_submitted"].fillna(0).sum()),
-        "sum_denied_claims": int(monthly["sim_denied_claims"].fillna(0).sum()),
-        "months": int(len(monthly)),
+        "sim_sum_claims_submitted": int(monthly["sim_claims_submitted"].fillna(0).sum()),
+        "sim_sum_denied_claims": int(monthly["sim_denied_claims"].fillna(0).sum()),
+        "sim_months": int(len(monthly)),
         "note": (
             "These must equal count(*) from rcm.fact_inpatient_claim and count(*) from "
             "rcm.sim_claim_adjudication where sim_denial_flag respectively "

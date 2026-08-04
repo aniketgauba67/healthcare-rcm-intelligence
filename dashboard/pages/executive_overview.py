@@ -76,25 +76,27 @@ kpi_row(
     [
         Kpi(
             "Claims submitted",
-            f"{totals['claims_submitted']:,}",
-            "SOURCE",
-            "Every inpatient claim in the CMS synthetic file.",
+            f"{totals['sim_claims_submitted']:,}",
+            "SIMULATED",
+            "Counted by SIMULATED submission month, which is why it carries the marker. "
+            "The book-level total still reconciles exactly to count(*) over the CMS "
+            "synthetic fact — every inpatient claim in the published file, counted once.",
         ),
         Kpi(
             "Denial rate",
-            percent(totals["denial_rate"], 2),
+            percent(totals["sim_denial_rate"], 2),
             "SIMULATED",
             "Denied claims / claims submitted, summed across months rather than averaged.",
         ),
         Kpi(
             "Clean-claim rate",
-            percent(totals["clean_claim_rate"], 2),
+            percent(totals["sim_clean_claim_rate"], 2),
             "SIMULATED",
             "Claims that adjudicated with no denial and no rework.",
         ),
         Kpi(
             "First-pass paid rate",
-            percent(totals["first_pass_paid_rate"], 2),
+            percent(totals["sim_first_pass_paid_rate"], 2),
             "SIMULATED",
             "Paid on first submission, no appeal, no resubmission.",
         ),
@@ -230,19 +232,19 @@ kpi_row(
         ),
         Kpi(
             "Appeals filed",
-            f"{totals['claims_appealed']:,}",
+            f"{totals['sim_claims_appealed']:,}",
             "SIMULATED",
             "Of 2,663 simulated denials, 967 were appealed.",
         ),
         Kpi(
             "Overturn rate of appealed",
-            percent(totals["appeal_overturn_rate"], 1),
+            percent(totals["sim_appeal_overturn_rate"], 1),
             "SIMULATED",
             "Overturned / appealed. Not overturned / denied.",
         ),
         Kpi(
             "Avg days to payment",
-            f"{totals['avg_days_to_payment']:.1f}",
+            f"{totals['sim_avg_days_to_payment']:.1f}",
             "SIMULATED",
             "Volume-weighted across months.",
         ),
