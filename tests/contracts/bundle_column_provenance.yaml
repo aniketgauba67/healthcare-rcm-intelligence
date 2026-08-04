@@ -1,0 +1,237 @@
+# Provenance classification for every column in the committed demo bundle.
+#
+# WHY THIS FILE EXISTS
+# The bundle (dashboard/demo_data/rcm_demo.duckdb) is the single most exposed
+# artifact in this repository: it ships to a public hosted demo and a reader can
+# open it with no database, no environment and no code. CLAUDE.md §1 says the
+# property the whole project rests on is that no simulated value is ever
+# presented as real, and §3.2 says every simulated column carries a `sim_`
+# prefix. The same defect -- a simulated value reaching a surface without its
+# marker -- has now been found FOUR times, one layer further out each time:
+# in the work-queue CSVs, in the view layer, on the API wire, and here in the
+# bundle. Each was fixed as an individual rename. This file exists so the fifth
+# occurrence fails a test instead of being found by a human.
+#
+# HOW THE GUARD USES IT (tests/contracts/test_bundle_column_provenance.py)
+#   1. Every column in the bundle must appear here. A NEW column fails the build
+#      until someone classifies it. That is the property a hardcoded allowlist
+#      cannot give you.
+#   2. Every column classified SIMULATED must carry the `sim_` prefix.
+#   3. No column classified SOURCE / DERIVED / REFERENCE / PROCESS may carry it.
+#      Over-marking is also a defect: if `sim_` appears on things that are not
+#      simulated, the marker stops meaning anything.
+#   4. Every entry needs a real reason. A bare list is how `action_type` reached
+#      a forbidden-column list unexamined, and how an unmarked simulated rate
+#      survived four commits.
+#
+# THE FIVE CLASSES (CLAUDE.md §3.1, plus PROCESS)
+#   SOURCE     Unmodified field from the CMS synthetic claims files.
+#   DERIVED    Computed ONLY from SOURCE. No simulated input anywhere upstream.
+#   REFERENCE  From an official published code or facility reference file.
+#   SIMULATED  The value depends on this project's simulated adjudication layer.
+#              Includes aggregates, rates, counts and flags computed over
+#              simulated inputs, and model outputs that predict a simulated
+#              outcome. MUST carry `sim_`.
+#   PROCESS    Metadata about OUR pipeline or experiment rather than a fact
+#              about a claim or a statement about the simulated world: build
+#              stamps, manifest rows, fold and queue labels, ordinal positions.
+#              Stays bare. This follows the settled `split` ruling -- a fold
+#              assignment is metadata about our experiment, not an attribute of
+#              the claim -- and the `queue_mode` and `as_of` rulings after it.
+#
+# A LIMIT THIS FILE CANNOT EXPRESS, stated so nobody mistakes green for safe.
+# Column naming cannot carry MEMBERSHIP. vw_work_queue_priority selects
+# denied-or-open-AR claims in its WHERE clause, so the ROW SET already knows the
+# outcome even where every column name is honest. That is disclosed on the
+# surface, not encoded here.
+
+rules:
+  marker: sim_
+  classes_requiring_marker: [SIMULATED]
+  classes_forbidding_marker: [SOURCE, DERIVED, REFERENCE, PROCESS]
+  minimum_reason_words: 4
+
+tables:
+
+  # --------------------------------------------------------------- build info
+  demo_build_info:
+    git_commit:        {class: PROCESS, why: "commit the bundle was built from"}
+    git_branch:        {class: PROCESS, why: "branch the bundle was built from"}
+    git_tree_dirty:    {class: PROCESS, why: "whether the build tree was clean"}
+    built_at_utc:      {class: PROCESS, why: "wall clock of the build run"}
+    source_vintages:   {class: PROCESS, why: "vintages of the inputs, build metadata"}
+    dataset_names:     {class: PROCESS, why: "inventory of datasets in this bundle"}
+    contains_simulated: {class: PROCESS, why: "disclosure flag about the bundle itself"}
+    notice:            {class: PROCESS, why: "human-readable provenance notice text"}
+
+  demo_manifest:
+    dataset:           {class: PROCESS, why: "name of a dataset in this bundle"}
+    provenance:        {class: PROCESS, why: "declared provenance class of a dataset"}
+    contains_simulated: {class: PROCESS, why: "disclosure flag for one dataset"}
+    grain:             {class: PROCESS, why: "declared row grain of a dataset"}
+    rows:              {class: PROCESS, why: "row count of a bundled dataset"}
+    columns:           {class: PROCESS, why: "column count of a bundled dataset"}
+    simulated_columns: {class: PROCESS, why: "which columns the manifest declares simulated"}
+    note:              {class: PROCESS, why: "free-text note about one dataset"}
+
+  # ------------------------------------------------------------- model output
+  # Model A predicts sim_denial_flag and Model C predicts a simulated appeal
+  # outcome, so every score, rank, direction and recommended action derived from
+  # them is a statement about the SIMULATED world and carries the marker.
+  model_a_scores:
+    claim_sk:          {class: DERIVED, why: "surrogate key over SOURCE claim identity"}
+    fold:              {class: PROCESS, why: "train test fold assignment, our experiment"}
+    top_decile_flag:   {class: SIMULATED, why: "decile of a score predicting a simulated denial"}
+
+  model_a_reason_codes:
+    claim_sk:          {class: DERIVED, why: "surrogate key over SOURCE claim identity"}
+    driver_rank:       {class: SIMULATED, why: "rank of drivers of a simulated denial prediction"}
+    feature:           {class: PROCESS, why: "name of a feature column, not a value"}
+    direction:         {class: SIMULATED, why: "direction of effect on a simulated outcome"}
+    reason_code:       {class: SIMULATED, why: "reason attributed to a simulated denial prediction"}
+    analyst_action:    {class: SIMULATED, why: "action recommended from a simulated prediction"}
+
+  model_a_shap_global:
+    feature:           {class: PROCESS, why: "name of a feature column, not a value"}
+    reason_code:       {class: SIMULATED, why: "reason attributed to a simulated denial prediction"}
+    analyst_action:    {class: SIMULATED, why: "action recommended from a simulated prediction"}
+
+  model_c_work_queue:
+    queue_mode:        {class: PROCESS, why: "which queue build produced this row"}
+    claim_sk:          {class: DERIVED, why: "surrogate key over SOURCE claim identity"}
+    tier:              {class: PROCESS, why: "policy tier label applied by our rules"}
+    tier_rank:         {class: PROCESS, why: "ordinal position within a policy tier"}
+    queue_position:    {class: PROCESS, why: "ordinal position in the queue"}
+    recommended_action: {class: PROCESS, why: "policy recommendation from our own rules"}
+    as_of:             {class: PROCESS, why: "snapshot instant of this queue build"}
+
+  model_metrics:
+    model:             {class: PROCESS, why: "which model these metrics describe"}
+    generated_at_utc:  {class: PROCESS, why: "wall clock of the metrics run"}
+    provenance:        {class: PROCESS, why: "declared provenance of the metrics row"}
+    metrics_json:      {class: SIMULATED, why: "metrics measured against a simulated label"}
+
+  # -------------------------------------------------------------- claim facts
+  vw_claim_enriched:
+    claim_sk:          {class: DERIVED, why: "surrogate key over SOURCE claim identity"}
+    clm_id:            {class: SOURCE, why: "CMS synthetic claim identifier, unmodified"}
+    prvdr_num:         {class: SOURCE, why: "synthetic billing provider id from CMS"}
+    org_npi_num:       {class: SOURCE, why: "synthetic organisation NPI from CMS"}
+    provider_state_cd: {class: SOURCE, why: "provider state code from CMS"}
+    bene_key:          {class: SOURCE, why: "synthetic beneficiary key from CMS"}
+    drg_cd:            {class: SOURCE, why: "DRG code on the synthetic claim"}
+    drg_desc:          {class: REFERENCE, why: "MS-DRG v40 title from the published file"}
+    discharge_status_cd: {class: SOURCE, why: "discharge status code from CMS"}
+    nch_clm_type_cd:   {class: SOURCE, why: "claim type code from CMS"}
+    admtg_dgns_cd:     {class: SOURCE, why: "admitting diagnosis code from CMS"}
+    prncpal_dgns_cd:   {class: SOURCE, why: "principal diagnosis code from CMS"}
+    clm_utlztn_day_cnt: {class: SOURCE, why: "utilization day count from CMS"}
+    length_of_stay_days: {class: DERIVED, why: "computed from SOURCE admission and discharge"}
+    diagnosis_count:   {class: DERIVED, why: "count over SOURCE diagnosis slots"}
+    admission_date:    {class: SOURCE, why: "admission date from CMS"}
+    discharge_date:    {class: SOURCE, why: "discharge date from CMS"}
+    billed_charge_amt: {class: SOURCE, why: "total charge billed, from CMS"}
+    medicare_source_paid_amt: {class: SOURCE, why: "real Medicare payment amount from CMS"}
+    ncvrd_charge_amt:  {class: SOURCE, why: "non-covered charge amount from CMS"}
+    bene_deductible_amt: {class: SOURCE, why: "beneficiary deductible amount from CMS"}
+    submission_year_month: {class: SIMULATED, why: "month of the simulated submission date"}
+    prncpal_dgns_desc: {class: REFERENCE, why: "ICD-10-CM FY2023 description, published file"}
+    admtg_dgns_desc:   {class: REFERENCE, why: "ICD-10-CM FY2023 description, published file"}
+
+  # ------------------------------------------------------- simulated analytics
+  vw_ar_aging:
+    aging_bucket:      {class: SIMULATED, why: "bucket of days from a simulated submission date"}
+    bucket_sort:       {class: PROCESS, why: "display sort order for the buckets"}
+    open_claims:       {class: SIMULATED, why: "count of claims simulated as unpaid"}
+    denied_open_claims: {class: SIMULATED, why: "count filtered on the simulated denial flag"}
+    nondenied_open_claims: {class: SIMULATED, why: "count filtered on the simulated denial flag"}
+    source_billed_at_risk_amt: {class: SIMULATED, why: "SOURCE money summed over a simulated at-risk population"}
+    avg_days_outstanding: {class: SIMULATED, why: "average over simulated submission timing"}
+    min_days_outstanding: {class: SIMULATED, why: "minimum over simulated submission timing"}
+    max_days_outstanding: {class: SIMULATED, why: "maximum over simulated submission timing"}
+
+  vw_clean_claim_performance:
+    prvdr_num:         {class: SOURCE, why: "synthetic billing provider id from CMS"}
+    provider_state_cd: {class: SOURCE, why: "provider state code from CMS"}
+    provider_claims:   {class: SIMULATED, why: "claim count over the simulated adjudication join"}
+    clean_claims:      {class: SIMULATED, why: "count filtered on the simulated clean claim flag"}
+    first_pass_paid_claims: {class: SIMULATED, why: "count filtered on simulated first pass payment"}
+    denied_claims:     {class: SIMULATED, why: "count filtered on the simulated denial flag"}
+    clean_claim_rate:  {class: SIMULATED, why: "rate over the simulated clean claim flag"}
+    first_pass_paid_rate: {class: SIMULATED, why: "rate over simulated first pass payment"}
+    denial_rate:       {class: SIMULATED, why: "rate over the simulated denial flag"}
+    late_filing_rate:  {class: SIMULATED, why: "rate over the simulated late filing flag"}
+    rework_rate:       {class: SIMULATED, why: "rate over simulated denial rework cost"}
+    source_billed_amt: {class: SOURCE, why: "sum of SOURCE billed charges per provider"}
+    low_volume_flag:   {class: DERIVED, why: "threshold on a SOURCE claim count"}
+
+  vw_denial_root_cause:
+    denial_count:      {class: SIMULATED, why: "count of simulated denials"}
+    share_of_denials:  {class: SIMULATED, why: "share of the simulated denial population"}
+    full_denials:      {class: SIMULATED, why: "count filtered on simulated denial type"}
+    partial_denials:   {class: SIMULATED, why: "count filtered on simulated denial type"}
+    claims_appealed:   {class: SIMULATED, why: "count over the simulated appeals table"}
+    appeal_rate:       {class: SIMULATED, why: "rate over simulated appeal activity"}
+    claims_overturned: {class: SIMULATED, why: "count over simulated appeal outcomes"}
+    overturn_rate_of_appealed: {class: SIMULATED, why: "rate over simulated appeal outcomes"}
+    carc_category_label: {class: REFERENCE, why: "CARC category label, project authored labels only"}
+
+  vw_executive_rcm_summary:
+    submission_year_month: {class: SIMULATED, why: "month of the simulated submission date"}
+    month_start:       {class: SIMULATED, why: "earliest simulated submission date in month"}
+    claims_submitted:  {class: SIMULATED, why: "count over simulated submission timing"}
+    denied_claims:     {class: SIMULATED, why: "count filtered on the simulated denial flag"}
+    clean_claims:      {class: SIMULATED, why: "count filtered on the simulated clean claim flag"}
+    first_pass_paid_claims: {class: SIMULATED, why: "count filtered on simulated first pass payment"}
+    denial_rate:       {class: SIMULATED, why: "rate over the simulated denial flag"}
+    clean_claim_rate:  {class: SIMULATED, why: "rate over the simulated clean claim flag"}
+    first_pass_paid_rate: {class: SIMULATED, why: "rate over simulated first pass payment"}
+    late_filing_rate:  {class: SIMULATED, why: "rate over the simulated late filing flag"}
+    billed_charge_amt: {class: SOURCE, why: "sum of SOURCE billed charges per month"}
+    medicare_source_paid_amt: {class: SOURCE, why: "sum of real Medicare payments per month"}
+    avg_days_to_payment: {class: SIMULATED, why: "average over simulated payment timing"}
+    avg_days_to_adjudication: {class: SIMULATED, why: "average over simulated adjudication timing"}
+    claims_appealed:   {class: SIMULATED, why: "count over the simulated appeals table"}
+    claims_overturned: {class: SIMULATED, why: "count over simulated appeal outcomes"}
+    appeal_overturn_rate: {class: SIMULATED, why: "rate over simulated appeal outcomes"}
+
+  vw_payer_performance:
+    claims:            {class: SIMULATED, why: "count per simulated payer, payer dimension is simulated"}
+    realized_claim_share: {class: SIMULATED, why: "share across the wholly simulated payer mix"}
+    denied_claims:     {class: SIMULATED, why: "count filtered on the simulated denial flag"}
+    denial_rate:       {class: SIMULATED, why: "rate over the simulated denial flag"}
+    clean_claim_rate:  {class: SIMULATED, why: "rate over the simulated clean claim flag"}
+    late_filing_rate:  {class: SIMULATED, why: "rate over the simulated late filing flag"}
+    source_billed_amt: {class: SIMULATED, why: "SOURCE money grouped by a simulated payer"}
+    avg_days_to_payment: {class: SIMULATED, why: "average over simulated payment timing"}
+    median_days_to_payment: {class: SIMULATED, why: "median over simulated payment timing"}
+    avg_days_to_adjudication: {class: SIMULATED, why: "average over simulated adjudication timing"}
+    claims_appealed:   {class: SIMULATED, why: "count over the simulated appeals table"}
+    appeal_overturn_rate: {class: SIMULATED, why: "rate over simulated appeal outcomes"}
+
+  vw_work_queue_priority:
+    claim_sk:          {class: DERIVED, why: "surrogate key over SOURCE claim identity"}
+    clm_id:            {class: SOURCE, why: "CMS synthetic claim identifier, unmodified"}
+    prvdr_num:         {class: SOURCE, why: "synthetic billing provider id from CMS"}
+    age_days:          {class: SIMULATED, why: "days from the simulated submission date"}
+    is_heuristic_placeholder: {class: PROCESS, why: "labels this view as a heuristic scaffold"}
+
+  vw_model_monitoring:
+    submission_year_month: {class: SIMULATED, why: "month of the simulated submission date"}
+    feature_name:      {class: PROCESS, why: "name of a monitored feature, not a value"}
+    metric_kind:       {class: PROCESS, why: "which drift metric this row reports"}
+    n_claims:          {class: SIMULATED, why: "claim count within a simulated submission month"}
+    metric_value:      {class: SIMULATED, why: "drift metric computed over simulated outcomes"}
+    is_drift_scaffold: {class: PROCESS, why: "labels this view as a drift scaffold"}
+
+  vw_data_quality_scorecard:
+    check_id:          {class: PROCESS, why: "identifier of one quality check"}
+    dimension:         {class: PROCESS, why: "quality dimension the check belongs to"}
+    subject_provenance: {class: PROCESS, why: "provenance class the check is about"}
+    description:       {class: PROCESS, why: "human readable description of the check"}
+    numerator:         {class: PROCESS, why: "numerator of a data quality measurement"}
+    denominator:       {class: PROCESS, why: "denominator of a data quality measurement"}
+    metric_value:      {class: PROCESS, why: "value of a data quality measurement"}
+    threshold_min:     {class: PROCESS, why: "configured pass threshold for the check"}
+    severity:          {class: PROCESS, why: "severity assigned to a failing check"}
+    pass_flag:         {class: PROCESS, why: "whether the quality check passed"}
