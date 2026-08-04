@@ -2048,6 +2048,93 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
 >   READMEs plus the dirty-tree semantics. Small, not trivial. Phase 5.
 
 ## Phase 5 — App + Packaging (lead: app-engineer)
+> POST-AUDIT REMEDIATION (team-lead, 2026-08-03/04, human-directed). A full
+> integrity audit was run against everything that landed since 71cee4b, after
+> unsupervised work by a separate Codex-driven team while the project was
+> deployed. The audit report is in the session record; what landed here is below,
+> in the order the human set. main is NOT pushed — the human pushes after an
+> independent QA pass, and readiness will correctly fail closed until the hosted
+> bundle matches the new pin.
+>
+> AUDIT #2 — unmarked simulated columns in the public demo bundle. DONE
+> (e59aba5 spec+RED guard, 01b1a62 rename, f32829a rebuild+re-pin). 65 of 144
+> unmarked columns were classified SIMULATED and shipped without the marker, on
+> the one artifact a reader can open with no database. FOURTH appearance of one
+> defect family — work-queue CSVs, view layer, API wire, now the bundle — each
+> previously fixed as an individual rename, which is why there was a fourth. The
+> guard is declaration-driven so the FIFTH fails a test instead of a human: a new
+> bare column is unclassified and fails the build until someone decides what it
+> is. Bundle SHA-256 559022e2… supersedes 66456ebf…, re-pinned in all seven
+> locations. AWAITING independent review (qa-reviewer-p20) — the only verification
+> so far is by the same party that wrote the specification.
+>
+> AUDIT #6 — WITHDRAWN IN BOTH FORMS, and the withdrawal is the lesson.
+> Filed as order-dependent negative controls in the render gate, re-filed by me as
+> cold-start timeout fragility, and NEITHER exists. 35c6bfb raised the AppTest
+> timeout 240→450 against a measured 271.13s first render; 0021858 reverts it,
+> because on a repaired toolchain the same test measures 21.48s. The reading was
+> wrong by 12.6x and 240s was never too low.
+> WHAT MADE IT WRONG, recorded because it invalidated more than one number: a
+> corrupt .venv whose `ruff` binary would not start AT ALL (`ruff --version` hung
+> indefinitely while the `python` beside it ran in 0.04s), a FOUR-DAY-OLD orphaned
+> `uv run streamlit` server (PID 7429, from the 2026-07-29 app-engineer crash)
+> holding the uv environment lock, an iCloud sync daemon at 88% CPU over a repo
+> living under ~/Documents, and a Time Machine backup — all at once. Every
+> `uv run` in the session queued behind a binary that could never start.
+> The first `rm -rf .venv` SILENTLY DID NOT TAKE EFFECT (`uv sync` reported
+> "Audited 88 packages" and the ruff binary kept its Jul 22 timestamp); the repair
+> landed only on a second attempt from a verified working directory.
+> TEAM RULE: a timing measurement taken while the toolchain is degraded is not
+> evidence, and a test suite is the instrument LEAST able to tell you its own
+> environment is sick. Before filing any timing-derived finding, prove the
+> toolchain is healthy — `ruff --version` is a two-second check and it would have
+> saved this entire detour. I hypothesised four causes before isolating one, which
+> is the same reasoning-from-a-plausible-neighbour failure this project keeps
+> finding in its guards.
+>
+> AUDIT #9 — the unattributed "independently QA-accepted" claim. DONE (d6a568a).
+> The claim was NOT fabricated: a real Phase 5 acceptance is recorded here for
+> 2026-08-01 with genuine evidence. Two things were wrong. "Independently" had no
+> referent — the review is INTERNAL, by this project's own reviewer agent working
+> from a separate branch and re-running measurements rather than accepting the
+> implementer's report. That is a real discipline and it is not third-party
+> assurance; unqualified on a public README it reads as the latter. And the
+> acceptance no longer covers what ships: it was granted on bundle 66456ebf, the
+> one that shipped unmarked simulated columns. README and docs/hosted_deployment.md
+> now state what the process is, name it internal, and lead with what is NOT
+> accepted.
+> THE TEST THAT WOULD HAVE PREVENTED THE FIX (audit #4, became load-bearing the
+> moment #9 was corrected): tests/hosting/test_hosted_evidence.py REQUIRED the
+> README to contain "Phase 5 is independently QA-accepted" and FORBADE the strings
+> "Phase 5 remains under QA", "pending final artifact QA" and "not accepted or
+> deployed". Softening the claim to something true turned that file RED — a test
+> arguing to keep an overstatement on a public artifact. Rewritten to assert the
+> PROPERTY, not the VERDICT: limitations must still be disclosed, and if the README
+> says "QA-accepted" at all it must also say what that means.
+> TEAM RULE: a gate may require a claim to be SUPPORTED. It must never require the
+> claim to be POSITIVE.
+> Also fixed there: assertions matched raw text, so a sentence wrapped across two
+> markdown blockquote lines failed to match itself.
+>
+> AUDIT #1 — leakage blacklist protective direction. DONE (fd115c3). `_offenders`
+> matched by substring, so coverage was ONE-DIRECTIONAL and depended on which
+> spelling config/model.yaml held: entry `dollars_at_stake` catches
+> `sim_dollars_at_stake`, but entry `sim_dollars_at_stake` catches a bare
+> `dollars_at_stake` NOT AT ALL — the entry is longer than the column, so no
+> substring exists. The §3.2 rename in 01b1a62 moved every entry to the prefixed
+> spelling, i.e. into the direction with no coverage, silently unguarding every
+> bare name. Nothing exploited it because the views moved in the same commit, but
+> a blacklist whose coverage depends on a spelling is the placeholder defect that
+> OPENED Phase 4: green, and empty. Fix strips the marker from both sides so an
+> entry names the QUANTITY rather than one of its labels. Five scratch-frame tests
+> including over-blocking and a degenerate `sim_` entry, plus a NEGATIVE CONTROL —
+> reverted the fix, watched the two direction-specific tests fail, restored.
+>
+> STILL OPEN, in the human's order: AUDIT #5 (untracked AGENTS.md / .codex/ —
+> next), then AUDIT #8 (Postgres in the hosted readiness path) which the human has
+> RESERVED for explicit ruling because one branch of it edits the CLAUDE.md §2
+> locked-decision table. #7 (suite runtime) noted, not urgent.
+>
 > IN PROGRESS (app-engineer-5, `fix/bundle-sim-markers`): turning the RED guard
 > `tests/contracts/test_bundle_column_provenance.py` (added in e59aba5) green by
 > renaming the 65 bundle columns the approved classification
