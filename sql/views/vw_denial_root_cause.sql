@@ -30,6 +30,12 @@
 --     from rcm.vw_denial_root_cause;                          -- = 1222 (label-noise-ish)
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_denial_root_cause would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_denial_root_cause cascade;
 create or replace view rcm.vw_denial_root_cause as
 with denied as (
     select * from rcm.vw_claim_enriched where sim_denial_flag

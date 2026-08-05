@@ -30,6 +30,12 @@
 --   pass_flag = (metric_value within threshold). Row count = number of checks.
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_data_quality_scorecard would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_data_quality_scorecard cascade;
 create or replace view rcm.vw_data_quality_scorecard as
 with claims as (select count(*) n from rcm.fact_inpatient_claim),
      checks as (

@@ -29,6 +29,12 @@
 --   sum(billed_charge_amt) must equal sum(clm_tot_chrg_amt) in the fact.
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_executive_rcm_summary would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_executive_rcm_summary cascade;
 create or replace view rcm.vw_executive_rcm_summary as
 with appeals_by_claim as (
     select claim_sk,

@@ -29,6 +29,12 @@
 --           where sim_denial_flag or sim_ar_open_flag;
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_work_queue_priority would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_work_queue_priority cascade;
 create or replace view rcm.vw_work_queue_priority as
 with snapshot as (
     select greatest(max(sim_adjudication_date), max(sim_payment_date),

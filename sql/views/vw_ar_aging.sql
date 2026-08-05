@@ -41,6 +41,12 @@
 --   select count(*) from rcm.vw_ar_aging;              -- = 5 (spine: all buckets)
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_ar_aging would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_ar_aging cascade;
 create or replace view rcm.vw_ar_aging as
 with snapshot as (
     -- latest activity anywhere in the simulated timeline = the AR "as of" date

@@ -23,6 +23,12 @@
 --   round(sum(sim_payer_mix_share_config)::numeric,2) documents the design mix.
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_payer_performance would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_payer_performance cascade;
 create or replace view rcm.vw_payer_performance as
 with appeals_by_claim as (
     select claim_sk,

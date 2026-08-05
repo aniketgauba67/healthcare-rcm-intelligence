@@ -35,6 +35,12 @@
 --     = distinct months in rcm.vw_executive_rcm_summary.
 -- ============================================================================
 
+-- `create or replace view` CANNOT rename an output column, so a tree that
+-- already holds an older vw_model_monitoring would keep the old names and this
+-- file would silently fail to take effect. Locally that never showed, because
+-- vw_claim_enriched drop-cascades and takes its dependants with it; a FRESH
+-- database has no such cascade, which is how the hosted init surfaced it.
+drop view if exists rcm.vw_model_monitoring cascade;
 create or replace view rcm.vw_model_monitoring as
 with base as (
     select
