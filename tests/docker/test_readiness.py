@@ -44,7 +44,36 @@ def test_api_liveness_is_separate_from_postgres_readiness(monkeypatch) -> None:
     with pytest.raises(HTTPException) as raised:
         api_main.health()
     assert raised.value.status_code == 503
-    assert raised.value.detail["error"] == "postgres_not_ready"
+    # A reachable database with the WRONG schema. Retrying cannot fix it, and the
+    # response says so — three deploy cycles were spent retrying a failure that
+    # was deterministic from the first check.
+    assert raised.value.detail["error"] == "postgres_contract_mismatch"
+    assert raised.value.detail["retryable"] is False
+    assert "vw_model_monitoring" in raised.value.detail["detail"], (
+        "the offending relation must reach the caller; a bare 503 is what made this "
+        "undiagnosable from the platform log"
+    )
+
+
+def test_an_unreachable_database_is_reported_as_transient(monkeypatch) -> None:
+    """The other branch: cannot connect at all, which retrying MAY fix.
+
+    A rotated credential that has not propagated to the platform presents exactly
+    like this, and it is the reason this distinction exists — it cost a deploy
+    cycle that looked identical to a schema mismatch in the log.
+    """
+    monkeypatch.setenv("RCM_REQUIRE_POSTGRES_READY", "true")
+
+    def unreachable() -> None:
+        raise OSError("could not translate host name")
+
+    monkeypatch.setattr(api_main, "validate_postgres_contract", unreachable)
+
+    with pytest.raises(HTTPException) as raised:
+        api_main.health()
+    assert raised.value.status_code == 503
+    assert raised.value.detail["error"] == "postgres_unreachable"
+    assert raised.value.detail["retryable"] is True
 
 
 def test_api_readiness_passes_when_the_contract_and_bundle_are_ready(monkeypatch) -> None:

@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import logging
 import os
 import pathlib
 from typing import Annotated, Any, Literal
@@ -78,6 +79,10 @@ from src.infra.postgres_contract import PostgresContractError, validate_postgres
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 Role = Literal["executive", "analyst"]
+
+#: Readiness failures are logged here as well as returned, because a platform
+#: health check keeps the status code and throws the body away.
+_LOGGER = logging.getLogger("rcm.api")
 
 MODEL_A_LIMITATIONS = [
     "Every outcome behind this score is SIMULATED. The score is not evidence about real claims.",
@@ -213,20 +218,61 @@ def _postgres_readiness_required() -> bool:
 
 
 def _assert_required_dependencies() -> None:
+    """Readiness gate on the warehouse contract, with the reason on the way out.
+
+    THE REASON MUST REACH THE LOG. A platform health check reads the STATUS and
+    discards the body, so the operator sees a wall of identical `503`s while the
+    diagnosis sits unread in a response nobody keeps. Three deploy attempts were
+    spent guessing at a cause this function already knew, so it is logged here
+    as well as returned.
+
+    DETERMINISTIC FAILURES ARE NOT WORTH RETRYING. A missing column will never
+    resolve by asking again — the schema has to change — so a contract mismatch
+    is logged once at ERROR with the offending relations named. A connection
+    failure is genuinely transient (a sleeping database, a rotated credential
+    not yet propagated) and stays at WARNING, because retrying is the right
+    response to it. Both still return 503: fail-fast here means fail
+    INFORMATIVELY, not fail differently — the platform decides when to stop.
+    """
     if not _postgres_readiness_required():
         return
     try:
         validate_postgres_contract()
-    except Exception as error:
-        detail = str(error) if isinstance(error, PostgresContractError) else type(error).__name__
+    except PostgresContractError as error:
+        # The schema is reachable and WRONG. Retrying cannot fix it.
+        _LOGGER.error(
+            "readiness: postgres contract mismatch, not retryable without a schema change — %s",
+            error,
+        )
         raise HTTPException(
             status_code=503,
             detail={
-                "detail": f"PostgreSQL readiness failed: {detail}",
-                "error": "postgres_not_ready",
+                "detail": f"PostgreSQL readiness failed: {error}",
+                "error": "postgres_contract_mismatch",
+                "retryable": False,
                 "hint": (
-                    "Inspect the warehouse-init service. The Docker warehouse must contain "
-                    "exactly the tracked 24 base tables and 9 views before the API is ready."
+                    "The database is reachable but does not match the tracked DDL. Re-run "
+                    "scripts/initialize_hosted_postgres.py --recreate against it; retrying "
+                    "this endpoint will not change the result."
+                ),
+            },
+        ) from error
+    except Exception as error:
+        # Could not reach or authenticate. Often transient; retrying is correct.
+        _LOGGER.warning(
+            "readiness: postgres unreachable (%s: %s) — treating as transient",
+            type(error).__name__,
+            error,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "detail": f"PostgreSQL readiness failed: {type(error).__name__}: {error}",
+                "error": "postgres_unreachable",
+                "retryable": True,
+                "hint": (
+                    "Check DATABASE_URL and that the database is awake. A rotated credential "
+                    "that has not been updated here presents exactly like this."
                 ),
             },
         ) from error
