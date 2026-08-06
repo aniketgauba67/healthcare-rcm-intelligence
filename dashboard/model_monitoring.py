@@ -50,7 +50,7 @@ def render_model_monitoring(frame: pd.DataFrame) -> bool:
     )
     provenance_note(
         "SIMULATED",
-        "The claim count per month is in the tooltip. Early months are thin in the CMS "
-        "extract, so a swing in a rate there is sampling noise rather than drift.",
+        "The claim count per month is in the tooltip. Trailing months are thin in the "
+        "CMS extract, so a swing in a rate there is sampling noise rather than drift.",
     )
     return True

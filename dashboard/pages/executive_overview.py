@@ -227,9 +227,9 @@ _thin = thin_volume_layer(chart_frame, month_column="month", count_column="sim_c
 st.altair_chart(_thin + chart if _thin is not None else chart, use_container_width=True)
 provenance_note(
     "SIMULATED" if column.startswith("sim_") or is_rate else "SOURCE",
-    "One point per claim-submission month. Thin early months are real thinness in the "
-    "CMS extract, not a rendering artefact — the claim count is in the tooltip beside "
-    "every rate so a 3-claim month cannot be read as a trend.",
+    "One point per claim-submission month. Thin trailing months are real thinness in "
+    "the CMS extract, not a rendering artefact — the claim count is in the tooltip "
+    "beside every rate so a 3-claim month cannot be read as a trend.",
 )
 
 with st.expander("The monthly view as a table", icon=":material/table:"):
