@@ -33,6 +33,7 @@ from dashboard.components import (
     percent,
     provenance_note,
     render_page_header,
+    summary_with_detail,
     render_synthetic_data_banner,
     required_disclosures,
 )
@@ -260,4 +261,8 @@ st.caption(
 st.divider()
 required_disclosures()
 with st.expander("How dollars at risk should and should not be quoted", icon=":material/warning:"):
-    st.markdown(disclosures.DOLLARS_AT_RISK)
+    summary_with_detail(
+        disclosures.DOLLARS_AT_RISK_SUMMARY,
+        disclosures.DOLLARS_AT_RISK,
+        label="Technical detail — how that range was measured",
+    )

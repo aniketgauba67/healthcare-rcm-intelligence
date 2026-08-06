@@ -179,21 +179,38 @@ def test_the_rendered_page_carries_the_synthetic_data_banner(
 ) -> None:
     """CLAUDE.md §6, checked in the OUTPUT rather than in the call graph.
 
-    Anchored to `dashboard/disclosures.SYNTHETIC_DATA_BANNER`, the single source of
-    truth the component renders, so rewording the banner does not make this red and
-    dropping it does.
+    Anchored to the banner constants in `dashboard/disclosures.py`, the single
+    source of truth the component renders, so rewording a banner does not make
+    this red and dropping one does.
+
+    TWO ACCEPTED FORMS, and the reason matters. §6 says no page ships without the
+    banner. It does not say every page must carry six sentences of it, and
+    repeating the full text at full width on all six pages trained the eye to
+    skip the red block — a disclosure nobody reads is not a disclosure. So a page
+    may carry EITHER the full banner or the one-line form, which still says the
+    outcomes are simulated and names where the full text lives.
+    What this gate refuses is a page with NEITHER. That is the §6 property, and
+    it is unchanged: every page still renders a red block stating the data is
+    simulated, and the full text is still reachable in one place rather than
+    deleted. Loosening this to "any page is fine" would be weakening the gate;
+    accepting a second form that carries the same claim is not.
     """
     sys.path.insert(0, str(REPO_ROOT))
     from dashboard import disclosures
 
-    banner = disclosures.SYNTHETIC_DATA_BANNER
-    anchor = max(banner.replace("*", "").split("."), key=len).strip()[:60]
-    assert anchor, "SYNTHETIC_DATA_BANNER is empty; §6 has nothing to render"
+    def _anchor(text: str) -> str:
+        return max(text.replace("*", "").split("."), key=len).strip()[:60]
+
+    full_anchor = _anchor(disclosures.SYNTHETIC_DATA_BANNER)
+    short_anchor = _anchor(disclosures.BANNER_SHORT_PAGE)
+    assert full_anchor, "SYNTHETIC_DATA_BANNER is empty; §6 has nothing to render"
+    assert short_anchor, "BANNER_SHORT_PAGE is empty; the short form would disclose nothing"
 
     rendered = _render(page, tmp_path)
     everything = "\n".join(
         rendered["markdown"] + rendered["captions"] + rendered["errors"]
     ).replace("*", "")
+    anchor = full_anchor if full_anchor in everything else short_anchor
     assert anchor.replace("*", "") in everything, (
         f"{page.relative_to(REPO_ROOT)} rendered without the §6 synthetic-data banner in its "
         "output. 'No page ships without it' is absolute, and §3.5 is why: Medicare FFS has one "

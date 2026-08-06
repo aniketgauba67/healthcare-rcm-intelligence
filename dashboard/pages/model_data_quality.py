@@ -36,6 +36,7 @@ from dashboard.components import (
     kpi_row,
     provenance_note,
     render_page_header,
+    summary_with_detail,
     render_synthetic_data_banner,
     required_disclosures,
 )
@@ -50,7 +51,7 @@ render_page_header(
     "figure-by-figure reconciliation to the SQL control queries.",
     emitter=PAGE_EMITTER,
 )
-render_synthetic_data_banner()
+render_synthetic_data_banner(short=True)
 data_source_caption()
 
 
@@ -234,7 +235,11 @@ else:
     )
 
     with model_a_tab:
-        st.markdown(disclosures.MODEL_A_HONESTY)
+        summary_with_detail(
+            disclosures.MODEL_A_SUMMARY,
+            disclosures.MODEL_A_HONESTY,
+            label="Technical detail — Model A intervals and baselines",
+        )
         comparison = metrics_a["comparisons"]["xgboost_minus_logistic"]["roc_auc"]
         baseline = metrics_a["comparisons"]["logistic_minus_payer_rule"]["roc_auc"]
         kpi_row(
@@ -309,7 +314,11 @@ else:
         )
 
     with model_c_tab:
-        st.markdown(disclosures.MODEL_C_HONESTY)
+        summary_with_detail(
+            disclosures.MODEL_C_SUMMARY,
+            disclosures.MODEL_C_HONESTY,
+            label="Technical detail — Model C intervals and capture rates",
+        )
         against_rule = metrics_c["comparisons"]["xgboost_minus_category_rule"]["roc_auc"]
         kpi_row(
             [
@@ -336,7 +345,11 @@ else:
                 ),
             ]
         )
-        st.markdown(disclosures.MODEL_C_NO_SHAP)
+        summary_with_detail(
+            disclosures.MODEL_C_NO_SHAP_SUMMARY,
+            disclosures.MODEL_C_NO_SHAP,
+            label="Full explanation — why no SHAP for Model C",
+        )
         selection = pd.DataFrame(metrics_c["selection_bias"]["by_category"])
         selection_chart = (
             alt.Chart(selection)

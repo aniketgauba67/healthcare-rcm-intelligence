@@ -68,17 +68,61 @@ def _banner_markdown() -> str:
     return disclosures.SYNTHETIC_DATA_BANNER
 
 
-def render_synthetic_data_banner(extra: str | None = None) -> None:
+def render_synthetic_data_banner(extra: str | None = None, *, short: bool = False) -> None:
     """The §6 synthetic-data banner. Called at the top of every page.
 
     `extra` appends a page-specific note — the payer-dimension warning, the A/R
     shape note — INSIDE the same red block rather than beside it, so a reader
     cannot take the caveat and leave the banner behind.
+
+    `short` renders the one-line form. §6 says no page ships without the banner,
+    and that still holds: every page keeps a red block saying the outcomes are
+    simulated. What changes is length, not coverage. Repeating six sentences at
+    full width on all six pages trained the eye to skip the red block entirely,
+    which is the opposite of what §6 is for — a disclosure nobody reads is not a
+    disclosure. The full text stays one click away on Overview, in one place, so
+    it is still findable in full rather than deleted.
+
+    A page-specific `extra` is ALWAYS rendered in full, short form or not. Those
+    are the warnings that apply to that page alone — the payer dimension, the
+    work queue's membership selection — and they exist nowhere else, so
+    shortening them would drop content rather than relocate it.
     """
+    if short:
+        body = disclosures.BANNER_SHORT_PAGE
+        if extra:
+            body = f"{body}\n\n{extra}"
+        st.error(body, icon=":material/warning:")
+        return
     body = _banner_markdown()
     if extra:
         body = f"{body}\n\n{extra}"
     st.error(body, icon=":material/warning:")
+
+
+def summary_with_detail(
+    summary: str,
+    detail: str,
+    *,
+    label: str = "Full explanation",
+    icon: str | None = None,
+) -> None:
+    """One plain sentence visible, the rigorous text one click below it.
+
+    The dashboard's disclosures were written to be unarguable and they read like
+    an audit transcript: hedged, interval-laden, several sentences before the
+    point. A viewer scanning for a minute got none of it, because dense text at
+    full length is skipped rather than read.
+
+    NOTHING IS SHORTENED OR REMOVED HERE. `detail` is the existing text, moved
+    from the page body into an expander directly beneath its own summary. Every
+    figure, interval and caveat that was on the page is still on the page and
+    still reachable without leaving it. What changes is that the reader gets the
+    point first and chooses whether to read the proof.
+    """
+    st.markdown(summary)
+    with st.expander(label, icon=icon):
+        st.markdown(detail)
 
 
 def render_page_header(title: str, subtitle: str, *, emitter: DashboardEmitter) -> None:
@@ -114,16 +158,44 @@ class Kpi:
     help: str = ""
 
 
-def kpi_row(kpis: list[Kpi]) -> None:
-    """A row of metric tiles, each stamped with its provenance class."""
-    for column, kpi in zip(st.columns(len(kpis)), kpis, strict=True):
-        with column:
-            st.metric(
-                kpi.label,
-                kpi.value,
-                help=f"{kpi.help}\n\n{kpi.classification}: {_CLASS_HELP[kpi.classification]}".strip(),
-            )
-            st.markdown(_CLASS_BADGE[kpi.classification])
+#: Widest tile count that still shows a full money figure without CSS truncation.
+#:
+#: `st.metric` does not wrap. It ellipsises the value to whatever width its column
+#: has, CLIENT-SIDE, so a value that fits in the DOM still reads as "$14…" on the
+#: page. Four tiles in a row gave a quarter-width column, and
+#: "$141,046,614.08" does not fit in a quarter of a laptop viewport — which is
+#: why the Overview showed "20,…", "$14…", "12.…", "$6,…".
+#:
+#: Three is the widest that holds the longest value this dashboard renders. Rows
+#: are chunked rather than shrunk so NO DIGIT IS DROPPED: abbreviating to
+#: "$141.0M" would have fixed the layout by changing the number, and the figures
+#: on this dashboard reconcile to SQL control queries exactly as printed.
+_MAX_TILES_PER_ROW = 3
+
+
+def kpi_row(kpis: list[Kpi], *, per_row: int = _MAX_TILES_PER_ROW) -> None:
+    """Metric tiles stamped with provenance, chunked so values are not truncated.
+
+    Renders in rows of at most `per_row`. A caller passing more than that gets
+    several rows rather than one row of unreadably narrow tiles.
+    """
+    if per_row < 1:
+        raise ValueError("per_row must be at least 1")
+    for start in range(0, len(kpis), per_row):
+        chunk = kpis[start : start + per_row]
+        # Pad the final row so two leftover tiles keep the width of a full row's
+        # tiles instead of stretching to half the page each.
+        columns = st.columns(per_row)
+        for column, kpi in zip(columns[: len(chunk)], chunk, strict=True):
+            with column:
+                st.metric(
+                    kpi.label,
+                    kpi.value,
+                    help=(
+                        f"{kpi.help}\n\n{kpi.classification}: {_CLASS_HELP[kpi.classification]}"
+                    ).strip(),
+                )
+                st.markdown(_CLASS_BADGE[kpi.classification])
 
 
 def provenance_note(classification: Classification, text: str) -> None:
@@ -171,16 +243,16 @@ def required_disclosures(expanded: bool = False) -> None:
     from `dashboard/disclosures.py` so the dashboard, the API and the docs cannot
     drift into three wordings of the same fact.
     """
-    disclosure_block(
-        f"Data vintage — {disclosures.VINTAGE_SKEW_TITLE}",
+    summary_with_detail(
+        disclosures.VINTAGE_SKEW_SUMMARY,
         disclosures.VINTAGE_SKEW,
-        expanded=expanded,
+        label="Full explanation — data vintage",
         icon=":material/schedule:",
     )
-    disclosure_block(
-        f"Facility names — {disclosures.CROSSWALK_COLLISION_TITLE}",
+    summary_with_detail(
+        disclosures.CROSSWALK_COLLISION_SUMMARY,
         f"{disclosures.CROSSWALK_COLLISION}\n\n{disclosures.CROSSWALK_ROW_COUNT_NOTE}",
-        expanded=expanded,
+        label="Full explanation — facility names and keying",
         icon=":material/link_off:",
     )
 

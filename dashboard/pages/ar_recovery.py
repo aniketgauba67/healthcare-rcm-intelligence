@@ -38,6 +38,7 @@ from dashboard.components import (
     percent,
     provenance_note,
     render_page_header,
+    summary_with_detail,
     render_synthetic_data_banner,
     required_disclosures,
 )
@@ -53,7 +54,7 @@ render_page_header(
 # §3.5 makes the payer note part of THIS page's banner rather than a separate block
 # beside it: Medicare FFS has one payer, so a reader who takes the payer comparison
 # and leaves the caveat behind has taken the one thing this page cannot survive.
-render_synthetic_data_banner(extra=disclosures.PAYER_DIMENSION_NOTE)
+render_synthetic_data_banner(extra=disclosures.PAYER_DIMENSION_NOTE, short=True)
 data_source_caption()
 
 try:
@@ -151,7 +152,12 @@ else:
         ]
     )
 
-    st.info(disclosures.AR_AGING_NOTE, icon=":material/info:")
+    summary_with_detail(
+        disclosures.AR_AGING_NOTE_SUMMARY,
+        disclosures.AR_AGING_NOTE,
+        label="Full explanation — why the younger buckets are empty",
+        icon=":material/info:",
+    )
 
     aging_chart = (
         alt.Chart(aging.sort_values("bucket_sort"))

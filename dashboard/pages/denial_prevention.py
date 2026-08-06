@@ -49,7 +49,7 @@ render_page_header(
     "Denial mix, provider clean-claim performance, and the pre-submission risk model.",
     emitter=PAGE_EMITTER,
 )
-render_synthetic_data_banner()
+render_synthetic_data_banner(short=True)
 data_source_caption()
 
 try:

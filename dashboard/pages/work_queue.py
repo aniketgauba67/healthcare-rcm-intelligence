@@ -44,6 +44,7 @@ from dashboard.components import (
     money,
     provenance_note,
     render_page_header,
+    summary_with_detail,
     render_synthetic_data_banner,
     required_disclosures,
 )
@@ -69,7 +70,7 @@ render_page_header(
 )
 # The membership warning rides INSIDE the banner, not beside it. It is the one thing
 # on this page a reader must not be able to scroll past: the selection is the label.
-render_synthetic_data_banner(extra=MEMBERSHIP_WARNING)
+render_synthetic_data_banner(extra=MEMBERSHIP_WARNING, short=True)
 data_source_caption()
 
 role = st.session_state.get("role", "Executive")
@@ -364,7 +365,12 @@ else:
         ]
     )
 
-    st.info(disclosures.MODEL_A_EXPLANATION_LIMIT, icon=":material/help:")
+    summary_with_detail(
+        disclosures.MODEL_A_EXPLANATION_LIMIT_SUMMARY,
+        disclosures.MODEL_A_EXPLANATION_LIMIT,
+        label="Full explanation — why a third cannot be explained",
+        icon=":material/help:",
+    )
 
     if role == "Analyst":
         st.markdown("**Pick a flagged claim to see what drove its score.**")

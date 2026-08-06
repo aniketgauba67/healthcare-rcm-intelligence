@@ -53,6 +53,7 @@ from dashboard.components import (  # noqa: E402
     percent,
     render_synthetic_data_banner,
     required_disclosures,
+    summary_with_detail,
 )
 
 st.set_page_config(
@@ -64,8 +65,9 @@ st.set_page_config(
 
 ROLES = {
     "Executive": (
-        "Aggregate views only. Claim-level detail is hidden, the same way a real "
-        "deployment would scope it — demonstrated here, not enforced by anything."
+        "Aggregate views only — claim-level detail is hidden."
+        # The scoping caveat moves to the tooltip rather than being deleted: it is
+        # the honest part (nothing enforces this) and it still has to be readable.
     ),
     "Analyst": (
         "Adds the per-claim work queue, the claim inspector and the per-claim SHAP drivers."
@@ -170,9 +172,17 @@ def landing() -> None:
     st.divider()
     st.subheader("The model results, stated as they came out")
     with st.container(border=True):
-        st.markdown(disclosures.MODEL_A_HONESTY)
+        summary_with_detail(
+            disclosures.MODEL_A_SUMMARY,
+            disclosures.MODEL_A_HONESTY,
+            label="Technical detail — Model A intervals and baselines",
+        )
     with st.container(border=True):
-        st.markdown(disclosures.MODEL_C_HONESTY)
+        summary_with_detail(
+            disclosures.MODEL_C_SUMMARY,
+            disclosures.MODEL_C_HONESTY,
+            label="Technical detail — Model C intervals and capture rates",
+        )
 
 
 def _pages(role: str) -> list:  # noqa: ANN201 - list[st.navigation.Page]
