@@ -122,7 +122,15 @@ def _render(page: pathlib.Path, tmp_path: pathlib.Path, role: str = "Analyst") -
         # Strictly larger than _APPTEST_TIMEOUT_SECONDS so the inner AppTest
         # timeout is what reports; see the measurement note above.
         timeout=_APPTEST_TIMEOUT_SECONDS + 150,
-        env={"PYTHONPATH": str(REPO_ROOT), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+        # NO PYTHONPATH, DELIBERATELY. Setting it here is what let a real
+        # production failure pass every local run: Streamlit Cloud loads a page
+        # module directly, with only `dashboard/pages/` on sys.path, so
+        # `from dashboard import ...` raised ModuleNotFoundError in production
+        # while this harness — which handed the subprocess the repo root — stayed
+        # green on all five pages. A gate that supplies something the real
+        # environment does not is testing itself. Each page now carries its own
+        # sys.path bootstrap and this runs under the platform's conditions.
+        env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
     )
     if not out.is_file():
         pytest.fail(

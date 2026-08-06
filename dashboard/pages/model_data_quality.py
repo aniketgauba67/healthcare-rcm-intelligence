@@ -24,12 +24,25 @@ discover, because a green table that quietly cannot fail is worse than no table.
 
 from __future__ import annotations
 
-import altair as alt
-import pandas as pd
-import streamlit as st
+# STREAMLIT CLOUD LOADS THIS FILE DIRECTLY. `app.py` prepends the repo root to
+# sys.path, but that only runs when app.py is the entrypoint — and a page URL, a
+# refresh, or the multipage router loads THIS module first, with only
+# `dashboard/pages/` on the path. Without these four lines `from dashboard import
+# ...` below raises ModuleNotFoundError in production while passing every local
+# test, because the test harness sets PYTHONPATH and the platform does not.
+import pathlib
+import sys
 
-from dashboard import data, disclosures, reconcile
-from dashboard.components import (
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+import altair as alt  # noqa: E402
+import pandas as pd  # noqa: E402
+import streamlit as st  # noqa: E402
+
+from dashboard import data, disclosures, reconcile  # noqa: E402
+from dashboard.components import (  # noqa: E402
     Kpi,
     data_source_caption,
     dataframe,
@@ -40,8 +53,8 @@ from dashboard.components import (
     render_synthetic_data_banner,
     required_disclosures,
 )
-from dashboard.model_monitoring import render_model_monitoring
-from dashboard.provenance import emitter_for
+from dashboard.model_monitoring import render_model_monitoring  # noqa: E402
+from dashboard.provenance import emitter_for  # noqa: E402
 
 PAGE_EMITTER = emitter_for("dashboard/pages/model_data_quality.py")
 
