@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.data import usable_model_monitoring
-from dashboard.components import provenance_note
+from dashboard.components import provenance_note, thin_volume_layer
 
 
 def render_model_monitoring(frame: pd.DataFrame) -> bool:
@@ -40,7 +40,14 @@ def render_model_monitoring(frame: pd.DataFrame) -> bool:
         )
         .properties(height=280)
     )
-    st.altair_chart(drift_chart, use_container_width=True)
+    # Same treatment as the executive trend: mark the thin months on the chart
+    # itself, because the caption underneath arrives after the swing.
+    thin = thin_volume_layer(
+        series.dropna(subset=["month"]), month_column="month", count_column="sim_n_claims"
+    )
+    st.altair_chart(
+        thin + drift_chart if thin is not None else drift_chart, use_container_width=True
+    )
     provenance_note(
         "SIMULATED",
         "The claim count per month is in the tooltip. Early months are thin in the CMS "

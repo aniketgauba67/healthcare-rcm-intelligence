@@ -42,6 +42,7 @@ import streamlit as st  # noqa: E402
 from dashboard import data, disclosures, reconcile  # noqa: E402
 from dashboard.components import (  # noqa: E402
     Kpi,
+    NO_LABEL_TRUNCATION,
     control_query,
     data_source_caption,
     dataframe,
@@ -151,7 +152,12 @@ chart = (
     alt.Chart(by_category)
     .mark_bar()
     .encode(
-        y=alt.Y("sim_denial_category:N", sort="-x", title="Simulated denial category"),
+        y=alt.Y(
+            "sim_denial_category:N",
+            sort="-x",
+            title="Simulated denial category",
+            axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION),
+        ),
         x=alt.X("denials:Q", title="Denials"),
         tooltip=[
             alt.Tooltip("sim_denial_category:N", title="Category"),
@@ -317,7 +323,9 @@ with left:
         alt.Chart(shap_global)
         .mark_bar()
         .encode(
-            y=alt.Y("feature:N", sort="-x", title=None),
+            y=alt.Y(
+                "feature:N", sort="-x", title=None, axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION)
+            ),
             x=alt.X("sim_mean_abs_shap:Q", title="Mean |SHAP|"),
             tooltip=[
                 alt.Tooltip("feature:N", title="Feature"),

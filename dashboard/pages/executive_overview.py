@@ -46,6 +46,7 @@ from dashboard.components import (  # noqa: E402
     percent,
     provenance_note,
     render_page_header,
+    thin_volume_layer,
     summary_with_detail,
     render_synthetic_data_banner,
     required_disclosures,
@@ -220,7 +221,10 @@ chart = (
     )
     .properties(height=320)
 )
-st.altair_chart(chart, use_container_width=True)
+# Shade the months too thin to read as a trend, ON the chart. The caption below
+# says the same thing and stays — but it is read after the spike has landed.
+_thin = thin_volume_layer(chart_frame, month_column="month", count_column="sim_claims_submitted")
+st.altair_chart(_thin + chart if _thin is not None else chart, use_container_width=True)
 provenance_note(
     "SIMULATED" if column.startswith("sim_") or is_rate else "SOURCE",
     "One point per claim-submission month. Thin early months are real thinness in the "

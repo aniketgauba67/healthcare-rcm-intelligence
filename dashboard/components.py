@@ -31,6 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -206,6 +207,84 @@ def provenance_note(classification: Classification, text: str) -> None:
 # ---------------------------------------------------------------------------
 # Reconciliation, shown where the figure is
 # ---------------------------------------------------------------------------
+
+
+#: Axis labels are never truncated. Vega-Lite's default `labelLimit` is 180px and
+#: it ellipsises silently, which is how "MEDICAL_NECES…", "PRIOR_AUTH_MI…" and
+#: "Medicaid Manage…" reached the screen. A denial category a reader cannot name
+#: is not a denial category, and 0 means "no limit".
+NO_LABEL_TRUNCATION = 0
+
+
+def thin_volume_layer(
+    frame: pd.DataFrame,
+    *,
+    month_column: str,
+    count_column: str,
+    ratio: float = 0.25,
+) -> Any | None:
+    """Shade the months whose claim count is too thin to read as a trend.
+
+    Both time-series charts on this dashboard swing hard at the ends, and both
+    already carry a caption saying why: those months are genuinely thin in the CMS
+    extract. A caption below the chart is read AFTER the spike has already landed,
+    so the annotation goes ON the chart — the caption stays exactly as it was.
+
+    THIS ANNOTATES, IT DOES NOT FILTER. Every point still plots at its real value;
+    a shaded band behind the line marks where the denominator is small. Dropping
+    or smoothing the thin months would change the figures, which is the one thing
+    this must not do.
+
+    "Thin" is derived from the data rather than hard-coded to a date range, so it
+    keeps meaning if the extract changes: a month is thin when its claim count is
+    under `ratio` of the median month. Returns None when nothing qualifies, so a
+    dense series gets no annotation rather than an empty band.
+    """
+    if frame.empty or count_column not in frame or month_column not in frame:
+        return None
+    counts = pd.to_numeric(frame[count_column], errors="coerce")
+    median = counts.median()
+    if not median or pd.isna(median):
+        return None
+    thin = frame.loc[counts < median * ratio, month_column].dropna().sort_values()
+    if thin.empty:
+        return None
+
+    # Contiguous runs become one band each, so a leading and a trailing thin
+    # stretch are two shaded regions rather than a stripe per month.
+    months = list(pd.to_datetime(thin))
+    bands: list[dict[str, Any]] = []
+    start = previous = months[0]
+    for current in months[1:]:
+        if (current - previous).days > 62:  # a gap wider than one month ends the run
+            bands.append({"start": start, "end": previous})
+            start = current
+        previous = current
+    bands.append({"start": start, "end": previous})
+
+    band_frame = pd.DataFrame(bands)
+    # Extend each band by a month so a single thin month is still visible.
+    band_frame["end"] = band_frame["end"] + pd.Timedelta(days=31)
+
+    shading = (
+        alt.Chart(band_frame)
+        .mark_rect(color="#d62728", opacity=0.10)
+        .encode(x=alt.X("start:T"), x2=alt.X2("end:T"))
+    )
+    caption = (
+        alt.Chart(band_frame.head(1))
+        .mark_text(
+            align="left",
+            baseline="top",
+            dx=4,
+            dy=4,
+            fontSize=11,
+            color="#d62728",
+            text="thin data — low claim volume",
+        )
+        .encode(x=alt.X("start:T"))
+    )
+    return shading + caption
 
 
 def control_query(sql: str, label: str = "The SQL control query behind this figure") -> None:

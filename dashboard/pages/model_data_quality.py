@@ -44,6 +44,7 @@ import streamlit as st  # noqa: E402
 from dashboard import data, disclosures, reconcile  # noqa: E402
 from dashboard.components import (  # noqa: E402
     Kpi,
+    NO_LABEL_TRUNCATION,
     data_source_caption,
     dataframe,
     kpi_row,
@@ -368,7 +369,12 @@ else:
             alt.Chart(selection)
             .mark_bar()
             .encode(
-                y=alt.Y("sim_denial_category:N", sort="-x", title="Denial category"),
+                y=alt.Y(
+                    "sim_denial_category:N",
+                    sort="-x",
+                    title="Denial category",
+                    axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION),
+                ),
                 x=alt.X(
                     "appeal_rate:Q", title="Share of denials appealed", axis=alt.Axis(format="%")
                 ),

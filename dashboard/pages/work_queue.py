@@ -49,6 +49,7 @@ import streamlit as st  # noqa: E402
 from dashboard import data, disclosures, reconcile  # noqa: E402
 from dashboard.components import (  # noqa: E402
     Kpi,
+    NO_LABEL_TRUNCATION,
     control_query,
     data_source_caption,
     dataframe,
@@ -243,7 +244,9 @@ else:
         alt.Chart(capture)
         .mark_bar()
         .encode(
-            y=alt.Y("strategy:N", sort="-x", title=None),
+            y=alt.Y(
+                "strategy:N", sort="-x", title=None, axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION)
+            ),
             x=alt.X(
                 "captured:Q",
                 title="Share of recoverable dollars captured at 10% capacity",
@@ -414,7 +417,12 @@ else:
                     alt.Chart(drivers)
                     .mark_bar()
                     .encode(
-                        y=alt.Y("feature:N", sort=alt.SortField("sim_driver_rank"), title=None),
+                        y=alt.Y(
+                            "feature:N",
+                            sort=alt.SortField("sim_driver_rank"),
+                            title=None,
+                            axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION),
+                        ),
                         x=alt.X("sim_shap_contribution:Q", title="SHAP contribution (log-odds)"),
                         color=alt.Color(
                             "sim_direction:N", title="Direction", scale=alt.Scale(scheme="set2")
@@ -471,7 +479,12 @@ else:
             alt.Chart(top_reasons)
             .mark_bar()
             .encode(
-                y=alt.Y("sim_reason_code:N", sort="-x", title="Reason code"),
+                y=alt.Y(
+                    "sim_reason_code:N",
+                    sort="-x",
+                    title="Reason code",
+                    axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION),
+                ),
                 x=alt.X("claims:Q", title="Claims with this in their top 3 drivers"),
                 tooltip=[
                     alt.Tooltip("sim_reason_code:N"),

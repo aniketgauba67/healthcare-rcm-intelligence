@@ -43,6 +43,7 @@ import streamlit as st  # noqa: E402
 from dashboard import data, disclosures, reconcile  # noqa: E402
 from dashboard.components import (  # noqa: E402
     Kpi,
+    NO_LABEL_TRUNCATION,
     control_query,
     data_source_caption,
     dataframe,
@@ -258,7 +259,12 @@ else:
         alt.Chart(payers)
         .mark_bar()
         .encode(
-            y=alt.Y("sim_payer_name:N", sort="-x", title="Simulated payer archetype"),
+            y=alt.Y(
+                "sim_payer_name:N",
+                sort="-x",
+                title="Simulated payer archetype",
+                axis=alt.Axis(labelLimit=NO_LABEL_TRUNCATION),
+            ),
             x=alt.X(
                 f"{measure_column}:Q",
                 title=f"{measure_label} (SIMULATED)",
