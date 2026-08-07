@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 REQUIRED_FILES = [
-    "CLAUDE.md",
-    "tasks.md",
+    "docs/project_rules.md",
+    "README.md",
     "pyproject.toml",
     "Makefile",
     "config/sources.yaml",

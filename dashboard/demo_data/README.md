@@ -2,7 +2,7 @@
 
 `rcm_demo.duckdb` is the bundled extract the Streamlit dashboard and the FastAPI
 service read when no PostgreSQL warehouse is configured. It is committed on purpose:
-CLAUDE.md §2 locks the hosted demo to a bundled extract, so this file is the only way
+docs/project_rules.md §2 locks the hosted demo to a bundled extract, so this file is the only way
 a deployed app has data at all.
 
 **Every outcome in this bundle is SIMULATED.** The claims underneath are official CMS

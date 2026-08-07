@@ -252,7 +252,7 @@ SIM_VIOLATION_CHECKS: list[tuple[str, str]] = [
     ),
 ]
 
-# Every sim_ table must declare itself SIMULATED in its own rows (CLAUDE.md §3.1).
+# Every sim_ table must declare itself SIMULATED in its own rows (docs/project_rules.md §3.1).
 SIM_PROVENANCE_CHECKS: list[tuple[str, str]] = [
     (
         f"sim_provenance:{table}",

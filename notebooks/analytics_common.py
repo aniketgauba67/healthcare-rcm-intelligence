@@ -5,7 +5,7 @@ labeling live in one place. All frames are pulled from the live warehouse
 (rcm.vw_claim_enriched and the sim_ tables) via the read-only connection helper
 from the ingestion package (import only; no writes).
 
-HONESTY (CLAUDE.md §3): the adjudication/denial/payment/appeal/workflow columns
+HONESTY (docs/project_rules.md §3): the adjudication/denial/payment/appeal/workflow columns
 are SIMULATED and do NOT describe real payer behaviour. The payer dimension is
 100 percent simulated (§3.5). Anything a notebook flags is a "review flag",
 never fraud.
@@ -25,7 +25,7 @@ if str(REPO_ROOT) not in sys.path:
 
 SIMULATED_BANNER = (
     "SIMULATED DATA — the adjudication, denial, payment, appeal and workflow layer "
-    "is generated (CLAUDE.md §3). The multi-payer dimension is 100 percent simulated "
+    "is generated (docs/project_rules.md §3). The multi-payer dimension is 100 percent simulated "
     "(§3.5). Findings are review signals, never fraud, and do not describe any real payer."
 )
 

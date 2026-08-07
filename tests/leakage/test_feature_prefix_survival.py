@@ -18,7 +18,7 @@ where c565ea3 has historical.py:202 unprefixed. Three of the four names were rea
 and are now fixed; the fourth (`log_sim_denied_amount`) was ruled a naming
 preference and this gate no longer fires on it — see below.
 
-CLAUDE.md §3.2: "Every simulated table and column name is prefixed `sim_`." The
+docs/project_rules.md §3.2: "Every simulated table and column name is prefixed `sim_`." The
 warehouse satisfies that and Phase 3 proved it — data-engineer-p4 renamed the
 crosswalk columns and qa-reviewer-p10 built an end-state guard that fails if a
 column that carried `sim_` before a run loses it.

@@ -93,7 +93,7 @@ def test_the_driver_mechanism_is_forbidden_for_both_models() -> None:
     is a CARC group on a remittance advice that a human being can read. The
     driver mechanism is the simulation's internal statement of what caused the
     denial, appears on no remittance advice anyone has ever worked, and admitting
-    it would invert the CLAUDE.md §4.5 firewall through a column name.
+    it would invert the docs/project_rules.md §4.5 firewall through a column name.
     """
     assert _MECHANISM in forbidden_columns("A")
     assert _MECHANISM in forbidden_columns("C"), (
@@ -196,7 +196,7 @@ def test_model_c_relaxes_the_guard_and_does_not_replace_it() -> None:
 
 
 def test_the_crosswalk_stays_forbidden_to_model_c_too() -> None:
-    """Display-only linkage is display-only at every boundary (CLAUDE.md §3.4)."""
+    """Display-only linkage is display-only at every boundary (docs/project_rules.md §3.4)."""
     for column in ("sim_facility_ccn", "facility_ccn", "real_npi"):
         with pytest.raises(LeakageError, match=column):
             assert_no_forbidden_columns([column], model="C")

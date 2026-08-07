@@ -1,4 +1,4 @@
-"""Streamlit analyst dashboard (app-engineer, CLAUDE.md §5).
+"""Streamlit analyst dashboard.
 
 Import-light on purpose. `dashboard/datasource.py` and `dashboard/tables.py` never
 import streamlit, so they can be exercised by tests and by the API without a

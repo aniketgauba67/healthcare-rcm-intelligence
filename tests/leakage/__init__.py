@@ -1,1 +1,1 @@
-"""Leakage tests (CLAUDE.md §4.1)."""
+"""Leakage tests (docs/project_rules.md §4.1)."""

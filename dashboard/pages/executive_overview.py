@@ -2,7 +2,7 @@
 
 Headline RCM KPIs for the whole book, rolled up from `rcm.vw_executive_rcm_summary`
 and never recomputed from claims. Every figure on this page has a control query
-under it (CLAUDE.md §7), and the classification under every tile says whether the
+under it (docs/project_rules.md §7), and the classification under every tile says whether the
 number came from CMS or from our simulation.
 
 THE ONE MIXED TILE ROW, AND WHY IT IS MIXED ON PURPOSE

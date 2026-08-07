@@ -133,7 +133,7 @@ def test_no_single_feature_is_suspiciously_predictive(frame, config) -> None:
 
     The label carries deliberate noise and the oracle tops out near AUC 0.68, so
     no single column should come close on its own. A feature above the config's
-    `suspicious_roc_auc` is a leak to hunt, not a discovery — CLAUDE.md §1.
+    `suspicious_roc_auc` is a leak to hunt, not a discovery — docs/project_rules.md §1.
     """
     from sklearn.metrics import roc_auc_score
 

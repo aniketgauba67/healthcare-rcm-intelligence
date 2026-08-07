@@ -1,5 +1,5 @@
 -- ============================================================================
--- 50_sim_adjudication.sql — the SIMULATED adjudication layer (CLAUDE.md §3)
+-- 50_sim_adjudication.sql — the SIMULATED adjudication layer (docs/project_rules.md §3)
 --
 -- Grain:        sim_payer                     : one simulated payer archetype
 --               sim_service_line              : one simulated service-line bucket
@@ -39,7 +39,7 @@
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- sim_payer — the simulated multi-payer dimension (CLAUDE.md §3.5).
+-- sim_payer — the simulated multi-payer dimension (docs/project_rules.md §3.5).
 -- Medicare FFS has ONE payer; every payer below is an invented ARCHETYPE, not
 -- modelled on or named after any real insurer.
 -- ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ create table rcm.sim_payer (
 -- entire DDL script then fails to execute. Write "percent" or "share" instead.
 comment on table rcm.sim_payer is
   'SIMULATED: invented payer archetypes. Medicare FFS has one payer; this '
-  'multi-payer dimension is entirely simulated (CLAUDE.md §3.5).';
+  'multi-payer dimension is entirely simulated (docs/project_rules.md §3.5).';
 
 -- ---------------------------------------------------------------------------
 -- sim_service_line — coarse MS-DRG range buckets. The boundaries are a design
@@ -88,7 +88,7 @@ comment on table rcm.sim_service_line is
 -- ---------------------------------------------------------------------------
 -- sim_authorization_eligibility — PRE-SUBMISSION facts. Everything here is
 -- knowable before a claim goes out the door, so these ARE legitimate features
--- for the Model A denial-risk problem (CLAUDE.md §4).
+-- for the Model A denial-risk problem (docs/project_rules.md §4).
 -- ---------------------------------------------------------------------------
 drop table if exists rcm.sim_authorization_eligibility cascade;
 create table rcm.sim_authorization_eligibility (
@@ -151,7 +151,7 @@ comment on table rcm.sim_documentation_coding is
 -- sim_claim_adjudication — the hub. One row per claim: generated timeline,
 -- generated money, generated denial outcome.
 --
--- LEAKAGE WARNING (CLAUDE.md §4): almost every column here is POST-SUBMISSION
+-- LEAKAGE WARNING (docs/project_rules.md §4): almost every column here is POST-SUBMISSION
 -- and must be on the Model A forbidden list — the outcome, all money, all
 -- adjudication/payment dates. sim_latent_p and sim_provider_quality_latent are
 -- generator internals stored for VALIDATION ONLY and must never be features.
@@ -229,7 +229,7 @@ create index ix_sim_adj_category  on rcm.sim_claim_adjudication (sim_denial_cate
 create index ix_sim_adj_submitted on rcm.sim_claim_adjudication (sim_submission_date);
 comment on table rcm.sim_claim_adjudication is
   'SIMULATED adjudication outcomes, money and timeline. The CMS synthetic claims '
-  'contain none of this. Does NOT represent real payer behaviour (CLAUDE.md §3, '
+  'contain none of this. Does NOT represent real payer behaviour (docs/project_rules.md §3, '
   'docs/assumptions.md). Most columns are post-submission — see '
   'docs/simulated_forbidden_columns.md before using any of it as a feature.';
 
@@ -275,7 +275,7 @@ comment on table rcm.sim_appeals is
 -- ---------------------------------------------------------------------------
 -- sim_workflow_events — the event log for process mining. One row per event
 -- occurrence, sequenced within a claim by generated timestamp.
--- Post-submission events are forbidden Model A features (CLAUDE.md §4).
+-- Post-submission events are forbidden Model A features (docs/project_rules.md §4).
 -- ---------------------------------------------------------------------------
 drop table if exists rcm.sim_workflow_events cascade;
 create table rcm.sim_workflow_events (

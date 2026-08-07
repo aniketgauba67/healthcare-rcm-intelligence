@@ -5,8 +5,8 @@
 # time (never estimated) and are the committed, human-readable counterpart to
 # the gitignored data/raw/manifest.json ledger.
 #
-# Classification vocabulary (CLAUDE.md §3): SOURCE | REFERENCE | DERIVED | SIMULATED.
-# Raw files are never committed (CLAUDE.md §3.6); only URLs, checksums, and
+# Classification vocabulary (docs/project_rules.md §3): SOURCE | REFERENCE | DERIVED | SIMULATED.
+# Raw files are never committed (docs/project_rules.md §3.6); only URLs, checksums, and
 # vintages live here.
 
 sources:
@@ -75,7 +75,7 @@ sources:
     url: https://download.cms.gov/nppes/NPI_Files.html
     provider: download.cms.gov
     classification: REFERENCE
-    license_note: Public NPI registry. Full monthly file ~1.14 GB zipped / ~9 GB CSV; we retain only a single-state streamed extract. Linked to claims ONLY via the SIMULATED crosswalk (CLAUDE.md §3.4).
+    license_note: Public NPI registry. Full monthly file ~1.14 GB zipped / ~9 GB CSV; we retain only a single-state streamed extract. Linked to claims ONLY via the SIMULATED crosswalk (docs/project_rules.md §3.4).
     role_note: "Reclassified 2026-07-22 to VALIDATION SAMPLE only (real-NPI spot-check). The crosswalk provider pool is now the nationwide medicare_providers dataset (human decision). See provenance_register.md."
     monthly_file_url: https://download.cms.gov/nppes/NPPES_Data_Dissemination_July_2026_V2.zip
     vintage: "2026-07"  # July 2026 V2 monthly dissemination; last-modified 2026-07-13
@@ -119,7 +119,7 @@ sources:
     license_note: Public facility directory (CCN, name, address, type). Linked to claims ONLY via the SIMULATED crosswalk. Real CCNs — never joined directly to synthetic claims.
     csv_url: https://data.cms.gov/provider-data/sites/default/files/resources/893c372430d9d71a1c52737d01239d47_1777413958/Hospital_General_Information.csv
     vintage: "2026-04"  # dataset xubh-q36u, last modified 2026-04-28
-    stratify_keys: [State, Hospital Type]  # crosswalk stratification (CLAUDE.md §3.4)
+    stratify_keys: [State, Hospital Type]  # crosswalk stratification (docs/project_rules.md §3.4)
     # Measured at download 2026-07-22.
     artifacts:
       hospital_general_information:
@@ -167,7 +167,7 @@ sources:
     url: https://www.cms.gov/medicare/coding-billing/icd-10-codes
     provider: www.cms.gov
     classification: REFERENCE
-    license_note: Public CMS code files. Never mix ICD-9 references (CLAUDE.md §2 locked decision).
+    license_note: Public CMS code files. Never mix ICD-9 references (docs/project_rules.md §2 locked decision).
     vintage: "FY2023"  # §2 vintage rule — claims are 2023-04, so FY2023 codes (NOT current year)
     # FY2023 files carry the CMS "updated-01/11/2023" revision; the canonical
     # /files/zip/ URL below 301-redirects to it (requests follows redirects).
@@ -197,7 +197,7 @@ sources:
     url: https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system
     provider: www.cms.gov
     classification: REFERENCE
-    license_note: Public HCPCS Level II descriptions ONLY. CPT Level I (5-digit numeric, AMA-licensed) and 2-char modifiers are excluded at load (CLAUDE.md §3.7).
+    license_note: Public HCPCS Level II descriptions ONLY. CPT Level I (5-digit numeric, AMA-licensed) and 2-char modifiers are excluded at load (docs/project_rules.md §3.7).
     vintage: "2023"  # January 2023 annual HCPCS update (matches claims period)
     artifacts:
       hcpcs_2023:
@@ -234,7 +234,7 @@ sources:
     provider: x12.org
     classification: REFERENCE
     license_note: >-
-      Used as denial-category taxonomy LABELS only (CLAUDE.md §3.7). The X12
+      Used as denial-category taxonomy LABELS only (docs/project_rules.md §3.7). The X12
       CARC list is not freely bulk-downloadable and its description text is
       copyrighted; we therefore record NO file and reproduce NO X12 description
       text. rcm.ref_carc holds the public CARC code identifiers used by the

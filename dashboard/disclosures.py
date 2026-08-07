@@ -15,7 +15,7 @@ holds the column-level provenance markers; this file holds the paragraphs.
 
 WHAT MUST NOT BE SOFTENED, AND WHY EACH ONE IS HERE
 ---------------------------------------------------
-* `SYNTHETIC_DATA_BANNER` — CLAUDE.md §6 ("no page ships without it") and §3.5
+* `SYNTHETIC_DATA_BANNER` — docs/project_rules.md §6 ("no page ships without it") and §3.5
   (the payer dimension is 100% simulated; Medicare FFS has ONE payer, so an
   unbannered payer comparison is a comparison of five payers that do not exist).
 * `VINTAGE_SKEW` — the crosswalk reference files postdate the claims by about
@@ -35,7 +35,7 @@ WHAT MUST NOT BE SOFTENED, AND WHY EACH ONE IS HERE
 from __future__ import annotations
 
 # ---------------------------------------------------------------------------
-# The banner. CLAUDE.md §6: every page renders it. No exceptions.
+# The banner. docs/project_rules.md §6: every page renders it. No exceptions.
 # ---------------------------------------------------------------------------
 
 SYNTHETIC_DATA_BANNER = (
@@ -61,7 +61,7 @@ BANNER_SHORT_PAGE = (
 # What the API repeats in the metadata of any response carrying `sim_` fields.
 API_SIMULATED_NOTICE = (
     "Every sim_-prefixed field in this response is SIMULATED by this project's "
-    "adjudication layer (CLAUDE.md §3). The underlying claims are official CMS "
+    "adjudication layer (docs/project_rules.md §3). The underlying claims are official CMS "
     "synthetic Medicare records. No real patient, provider, payer or adjudication "
     "data is served by this API. The multi-payer dimension is 100% simulated — "
     "Medicare fee-for-service has one payer."
@@ -123,7 +123,7 @@ CROSSWALK_COLLISION_SUMMARY = (
 CROSSWALK_COLLISION = (
     "CMS synthetic claims carry synthetic provider and facility identifiers. They "
     "do not correspond to any real NPI or CCN and cannot be joined to one "
-    "(CLAUDE.md §3.4), so every real facility name in this app is "
+    "(docs/project_rules.md §3.4), so every real facility name in this app is "
     # "display-only" belongs in the PARAGRAPH, not only in the heading above it.
     # The heading is one line a reader can skim past, and it is also the one piece
     # of a Streamlit expander that no render test can currently read back.
@@ -281,7 +281,7 @@ NOT_A_FRAUD_SIGNAL = (
 # ---------------------------------------------------------------------------
 
 PAYER_DIMENSION_NOTE = (
-    "**The payer dimension on this page is 100% invented (CLAUDE.md §3.5).** "
+    "**The payer dimension on this page is 100% invented (docs/project_rules.md §3.5).** "
     "Medicare fee-for-service has exactly one payer. The five archetypes below are "
     "simulated, are modelled on and named after no real insurer, and no row here "
     "describes real Medicare, Medicare Advantage, commercial or Medicaid "

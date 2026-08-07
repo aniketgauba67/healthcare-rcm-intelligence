@@ -1,4 +1,4 @@
-"""Temporal splits (CLAUDE.md §4.3: never random, wherever time matters).
+"""Temporal splits (docs/project_rules.md §4.3: never random, wherever time matters).
 
 The obvious split — hold out the last calendar year — does not work on this
 warehouse. Submission dates run 2015-2024 but the tail is thin: 2023 holds about
@@ -112,7 +112,7 @@ def split_from_config(frame: pd.DataFrame, config: dict) -> TemporalSplit:
     spec = config["split"]
     if spec.get("strategy") != "temporal":
         raise ValueError(
-            f"split.strategy is {spec.get('strategy')!r}; CLAUDE.md §4.3 requires 'temporal'"
+            f"split.strategy is {spec.get('strategy')!r}; docs/project_rules.md §4.3 requires 'temporal'"
         )
     return quantile_temporal_split(
         frame, time_column=spec["time_column"], train_quantile=float(spec["train_quantile"])

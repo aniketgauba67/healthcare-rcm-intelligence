@@ -1,4 +1,4 @@
-"""Temporal splits: forward in time, atomic on the cut date (CLAUDE.md §4.3)."""
+"""Temporal splits: forward in time, atomic on the cut date (docs/project_rules.md §4.3)."""
 
 from __future__ import annotations
 

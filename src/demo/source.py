@@ -4,7 +4,7 @@ Two backends, one interface:
 
 * **bundle** (the default) — the committed DuckDB extract. No database, no
   network, no credentials. This is what a hosted demo and a clean-clone
-  `docker compose up` both run on, and CLAUDE.md §2 locks the hosted demo to it.
+  `docker compose up` both run on, and docs/project_rules.md §2 locks the hosted demo to it.
 * **postgres** — the live warehouse, for a developer who has loaded one and wants
   the app pointed at it.
 

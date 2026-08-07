@@ -1,4 +1,4 @@
-"""Shared UI, and the one component CLAUDE.md §6 makes non-optional.
+"""Shared UI, and the one component docs/project_rules.md §6 makes non-optional.
 
 **Every page renders `render_synthetic_data_banner()`. No page ships without it.**
 That is §6 verbatim, and §3.5 is why it is absolute rather than a nicety: Medicare
@@ -60,7 +60,7 @@ _CLASS_BADGE: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# The banner. CLAUDE.md §6.
+# The banner. docs/project_rules.md §6.
 # ---------------------------------------------------------------------------
 
 
@@ -357,7 +357,7 @@ def data_source_caption() -> None:
         )
     else:
         st.caption(
-            "Reading a LIVE PostgreSQL warehouse. The hosted demo does not — CLAUDE.md §2 "
+            "Reading a LIVE PostgreSQL warehouse. The hosted demo does not — docs/project_rules.md §2 "
             "locks it to the bundled extract, so figures here may differ from the deployed app "
             "if the warehouse has moved."
         )

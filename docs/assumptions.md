@@ -16,7 +16,7 @@ wrong when this project is presented:
    submission dates, appeals, or workflow events. Every one of those is
    fabricated here. The denial *rate* is something this simulation was told to
    produce, not something it discovered.
-2. **The multi-payer dimension is fiction** (CLAUDE.md §3.5). Medicare FFS has
+2. **The multi-payer dimension is fiction** (docs/project_rules.md §3.5). Medicare FFS has
    one payer. The five payers below are archetypes invented for this project;
    they are deliberately not modelled on, named after, or calibrated to any
    identifiable real insurer, and any per-payer difference shown anywhere in
@@ -28,7 +28,7 @@ wrong when this project is presented:
    to a parameter means "this is why the range is plausible", never "this output
    was checked against real data".
 
-Provenance classification for this entire layer: **SIMULATED** (CLAUDE.md §3.1).
+Provenance classification for this entire layer: **SIMULATED** (docs/project_rules.md §3.1).
 Every table and column is `sim_`-prefixed (§3.2).
 
 ---
@@ -199,9 +199,9 @@ tree edge stays small.
 
 This is deliberately left as-is. The generator must never be tuned to make a
 particular downstream model win — conditioning the data on a model metric would
-manufacture a Phase 4 result instead of earning it (CLAUDE.md §1). A mechanism
+manufacture a Phase 4 result instead of earning it (docs/project_rules.md §1). A mechanism
 may only ever be strengthened on independent domain-realism grounds with a
-citation, accepting whatever model edge results. CLAUDE.md §7's ML definition of
+citation, accepting whatever model edge results. docs/project_rules.md §7's ML definition of
 done is "baseline vs advanced comparison **reported**," not "advanced must win":
 a regularised logistic baseline being competitive with gradient boosting is a
 realistic, credible outcome for denial prediction, and reporting it truthfully —
@@ -215,7 +215,7 @@ claim, not from a fixed marginal distribution. A claim denied with a missing
 authorization overwhelmingly gets a prior-authorization category; a claim denied
 by the continuous terms alone falls to the `baseline` mix.
 
-**CARC handling (CLAUDE.md §3.7).** CARC codes appear as **category labels
+**CARC handling (docs/project_rules.md §3.7).** CARC codes appear as **category labels
 only** — the code group is stored as a short string (`"197"`, `"29"`, …) and the
 human-readable name beside it is plain language **written for this project**. No
 CARC description text is reproduced anywhere in this repository, and no CARC
@@ -425,7 +425,7 @@ the simulation did what it was told, not that what it was told is true.
 ## 12. KNOWN LIMITATION: the §4.5 firewall is a discipline, not an information barrier
 
 Recorded by qa-reviewer 2026-07-29, gating [FIREWALL-DOC-HOLE]. This document
-publishes generator-realized values, and CLAUDE.md §4.5 firewalls ml-engineer
+publishes generator-realized values, and docs/project_rules.md §4.5 firewalls ml-engineer
 from `src/simulation/` but not from `docs/`. Any statement anywhere in this
 repository that ml-engineer **cannot see** realized generator output is false.
 Rather than quietly narrowing the claim, here is exactly what leaks and why the
@@ -446,7 +446,7 @@ not fixable, because §1 and §7 require them.** These are *not* derivable from
 the feature store, so this document really is where they leak:
 
 * the **oracle AUC ≈ 0.68** ceiling (§2), computed from `sim_latent_p` — which
-  CLAUDE.md §4 bans as a feature precisely so no model can reach it;
+  docs/project_rules.md §4 bans as a feature precisely so no model can reach it;
 * the latent-vs-observed calibration internals (§2): latent mean 8.9%, the
   16.7% naive solve, the ε flip counts (961 / 892 / 69);
 * §4.1's prototype finding that gradient boosting beats a logistic baseline by
@@ -458,7 +458,7 @@ Deleting these would damage honesty to protect a wall with no other sides. The
 oracle AUC is what makes a shipped ROC-AUC of 0.6254 an *honest result near a
 known ceiling* rather than a weak one, and §4.1 exists so that a competitive
 linear baseline is reported as a finding rather than hidden as a failure
-(CLAUDE.md §7: "baseline vs advanced comparison **reported**").
+(docs/project_rules.md §7: "baseline vs advanced comparison **reported**").
 
 **What §4.5 does buy, stated at its true strength.** ml-engineer does not read
 generator source, so no feature, no threshold and no split boundary is written
@@ -482,7 +482,7 @@ consumes are features in it** — `sim_auth_missing`, `sim_auth_required`,
 So `sim_latent_p` is analytically reconstructible from published documents plus
 the feature store, without opening `src/simulation/` even once. An agent that did
 it would score with the oracle and land at the AUC ≈ 0.68 ceiling. This is not
-fixable by redaction either: CLAUDE.md §7 requires the assumptions to be
+fixable by redaction either: docs/project_rules.md §7 requires the assumptions to be
 documented with citations, the locked decisions put the seeds and parameters in
 `config/simulation.yaml`, and the mechanism indicators are legitimate
 pre-submission features that Model A is *supposed* to have.

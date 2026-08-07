@@ -7,7 +7,7 @@
 --               place. Every 1:1 sim_ table (adjudication, auth/eligibility,
 --               documentation, operating costs) attaches on claim_sk.
 --
--- Sources & per-column provenance classification (CLAUDE.md §3.1):
+-- Sources & per-column provenance classification (docs/project_rules.md §3.1):
 --   SOURCE     (from CMS synthetic RIF, unmodified):
 --     clm_id, prvdr_num, org_npi_num, provider_state_cd, drg_cd,
 --     discharge_status_cd, admission_date, discharge_date, from_date, thru_date,
@@ -22,7 +22,7 @@
 --   REFERENCE  (official code-set display text, FY2023 vintage §2; DISPLAY-ONLY,
 --              never a grouping key — join on SOURCE codes, misses stay NULL):
 --     drg_desc (MS-DRG v40 title), prncpal_dgns_desc + admtg_dgns_desc (ICD-10-CM)
---   SIMULATED  (generated adjudication layer, CLAUDE.md §3 — NOT real payer
+--   SIMULATED  (generated adjudication layer, docs/project_rules.md §3 — NOT real payer
 --              behaviour; every sim_* column below is invented):
 --     sim_payer_id, sim_payer_name, sim_service_line_id/name, all denial fields,
 --     all sim money (allowed/paid/patient-resp/contractual/denied), all sim
@@ -30,7 +30,7 @@
 --     auth/eligibility + documentation/coding facts, all operating-cost fields,
 --     sim_adjudicated, sim_clean_claim_flag, sim_first_pass_paid_flag,
 --     sim_ar_open_flag and sim_ar_balance_amt.
---   SIMULATED-LINKAGE / DISPLAY-ONLY (CLAUDE.md §3.4, tasks.md crosswalk ruling):
+--   SIMULATED-LINKAGE / DISPLAY-ONLY (docs/project_rules.md §3.4):
 --     sim_facility_ccn, sim_facility_name, sim_facility_state, sim_facility_type.
 --     These come from sim_facility_crosswalk (a SEEDED RANDOM assignment, NOT a
 --     real correspondence) and are DISPLAY-ONLY. They keep the `sim_` prefix all
@@ -43,7 +43,7 @@
 --     sim_facility_ccn/sim_facility_name.
 --
 -- Payer note: sim_payer_* is 100% SIMULATED (Medicare FFS has one payer,
---             CLAUDE.md §3.5). Any view grouping by payer carries the banner.
+--             docs/project_rules.md §3.5). Any view grouping by payer carries the banner.
 --
 -- Control query (must reconcile):
 --   select count(*) from vw_claim_enriched;                     -- = 20867

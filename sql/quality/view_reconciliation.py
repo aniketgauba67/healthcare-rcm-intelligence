@@ -1,6 +1,6 @@
 """Reconciliation checks for the analytics KPI views (analytics-engineer, sql/quality/).
 
-Each view header names a control query it must reconcile to (CLAUDE.md §6, §7
+Each view header names a control query it must reconcile to (docs/project_rules.md §6, §7
 "views reconcile to control queries"). This module makes those control queries an
 automated gate, mirroring the src/ingestion/warehouse_sql_checks.py pattern:
 every check is a VIOLATION-COUNT query returning a single integer where 0 == pass.

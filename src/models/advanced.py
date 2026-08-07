@@ -11,7 +11,7 @@ construction — you cannot miss an authorization that was never required, so
 `sim_auth_missing` already *is* the `auth_required x auth_missing` interaction,
 and there is nothing left for a tree to discover in it. The one genuinely
 tree-shaped interaction available (payer x service line) is thin, because the
-source DRG mix is concentrated. CLAUDE.md §7 asks for the comparison to be
+source DRG mix is concentrated. docs/project_rules.md §7 asks for the comparison to be
 reported, not for the tree to win, and manufacturing a win by searching until
 the tree came out ahead would be optimising impressive over honest (§1).
 """

@@ -16,7 +16,7 @@ That is worse than leaving them all bare. `GET /metrics/executive` now returns
 `meta.notice` tells the reader "Every sim_-prefixed field in this response is
 SIMULATED". A reader who believes the notice concludes that the eight unmarked
 siblings are real — and every one of them is a rate or a count over this
-project's simulated adjudication layer. CLAUDE.md §1 makes "no simulated value
+project's simulated adjudication layer. docs/project_rules.md §1 makes "no simulated value
 presented as real" the property the project rests on; an absent marker inside a
 mixed object is no longer silence, it is an assertion.
 

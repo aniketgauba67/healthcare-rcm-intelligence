@@ -1,4 +1,4 @@
-"""Prior-period historical rates (CLAUDE.md §4.2).
+"""Prior-period historical rates (docs/project_rules.md §4.2).
 
 A provider's clean-claim rate and a payer's denial propensity are the two
 features a denials manager would actually ask for, and both are computed from
@@ -200,7 +200,7 @@ def add_prior_period_rates(
     ).raw_rate
 
     out = frame.copy()
-    # The book rate carries the `sim_` prefix (CLAUDE.md §3.2) because it is an
+    # The book rate carries the `sim_` prefix (docs/project_rules.md §3.2) because it is an
     # aggregate of a SIMULATED outcome column, even though its keys are dates.
     # Every entity rate below inherits the prefix from its `definitions` key; this
     # one has no entity to inherit from, so the name states it directly. An

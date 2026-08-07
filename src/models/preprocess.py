@@ -1,4 +1,4 @@
-"""Preprocessing, fitted on training folds only (CLAUDE.md §4.4).
+"""Preprocessing, fitted on training folds only (docs/project_rules.md §4.4).
 
 Everything that learns anything from the data — the imputer's medians, the
 scaler's means, the encoder's category vocabulary — lives inside one sklearn

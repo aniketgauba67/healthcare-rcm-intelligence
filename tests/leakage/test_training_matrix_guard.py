@@ -1,5 +1,5 @@
 """GATE 2, second assertion: no forbidden column, and nothing derived from one,
-may enter a training matrix (CLAUDE.md §4.1).
+may enter a training matrix (docs/project_rules.md §4.1).
 
 DISCOVERY CONTRACT — how a matrix gets checked
 ----------------------------------------------
@@ -141,7 +141,7 @@ def test_guard_is_wired_once_a_feature_store_exists(matrices):
         pytest.skip("src/features/ is empty — Phase 4 feature work has not started")
     assert matrices, (
         f"src/features/ contains {modules} but no training matrix could be discovered, "
-        "so the CLAUDE.md §4.1 leakage guard is checking nothing. Expose the matrix by "
+        "so the docs/project_rules.md §4.1 leakage guard is checking nothing. Expose the matrix by "
         "any route in this module's discovery contract: write it to artifacts/features/, "
         "set RCM_FEATURE_MATRIX, or add a no-argument build_training_matrix() to "
         "src/features/__init__.py."
@@ -186,7 +186,7 @@ def test_no_unrecognised_date_enters_a_matrix(require_matrices, permitted_column
 
 
 def test_split_is_temporal_where_the_matrix_declares_one(require_matrices):
-    """CLAUDE.md §4.3. A random split leaves training rows past the earliest test row.
+    """docs/project_rules.md §4.3. A random split leaves training rows past the earliest test row.
 
     The fold column and the time axis are whatever the matrix DECLARES them to be,
     so this check survives any rename of either — see this module's docstring and

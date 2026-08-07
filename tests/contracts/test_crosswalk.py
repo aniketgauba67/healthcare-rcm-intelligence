@@ -1,4 +1,4 @@
-"""Contract tests for the SIMULATED linkage crosswalk (CLAUDE.md §3.4)."""
+"""Contract tests for the SIMULATED linkage crosswalk (docs/project_rules.md §3.4)."""
 
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ def test_crosswalk_checks_detect_fk_and_provenance_violations():
 
 
 def test_every_crosswalk_column_carries_sim_prefix():
-    """Regression guard for CLAUDE.md §3.2: BOTH crosswalk tables are SIMULATED,
+    """Regression guard for docs/project_rules.md §3.2: BOTH crosswalk tables are SIMULATED,
     so every column that lands in Postgres must start with `sim_`. Asserts on the
     full loadable frames (builder output + seed/provenance) actually written by
     load_crosswalk via to_sql (column-name mapped)."""

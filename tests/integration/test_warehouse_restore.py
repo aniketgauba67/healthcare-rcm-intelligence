@@ -28,7 +28,7 @@ Two deliberate choices:
     re-running the reference loader, which needs the gitignored raw downloads. The
     snapshot is a write-back of the exact values that were there, so this stays
     test-harness bookkeeping and does not reimplement any of
-    `src/ingestion/reference_codes.py` (that file is data-engineer's; CLAUDE.md §5).
+    `src/ingestion/reference_codes.py`.
 
 Repair, then assert (tests/integration/test_end_state.py). Both halves are
 needed: restoring without asserting moves the blind spot instead of closing it.

@@ -1,8 +1,5 @@
 .git
 .github
-.claude
-.agents
-.codex
 .env
 .env.*
 !.env.example

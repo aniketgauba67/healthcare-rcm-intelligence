@@ -1,9 +1,9 @@
 # Zero-Cost Hosted Deployment
 
 This guide records the zero-cost portfolio deployment on Neon Free, Render Free,
-and Streamlit Community Cloud. It was reviewed and accepted on 2026-08-01 by this
-project's own QA-reviewer agent — an internal review process, not an audit by an
-outside party. That acceptance applied to an artifact that has since been
+and Streamlit Community Cloud. It passed the project's internal QA review on
+2026-08-01; that was an internal review process, not an audit by an outside
+party. That acceptance applied to an artifact that has since been
 superseded. The public services now serve the current `559022e2` bundle; see the
 pinned-bundle note below for its distinct deployment-verification and QA status.
 This remains portfolio-scale hosting, not a production or always-on deployment.
@@ -27,7 +27,7 @@ portfolio evidence, not proof of production availability.
 
 ## Where the demo data comes from, and one documented deviation
 
-CLAUDE.md §2 locks the demo data path to the bundled DuckDB extract rather than a
+docs/project_rules.md §2 locks the demo data path to the bundled DuckDB extract rather than a
 live warehouse. **Every value a visitor sees still comes from that bundle.** The
 dashboard opens the committed artifact directly; the API serves it too; neither
 reads application data from PostgreSQL.
@@ -205,10 +205,10 @@ best-effort availability rather than production service guarantees. No paid
 resource, payment method, paid disk, paid database, paid instance, or custom
 domain is used.
 
-Phase 5 was QA-accepted on 2026-08-01 by this project's own QA-reviewer agent,
-working from a separate branch and re-running each measurement rather than
-accepting the implementer's report. That is an internal review process, not an
-audit by an outside party. The acceptance was granted on clean-SHA artifact
+Phase 5 passed internal QA on 2026-08-01 through a separate review that re-ran
+each measurement rather than accepting the implementation report. That is an
+internal review process, not an audit by an outside party. The acceptance was
+granted on clean-SHA artifact
 `66456ebf` from source SHA `ab2aa415`, after local clean-clone, artifact, and
 public hosted checks all passed.
 

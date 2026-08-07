@@ -2,7 +2,7 @@
 
     uv run python -m src.demo.build [--output PATH] [--skip-models]
 
-CLAUDE.md §2 locks the hosted demo to a bundled Parquet/DuckDB extract rather
+docs/project_rules.md §2 locks the hosted demo to a bundled Parquet/DuckDB extract rather
 than a live database. This module is the build step that produces it: it reads
 the curated PostgreSQL views and the Phase 4 model artifacts and writes one
 DuckDB file plus a provenance note beside it.
@@ -452,7 +452,7 @@ def build_manifest(
     if undeclared := sorted(present - declared):
         raise BuildError(
             f"{undeclared} would be written into the bundle and are not declared in "
-            "src/demo/spec.py. CLAUDE.md §3.3: a committed data file whose contents nothing "
+            "src/demo/spec.py. docs/project_rules.md §3.3: a committed data file whose contents nothing "
             "classifies is a provenance hole. Declare them with a classification first."
         )
     if unwritten := sorted(required - present):
@@ -503,7 +503,7 @@ def write_bundle(
                 "contains_simulated": True,
                 "notice": (
                     "Every sim_-prefixed column in this bundle is SIMULATED by this "
-                    "project's adjudication layer (CLAUDE.md §3). The underlying claims are "
+                    "project's adjudication layer (docs/project_rules.md §3). The underlying claims are "
                     "official CMS synthetic Medicare records. The multi-payer dimension is "
                     "100% simulated - Medicare fee-for-service has one payer."
                 ),
@@ -621,7 +621,7 @@ def write_provenance_note(
         "",
         "`rcm_demo.duckdb` is the bundled extract the Streamlit dashboard and the FastAPI",
         "service read when no PostgreSQL warehouse is configured. It is committed on purpose:",
-        "CLAUDE.md §2 locks the hosted demo to a bundled extract, so this file is the only way",
+        "docs/project_rules.md §2 locks the hosted demo to a bundled extract, so this file is the only way",
         "a deployed app has data at all.",
         "",
         "**Every outcome in this bundle is SIMULATED.** The claims underneath are official CMS",

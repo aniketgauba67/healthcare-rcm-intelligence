@@ -4,7 +4,7 @@
 -- Grain:        one row per SYNTHETIC billing provider (prvdr_num). ~4,877 rows
 --               (includes the Unknown provider member for null-provider claims).
 --
--- ***  MANDATORY KEYING (tasks.md crosswalk ruling)  ***
+-- ***  MANDATORY SYNTHETIC-PROVIDER KEYING  ***
 --      This view groups on the SYNTHETIC prvdr_num, NEVER on sim_facility_ccn /
 --      sim_facility_name. The simulated crosswalk multiplexes 4,876 synthetic
 --      providers onto only 2,857 real CCNs (worst 8:1), so grouping by CCN would

@@ -7,7 +7,7 @@ ruling). Expected RED until each artifact directory carries a provenance note.
 that the label and every `sim_` feature are SIMULATED. The CSVs beside it do not,
 and two of them are the artifacts §3 names explicitly:
 
-* `slice_payer.csv` is a PAYER-LEVEL ANALYSIS. CLAUDE.md §3.5 is unambiguous:
+* `slice_payer.csv` is a PAYER-LEVEL ANALYSIS. docs/project_rules.md §3.5 is unambiguous:
   "Medicare FFS has one payer. Our multi-payer dimension is 100% simulated. Every
   payer-level analysis, view, and dashboard page must carry the simulated-data
   banner." The file lists MCR_FFS, MCR_ADV, COM_LARGE, COM_REGIONAL and MCD_MCO
@@ -58,7 +58,7 @@ def test_the_artifact_directory_states_its_provenance(directory: pathlib.Path) -
         f"note beside them: {csvs}. metrics.json in this same directory embeds a `provenance` "
         "key and the CSVs do not, so a reader who opens slice_payer.csv gets a five-payer "
         "denial-rate comparison with nothing saying the payer dimension is 100% simulated "
-        "(CLAUDE.md §3.5 requires the banner on every payer-level analysis). Add a README.md "
+        "(docs/project_rules.md §3.5 requires the banner on every payer-level analysis). Add a README.md "
         "here — one file, written by the run — stating what the directory holds, that the "
         "outcomes are SIMULATED, and the `make` target that regenerates it."
     )

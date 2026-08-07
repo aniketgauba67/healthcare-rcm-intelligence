@@ -1,5 +1,5 @@
 {
-  "purpose": "Model A training matrix, discoverable by tests/leakage/ (CLAUDE.md \u00a74.1). Regenerate with `make features`.",
+  "purpose": "Model A training matrix, discoverable by tests/leakage/ (docs/project_rules.md \u00a74.1). Regenerate with `make features`.",
   "provenance": "CMS synthetic claim facts (SOURCE) + sim_-prefixed SIMULATED adjudication inputs. No real patient, provider or payer data.",
   "rows": 20867,
   "feature_count": 39,

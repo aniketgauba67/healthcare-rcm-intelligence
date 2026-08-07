@@ -70,7 +70,7 @@ data_source_caption()
 
 
 # ---------------------------------------------------------------------------
-# Reconciliation — CLAUDE.md §7
+# Reconciliation — docs/project_rules.md §7
 # ---------------------------------------------------------------------------
 
 st.subheader("Every figure on this dashboard, against its SQL control query")
@@ -417,7 +417,7 @@ kpi_row(
             "Data source",
             str(described.get("kind", "unknown")),
             "DERIVED",
-            "CLAUDE.md §2 locks the hosted demo to the bundled extract.",
+            "docs/project_rules.md §2 locks the hosted demo to the bundled extract.",
         ),
         Kpi(
             "Built from commit",

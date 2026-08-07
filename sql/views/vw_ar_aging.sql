@@ -106,5 +106,5 @@ group by spine.aging_bucket, spine.bucket_sort;
 
 comment on view rcm.vw_ar_aging is
   'SIMULATED AR aging of unpaid claims by days outstanding to a snapshot date. '
-  'Timeline and money are simulated (CLAUDE.md §3). Most open AR is fully-denied '
+  'Timeline and money are simulated (docs/project_rules.md §3). Most open AR is fully-denied '
   'claims (open but ~$0 balance); count and balance are shown separately.';

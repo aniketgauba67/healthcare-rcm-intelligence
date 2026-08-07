@@ -131,7 +131,7 @@ kpi_row(
             f"{by_category['sim_denial_category'].nunique()}",
             "SIMULATED",
             "CARC codes are used as category LABELS only — no licensed X12 wording is in "
-            "this repository (CLAUDE.md §3.7).",
+            "this repository (docs/project_rules.md §3.7).",
         ),
         Kpi(
             "Carry no mechanism at all",

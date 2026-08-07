@@ -3,7 +3,7 @@
 Covers the code sets that give SOURCE claim attributes human-readable names:
 ICD-10-CM (diagnoses), ICD-10-PCS (procedures), HCPCS Level II, MS-DRG v40, and
 a §3.7-clean CARC label taxonomy. Every code set matches the 2023-04 claims
-vintage (CLAUDE.md §2): FY2023 ICD-10, 2023 HCPCS, MS-DRG v40 / IPPS FY2023.
+vintage (docs/project_rules.md §2): FY2023 ICD-10, 2023 HCPCS, MS-DRG v40 / IPPS FY2023.
 
 Two phases, both idempotent and re-runnable:
 
@@ -16,7 +16,7 @@ The LOAD is deliberately ADDITIVE: it applies only sql/ddl/60_reference_codes.sq
 dim_drg.drg_desc by value join. It NEVER drops or reloads fact_* / sim_* tables,
 so a live simulation layer and its FKs stay valid (contrast `make warehouse`).
 
-CLAUDE.md §3.7 compliance:
+docs/project_rules.md §3.7 compliance:
   - HCPCS: only Level II codes (letter + 4 digits) are kept. CPT Level I
     (5-digit numeric, AMA-licensed), 2-char modifiers, and the D-series
     (dental CDT, ADA-copyright) are excluded at parse time.
@@ -49,7 +49,7 @@ _DDL_FILE = REPO_ROOT / "sql" / "ddl" / "60_reference_codes.sql"
 _SCHEMA = "rcm"
 
 # Level II HCPCS: one letter + four digits. Excludes CPT Level I (numeric),
-# 2-char modifiers, and the ADA-copyright D-series (CLAUDE.md §3.7).
+# 2-char modifiers, and the ADA-copyright D-series (docs/project_rules.md §3.7).
 _HCPCS_LEVEL2 = re.compile(r"^[A-CE-Z][0-9]{4}$")
 
 # CARC code identifiers used by the simulation's denial taxonomy, paired with

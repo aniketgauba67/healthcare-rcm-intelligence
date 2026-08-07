@@ -1,4 +1,4 @@
-"""Leakage enforcement for the feature store (CLAUDE.md §4, NON-NEGOTIABLE).
+"""Leakage enforcement for the feature store (docs/project_rules.md §4, NON-NEGOTIABLE).
 
 Two jobs:
 
@@ -36,7 +36,7 @@ FIREWALL_DOC_PATH = REPO_ROOT / "docs" / "simulated_forbidden_columns.md"
 
 Model = Literal["A", "C"]
 
-#: CLAUDE.md §3.2 marker. Matching strips it from both the blacklist entry and
+#: docs/project_rules.md §3.2 marker. Matching strips it from both the blacklist entry and
 #: the candidate column so an entry names the QUANTITY, not one of its spellings.
 SIM_MARKER = "sim_"
 
@@ -284,7 +284,7 @@ def assert_no_forbidden_columns(
         detail = ", ".join(f"{col} (matches {why})" for col, why in sorted(hits.items()))
         raise LeakageError(
             f"forbidden columns in {context} for Model {model}: {detail}. "
-            "See CLAUDE.md §4 and docs/simulated_forbidden_columns.md."
+            "See docs/project_rules.md §4 and docs/simulated_forbidden_columns.md."
         )
 
 
@@ -299,7 +299,7 @@ def assert_sources_safe(
     check above, but `payer_prior_denial_rate` reveals nothing about its
     lineage — the feature store declares its source columns and they are checked
     here. Historical-rate features computed on a prior period are the intended
-    exception and declare that separately (CLAUDE.md §4.2).
+    exception and declare that separately (docs/project_rules.md §4.2).
     """
     blacklist = forbidden_columns(model, config)
     problems: list[str] = []
@@ -311,7 +311,7 @@ def assert_sources_safe(
     if problems:
         raise LeakageError(
             f"features derived from forbidden columns for Model {model}: {'; '.join(problems)}. "
-            "See CLAUDE.md §4.1."
+            "See docs/project_rules.md §4.1."
         )
 
 

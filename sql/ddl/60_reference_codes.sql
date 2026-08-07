@@ -8,7 +8,7 @@
 -- Provenance:   REFERENCE (unmodified public code/description text), EXCEPT
 --               ref_carc.category_label which is a project-authored taxonomy
 --               label (DERIVED) — no X12 copyrighted CARC description text is
---               reproduced (CLAUDE.md §3.7).
+--               reproduced (docs/project_rules.md §3.7).
 -- Notes:        ADDITIVE and idempotent. Uses `create table if not exists` and
 --               NEVER drops/cascades, so applying this file does NOT touch
 --               fact_* or sim_* tables (their FKs / surrogate keys stay valid).
@@ -30,7 +30,7 @@ create table if not exists rcm.ref_icd10cm (
 );
 comment on table rcm.ref_icd10cm is
   'REFERENCE: FY2023 ICD-10-CM diagnosis code long descriptions (CMS public '
-  'code file, unmodified). Dotless tabular code form. Never mix ICD-9 (CLAUDE.md §2).';
+  'code file, unmodified). Dotless tabular code form. Never mix ICD-9 (docs/project_rules.md §2).';
 
 -- ---------------------------------------------------------------------------
 -- ref_icd10pcs — ICD-10-PCS procedure code long descriptions (FY2023). REFERENCE.
@@ -49,7 +49,7 @@ comment on table rcm.ref_icd10pcs is
 -- ---------------------------------------------------------------------------
 -- ref_hcpcs — HCPCS Level II code descriptions (2023). REFERENCE.
 -- Level II ONLY (alphanumeric letter+4 digits). CPT Level I (5-digit numeric,
--- AMA-licensed) and 2-character modifiers are excluded at load (CLAUDE.md §3.7).
+-- AMA-licensed) and 2-character modifiers are excluded at load (docs/project_rules.md §3.7).
 -- ---------------------------------------------------------------------------
 create table if not exists rcm.ref_hcpcs (
     hcpcs_code  text primary key,
@@ -61,7 +61,7 @@ create table if not exists rcm.ref_hcpcs (
 );
 comment on table rcm.ref_hcpcs is
   'REFERENCE: 2023 HCPCS Level II public descriptions (CMS Jan-2023 Alpha-Numeric '
-  'file). CPT Level I descriptions are AMA-licensed and are NOT stored (CLAUDE.md §3.7).';
+  'file). CPT Level I descriptions are AMA-licensed and are NOT stored (docs/project_rules.md §3.7).';
 
 -- ---------------------------------------------------------------------------
 -- ref_msdrg — MS-DRG v40 (FY2023) titles + MDC/type. REFERENCE.
@@ -94,6 +94,6 @@ create table if not exists rcm.ref_carc (
     provenance     text not null default 'REFERENCE'  -- code=REFERENCE; label=DERIVED (see comment)
 );
 comment on table rcm.ref_carc is
-  'CARC code identifiers used as denial-category LABELS only (CLAUDE.md §3.7). '
+  'CARC code identifiers used as denial-category LABELS only (docs/project_rules.md §3.7). '
   'category_label is project-authored (DERIVED); no copyrighted X12 CARC '
   'description text is reproduced. Join target for sim_denial_carc_group.';

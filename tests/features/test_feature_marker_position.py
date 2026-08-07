@@ -7,7 +7,7 @@ beside genuine CMS columns is indistinguishable from a real Medicare book rate,
 and that one shipped in the committed matrix for three commits. Where the marker
 is present but infixed the property already holds, so qa's gate correctly stays
 quiet; this file holds the remaining difference between "the reader is told" and
-what CLAUDE.md §3.2 actually says: "every simulated table and column name is
+what docs/project_rules.md §3.2 actually says: "every simulated table and column name is
 prefixed `sim_`".
 
 WHY IT IS WORTH A TEST NOW, when it twice was not. `log_sim_denied_amount` was

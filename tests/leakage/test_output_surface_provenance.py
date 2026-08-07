@@ -77,7 +77,7 @@ ARTIFACT_ROOTS = (REPO_ROOT / "models_artifacts", REPO_ROOT / "artifacts")
 SWEPT_PACKAGES = (REPO_ROOT / "dashboard", REPO_ROOT / "src" / "api")
 
 # Calls that put a table in front of a person. `st.metric` is deliberately absent:
-# it renders one number, and the banner requirement in CLAUDE.md §6 is what covers
+# it renders one number, and the banner requirement in docs/project_rules.md §6 is what covers
 # a page's scalar figures.
 _EMITTER_CALLS = (
     "to_csv",
@@ -264,7 +264,7 @@ def test_every_emitted_simulated_column_carries_the_marker(measured) -> None:
             failures.append(f"{surface.name}: `{column}` <- {', '.join(sorted(inputs))}")
     assert not failures, (
         f"{len(failures)} emitted column(s) change when a SIMULATED input changes and carry no "
-        "`sim_` marker anywhere in the name, so CLAUDE.md §3.2's provenance is lost at the "
+        "`sim_` marker anywhere in the name, so docs/project_rules.md §3.2's provenance is lost at the "
         "boundary a user reads:\n  "
         + "\n  ".join(failures)
         + "\n\nThese names are column headers on the Phase 5 work-queue page and in "
@@ -566,7 +566,7 @@ def test_every_user_facing_emitter_is_registered() -> None:
     assert not unregistered, (
         "these modules put a table in front of a user and are not registered as surfaces in "
         "tests/leakage/test_output_surface_provenance.py, so nothing checks that their columns "
-        "declare simulated provenance (CLAUDE.md §3.2, §3.5):\n  "
+        "declare simulated provenance (docs/project_rules.md §3.2, §3.5):\n  "
         + "\n  ".join(unregistered)
         + "\n\n"
         "To register: expose the frame-building step as a function taking the input frame and "

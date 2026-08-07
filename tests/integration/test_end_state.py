@@ -139,7 +139,7 @@ def test_the_run_did_not_strip_the_sim_prefix_from_any_column(
 
     This is not something the restore can fix — re-applying the branch's own SQL is
     the correct behaviour for that branch — so the guard makes it visible instead.
-    The rule it protects is CLAUDE.md §3.2, and the §4 blacklist matches on column
+    The rule it protects is docs/project_rules.md §3.2, and the §4 blacklist matches on column
     names, so a stripped prefix is a leakage-surface change, not cosmetics.
     """
     if not warehouse_baseline.reachable or not warehouse_baseline.sim_table_columns:
@@ -166,7 +166,7 @@ def test_the_run_did_not_strip_the_sim_prefix_from_any_column(
 
     assert not regressions, (
         f"columns that carried the `sim_` prefix before this run no longer exist "
-        f"after it: {regressions}. CLAUDE.md §3.2 requires every simulated column to "
+        f"after it: {regressions}. docs/project_rules.md §3.2 requires every simulated column to "
         f"be prefixed, and the §4 leakage blacklist matches on column names. The "
         f"usual cause is running the integration suite from a branch whose "
         f"sql/ddl/ predates a rename: apply_ddl rewrote the table into the older "

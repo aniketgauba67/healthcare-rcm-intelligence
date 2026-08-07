@@ -18,7 +18,7 @@
 --                 sim_cost_to_collect                           = SIMULATED
 --
 -- HONESTY:      Every amount except billed_charge_amt and medicare_source_paid_amt
---               is SIMULATED (CLAUDE.md §3). The multi-payer economics this view
+--               is SIMULATED (docs/project_rules.md §3). The multi-payer economics this view
 --               summarizes do NOT describe real payer behaviour. Dashboard pages
 --               rendering this view must show the synthetic-data banner.
 --
@@ -95,4 +95,4 @@ group by e.sim_submission_year_month;
 comment on view rcm.vw_executive_rcm_summary is
   'Headline RCM KPIs per submission month. Only billed_charge_amt and '
   'medicare_source_paid_amt are SOURCE; every other amount/rate is SIMULATED '
-  '(CLAUDE.md §3). Render the synthetic-data banner.';
+  '(docs/project_rules.md §3). Render the synthetic-data banner.';

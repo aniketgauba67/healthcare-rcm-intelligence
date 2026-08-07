@@ -4,7 +4,7 @@ QA-AUTHORED REVIEW GATE (tests/leakage/ is qa's under the 2026-07-27 ownership
 ruling). Expected RED until the matrix is registered. Do not delete it to go
 green.
 
-CLAUDE.md §3.3: the provenance register and the data dictionary "must be updated
+docs/project_rules.md §3.3: the provenance register and the data dictionary "must be updated
 in the same PR that adds or changes any table or column".
 `artifacts/features/model_a_training_matrix.parquet` has been committed since
 cd3e30c — 20,867 rows x 44 columns mixing SOURCE, DERIVED and SIMULATED — and
@@ -49,7 +49,7 @@ def test_the_committed_training_matrix_is_registered(doc: pathlib.Path) -> None:
     assert "model_a_training_matrix" in text, (
         f"{doc.relative_to(_REPO_ROOT)} never mentions model_a_training_matrix, but the parquet "
         "is COMMITTED and is the only data file a reader can open from a clean clone with no "
-        "database. CLAUDE.md §3.3 requires the register and the dictionary to cover it. State "
+        "database. docs/project_rules.md §3.3 requires the register and the dictionary to cover it. State "
         "what it is, `make features` as the regeneration path, its grain (one row per claim, "
         "20,867), the per-column provenance, and explicitly that every sim_-prefixed column is "
         "SIMULATED."

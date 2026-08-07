@@ -8,7 +8,7 @@ Six endpoints: `/health`, `POST /score/denial`, `POST /score/appeal`,
 
 THE RULE THIS SERVICE IS BUILT AROUND
 --------------------------------------
-CLAUDE.md §3 at the wire: **every response containing simulated values says so.**
+docs/project_rules.md §3 at the wire: **every response containing simulated values says so.**
 The `meta` block on every payload carries `contains_simulated`, the list of
 simulated fields, and the notice — and the flag is MEASURED from the payload and
 from the declared provenance of the datasets it was built from, never asserted by

@@ -1,6 +1,6 @@
 """The Model A feature store: point-in-time facts as of the moment before submission.
 
-Naming follows CLAUDE.md §3.2 rather than modelling convention: a feature
+Naming follows docs/project_rules.md §3.2 rather than modelling convention: a feature
 computed from simulated inputs keeps the `sim_` prefix, even after engineering,
 so that a matrix, a SHAP plot or a dashboard column carries its provenance with
 it. `billed_charge_amt` and `patient_age_years` come from the CMS claim and do

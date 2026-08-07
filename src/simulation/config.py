@@ -1,6 +1,6 @@
 """Typed access to config/simulation.yaml, plus the RNG stream scheme.
 
-Nothing in the simulation layer hardcodes a seed or a coefficient (CLAUDE.md
+Nothing in the simulation layer hardcodes a seed or a coefficient (docs/project_rules.md
 §2): every number is read from the YAML, and every value read here is a DESIGN
 CHOICE documented in docs/assumptions.md.
 """
@@ -93,7 +93,7 @@ class SimulationConfig:
         return [c["id"] for c in self.denial_categories["catalog"]]
 
     def carc_group(self, category_id: str) -> str:
-        """CARC code used as a CATEGORY LABEL only (CLAUDE.md §3.7)."""
+        """CARC code used as a CATEGORY LABEL only (docs/project_rules.md §3.7)."""
         return next(
             c["carc_group"] for c in self.denial_categories["catalog"] if c["id"] == category_id
         )

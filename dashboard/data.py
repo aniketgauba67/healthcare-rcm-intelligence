@@ -3,7 +3,7 @@
 No page opens a data source and no page writes SQL. A page asks for a named
 dataset and gets the curated view back unchanged, because the bundle's tables are
 `select * from rcm.vw_...` copies written by `src/demo/build.py` — that is what
-makes CLAUDE.md §7's "dashboard totals reconcile to SQL control queries" a
+makes docs/project_rules.md §7's "dashboard totals reconcile to SQL control queries" a
 property of the pipeline rather than a thing somebody checked once. The moment a
 page recomputes a KPI in pandas there are two definitions of it and only one is
 under the control queries.

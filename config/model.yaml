@@ -1,6 +1,6 @@
 # Model configuration — Healthcare RCM Intelligence Platform
 #
-# LEAKAGE BLACKLIST (CLAUDE.md §4, NON-NEGOTIABLE).
+# LEAKAGE BLACKLIST (docs/project_rules.md §4, NON-NEGOTIABLE).
 #
 # Source of truth for every entry under `forbidden_*` below is
 # docs/simulated_forbidden_columns.md — the §4.5 firewall interface, written by
@@ -22,7 +22,7 @@
 #   forbidden_derived_features  DERIVED columns in the analytics views that are
 #                               functions of the above. Not in the document —
 #                               the document covers the generated schema, these
-#                               are sql/views/ columns. CLAUDE.md §4.1 requires
+#                               are sql/views/ columns. docs/project_rules.md §4.1 requires
 #                               blocking "a column derived from one" too.
 #   forbidden_source_features   SOURCE (CMS) columns that are adjudication
 #                               outputs and so are not knowable pre-submission.
@@ -164,7 +164,7 @@ workflow_events:
     - sim_touch_minutes
 
 # DERIVED columns of sql/views/ (not generated columns, so outside the scope of
-# the firewall document) that are functions of forbidden columns. CLAUDE.md §4.1
+# the firewall document) that are functions of forbidden columns. docs/project_rules.md §4.1
 # requires blocking derived columns too. Value = what it is derived from.
 #
 # HOW THESE ARE MATCHED, because it decides what an entry here has to say.
@@ -207,7 +207,7 @@ forbidden_derived_features:
 # SOURCE columns from the CMS claim that are adjudication OUTPUTS. They are real
 # rather than simulated, so the firewall document does not cover them, but a
 # biller does not know any of them at the moment before submission — the same
-# test CLAUDE.md §4 applies to the simulated layer. billed_charge_amt (what is
+# test docs/project_rules.md §4 applies to the simulated layer. billed_charge_amt (what is
 # billed) is permitted; what Medicare decided to pay is not.
 forbidden_source_features:
   medicare_source_paid_amt: CMS clm_pmt_amt — the payer's payment decision
@@ -231,12 +231,12 @@ forbidden_source_features:
   # covered stay.
   clm_utlztn_day_cnt: covered/utilization days is a benefit determination
 
-# Names CLAUDE.md §4 or an older config called out that match no column in the
+# Names docs/project_rules.md §4 or an older config called out that match no column in the
 # schema today. Kept so a future rename cannot reintroduce them silently.
 forbidden_features_defensive:
   - sim_denial_reason
 
-# Simulated display-only linkage (CLAUDE.md §3.4). These tables map synthetic
+# Simulated display-only linkage (docs/project_rules.md §3.4). These tables map synthetic
 # provider identifiers onto real facilities and NPIs by seeded random
 # assignment, purely so the dashboard has recognisable names. The assignment
 # carries no information about the claim, and it multiplexes 4,876 synthetic
@@ -385,7 +385,7 @@ estimators:
 #     = p_prevented_given_flagged_and_worked x share_of_claim_value_permanently_lost
 #
 # NEITHER FACTOR IS DERIVED FROM THE SIMULATION. The generator's realized
-# overturn and rework rates are behind the CLAUDE.md §4.5 firewall, and reading
+# overturn and rework rates are behind the docs/project_rules.md §4.5 firewall, and reading
 # them to set a business parameter would make the operating point a function of
 # exactly what the firewall exists to hide. Published sources only, and the
 # factors were fixed BEFORE the resulting threshold was computed — a cost matrix
@@ -519,7 +519,7 @@ appeal_economics:
 
 calibration: isotonic
 
-# Honesty tripwire (CLAUDE.md §1, docs/simulated_forbidden_columns.md §8). The
+# Honesty tripwire (docs/project_rules.md §1, docs/simulated_forbidden_columns.md §8). The
 # label carries deliberate noise; scoring with the true latent probability tops
 # out near AUC 0.68 and roughly a third of denials carry no mechanism signal.
 # A model above this bound is a leak to hunt, not a result to report.

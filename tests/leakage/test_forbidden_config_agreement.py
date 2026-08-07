@@ -1,6 +1,6 @@
 """GATE 2, first assertion: `config/model.yaml` and the firewall document must AGREE.
 
-CLAUDE.md §4 puts the forbidden-column blacklist in `config/model.yaml`, and §4.5 puts
+docs/project_rules.md §4 puts the forbidden-column blacklist in `config/model.yaml`, and §4.5 puts
 the authoritative statement of the boundary in `docs/simulated_forbidden_columns.md`,
 because ml-engineer may not read `src/simulation/`. The config is therefore a
 transcription, and nothing was checking the transcription.
@@ -92,7 +92,7 @@ def _column_bearing_blocks(config: dict) -> dict[str, set[str]]:
 def configured(model_config) -> list[str]:
     """The blacklist as a flat list of names, unioned across every column block.
 
-    CLAUDE.md §4 names `forbidden_features` as the blacklist's home, and the config
+    docs/project_rules.md §4 names `forbidden_features` as the blacklist's home, and the config
     keeps that key as the surface that must equal the firewall document exactly. It
     then carries further blocks for things the document does not cover — whole-table
     expansions, DERIVED view columns, SOURCE adjudication outputs, the crosswalk
@@ -100,7 +100,7 @@ def configured(model_config) -> list[str]:
     that union is what these tests check.
     """
     assert FORBIDDEN_KEY in model_config, (
-        f"config/model.yaml has no `{FORBIDDEN_KEY}` key — CLAUDE.md §4 requires the "
+        f"config/model.yaml has no `{FORBIDDEN_KEY}` key — docs/project_rules.md §4 requires the "
         "forbidden-column blacklist to live there"
     )
     blocks = _column_bearing_blocks(model_config)
@@ -222,15 +222,15 @@ def test_forbidden_tables_hold_table_names_not_column_names(model_config, genera
 
 
 def test_split_strategy_is_temporal(model_config):
-    """CLAUDE.md §4.3: temporal splits, never random, wherever time features exist."""
+    """docs/project_rules.md §4.3: temporal splits, never random, wherever time features exist."""
     strategy = model_config.get("split", {}).get("strategy")
     assert strategy == "temporal", (
-        f"config/model.yaml split.strategy is {strategy!r}; CLAUDE.md §4.3 requires 'temporal'"
+        f"config/model.yaml split.strategy is {strategy!r}; docs/project_rules.md §4.3 requires 'temporal'"
     )
 
 
 def test_seed_is_configured_not_hardcoded(model_config):
     """A locked decision: split seeds live in config, never in code."""
     assert isinstance(model_config.get("seed"), int), (
-        "config/model.yaml must declare an integer `seed` (CLAUDE.md §2, locked decision)"
+        "config/model.yaml must declare an integer `seed` (docs/project_rules.md §2, locked decision)"
     )

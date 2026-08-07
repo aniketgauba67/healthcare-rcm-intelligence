@@ -1,6 +1,6 @@
 # Forbidden and Permitted Columns of the Simulated Layer
 
-**Audience: ml-engineer.** CLAUDE.md §4.5 forbids the ml-engineer from reading
+**Audience: ml-engineer.** docs/project_rules.md §4.5 forbids the ml-engineer from reading
 `src/simulation/` internals — the feature store must be built as if the data
 were real. This document exists so that separation costs nothing: it is the
 authoritative, generator-side statement of which simulated columns are available
@@ -33,7 +33,7 @@ as a feature would produce a model that scores brilliantly and means nothing.
 historical clean-claim rate *is* a legitimate feature, and it is predictive
 precisely because this latent value drives it. But the latent value itself is
 the answer key. Compute the historical rate from observed prior-period outcomes
-with out-of-fold or prior-period logic (CLAUDE.md §4.2); never read this column.
+with out-of-fold or prior-period logic (docs/project_rules.md §4.2); never read this column.
 
 ## 2. FORBIDDEN for Model A (pre-submission denial risk) — post-submission columns
 
@@ -173,7 +173,7 @@ a metric. They are not new constraints — the §4.5 firewall stands.
   skewed test fold. Use an 80/20 split on `sim_submission_date` instead — the
   80th-percentile cut lands near 2021-12-28 and yields a clean ~4,170-claim
   (20%) forward test fold. Use a temporal split, never a random one, wherever a
-  time-dependent feature exists (CLAUDE.md §4.3).
+  time-dependent feature exists (docs/project_rules.md §4.3).
 - **Irreducible-noise ceiling.** The label carries deliberate noise. Scoring
   with the true latent probability — which no model can beat — tops out at
   **AUC ≈ 0.68**, and roughly **one third of the positive (denied) labels carry
@@ -190,5 +190,5 @@ a metric. They are not new constraints — the §4.5 firewall stands.
 ---
 
 Maintained by simulation-engineer, in the same commit as any change to the
-simulated schema (CLAUDE.md §3.3). If a column appears in the warehouse that is
+simulated schema (docs/project_rules.md §3.3). If a column appears in the warehouse that is
 not listed here, treat it as forbidden until this document is updated.

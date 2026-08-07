@@ -214,7 +214,7 @@ def test_temporal_probe_accepts_a_quantile_split(claim_frame):
 
 
 def test_temporal_probe_rejects_a_random_split(claim_frame):
-    """CLAUDE.md §4.3 forbids a random split wherever time-dependent features exist."""
+    """docs/project_rules.md §4.3 forbids a random split wherever time-dependent features exist."""
     rng = np.random.default_rng(5)
     is_train = pd.Series(rng.random(len(claim_frame)) < 0.8)
     findings = detectors.temporal_findings(claim_frame["sim_submission_date"], is_train)

@@ -136,7 +136,7 @@ def _git(*args: str) -> tuple[int, str]:
 def branch_is_not_stale() -> None:
     """Refuse to run the destructive suite from a branch that has not merged `main`.
 
-    TEAM RULE (tasks.md, 2026-07-27): `git merge main` BEFORE any write to the
+    INTEGRATION RULE: merge `main` BEFORE any write to the
     shared Postgres — DDL, loader, `make views`, or an integration run. Not after.
 
     This enforces the rule rather than trusting it to be remembered, because the

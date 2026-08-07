@@ -1,6 +1,6 @@
 """Every figure on this dashboard, and the SQL control query it must equal.
 
-CLAUDE.md §7, App: "dashboard totals reconcile to SQL control queries". This
+docs/project_rules.md §7, App: "dashboard totals reconcile to SQL control queries". This
 module is that reconciliation, written as data rather than as prose, so it can be
 rendered on the Model & data quality page AND asserted by a test.
 
@@ -473,5 +473,5 @@ def sql_for(figure: str) -> str:
     raise KeyError(
         f"{figure!r} is not a reconciled figure. Declared: "
         f"{[check.figure for check in ALL_CHECKS]}. Every figure a page shows needs a "
-        "control query here before it ships (CLAUDE.md §7)."
+        "control query here before it ships (docs/project_rules.md §7)."
     )

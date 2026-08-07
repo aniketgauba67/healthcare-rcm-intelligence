@@ -17,7 +17,7 @@ def test_all_sources_have_required_fields():
 
 
 def test_no_ingested_source_is_classified_simulated():
-    # Provenance rule (CLAUDE.md §3): downloaded raw sources are never SIMULATED.
+    # Provenance rule (docs/project_rules.md §3): downloaded raw sources are never SIMULATED.
     doc = load_sources()
     for name, cfg in doc["sources"].items():
         assert cfg["classification"] != "SIMULATED", name

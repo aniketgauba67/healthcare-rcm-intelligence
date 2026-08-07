@@ -6,10 +6,10 @@ Phase 5 board 2026-07-29. The ruling is written out in full as
 
 THE RULING, IN ONE LINE
 -----------------------
-CLAUDE.md §4.5 firewalls ml-engineer from `src/simulation/`, not from `docs/` or
+docs/project_rules.md §4.5 firewalls ml-engineer from `src/simulation/`, not from `docs/` or
 `config/`, and the generator's realized output, its internals and its entire
 latent formula are all published there. So the hole is REAL and is NOT FIXABLE by
-redaction — every candidate for deletion is required by CLAUDE.md §1 or §7. It is
+redaction — every candidate for deletion is required by docs/project_rules.md §1 or §7. It is
 recorded as a known limitation instead, and what gets enforced is that the
 disclosure does not GROW into the one shape that would be materially worse.
 
@@ -86,7 +86,7 @@ def test_the_firewall_limitation_is_recorded(assumptions_text: str) -> None:
     assert not missing, (
         f"{ASSUMPTIONS.relative_to(REPO_ROOT)} no longer records the [FIREWALL-DOC-HOLE] "
         f"limitation: {missing}. This section is the project's written admission that "
-        "CLAUDE.md §4.5 firewalls source files and not documentation. Removing it does not "
+        "docs/project_rules.md §4.5 firewalls source files and not documentation. Removing it does not "
         "close the hole — it only stops the hole being disclosed, which is a §1 problem, not "
         "a fix."
     )
@@ -123,7 +123,7 @@ def test_the_latent_probability_is_still_forbidden_as_a_feature() -> None:
     forbidden = " ".join(str(v) for v in config.values())
     assert "sim_latent_p" in forbidden, (
         f"sim_latent_p is no longer named anywhere in {MODEL_CONFIG.relative_to(REPO_ROOT)}. "
-        "CLAUDE.md §4 requires it be validation-only and never a feature, and §12 of the "
+        "docs/project_rules.md §4 requires it be validation-only and never a feature, and §12 of the "
         "assumptions doc rests on that."
     )
 
@@ -162,6 +162,6 @@ def test_no_generator_internal_reaches_a_published_artifact() -> None:
     assert not offenders, (
         "published artifacts carry generator-internal columns:\n  "
         + "\n  ".join(offenders)
-        + "\nThese are VALIDATION ONLY under CLAUDE.md §4 and must not reach a file anyone "
+        + "\nThese are VALIDATION ONLY under docs/project_rules.md §4 and must not reach a file anyone "
         "opens."
     )

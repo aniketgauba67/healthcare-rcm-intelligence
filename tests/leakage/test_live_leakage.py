@@ -12,7 +12,7 @@ the real warehouse, so it lives here, marked `integration`, rather than pretendi
 run in CI.
 
 Read-only throughout: SELECTs against `rcm`, no DDL, no writes. Safe to run in another
-agent's write window, though the shared-Postgres rule in tasks.md still applies to
+process's write window, though the shared-Postgres rule still applies to
 anything that reloads the warehouse underneath it.
 """
 
@@ -185,7 +185,7 @@ def test_config_covers_every_forbidden_column_in_the_warehouse(live_schema, fire
 # pattern matching nothing is the Phase 2 placeholder defect: it reads as coverage
 # and provides none.
 #
-#   forbidden_features_defensive — CLAUDE.md §4 names `sim_denial_reason` in its
+#   forbidden_features_defensive — docs/project_rules.md §4 names `sim_denial_reason` in its
 #     minimum list and the generator never emitted such a column. Keeping it
 #     honours the text of the rule; the key's own name says it is belt-and-braces.
 #   forbidden_crosswalk_display_features — deliberately carries BOTH the pre- and

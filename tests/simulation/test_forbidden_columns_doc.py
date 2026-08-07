@@ -2,7 +2,7 @@
 
 `docs/simulated_forbidden_columns.md` is the interface that lets ml-engineer
 populate `config/model.yaml: forbidden_features` without reading
-`src/simulation/` (CLAUDE.md §4.5). A generated column that is not mentioned
+`src/simulation/` (docs/project_rules.md §4.5). A generated column that is not mentioned
 there is a column nobody has classified as pre- or post-submission — which is
 exactly how a leak gets shipped. These tests fail the build in that case, so
 adding a column forces a decision about it.

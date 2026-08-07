@@ -1,6 +1,6 @@
 """Live-Postgres regression guard for the §3.2 crosswalk column-prefix rule.
 
-Both crosswalk tables are classified SIMULATED, so CLAUDE.md §3.2 requires every
+Both crosswalk tables are classified SIMULATED, so docs/project_rules.md §3.2 requires every
 column to carry the `sim_` prefix. This read-only test introspects
 information_schema against the live database and fails if any column of either
 crosswalk table is missing the prefix. It never writes, so it is safe to run in

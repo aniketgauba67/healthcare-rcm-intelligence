@@ -19,7 +19,7 @@
 # **observed vs expected** denials by **indirect standardization** (O/E ratio) with a
 # **Poisson funnel** flag.
 #
-# **MANDATORY KEYING (tasks.md).** Every provider aggregate keys on the SYNTHETIC
+# **MANDATORY KEYING.** Every provider aggregate keys on the SYNTHETIC
 # `prvdr_num`, never on `sim_facility_ccn`/`sim_facility_name` (the crosswalk multiplexes up
 # to 8 synthetic hospitals onto one real CCN). Real facility names are display-only
 # and are **deliberately withheld from the flagged-outlier tables** below: attaching

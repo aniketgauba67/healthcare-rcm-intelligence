@@ -13,7 +13,7 @@
 --
 -- Grain:        one row per (sim_submission_year_month, feature_name). The monitored
 --               columns are exactly the pre-submission Model A candidates
---               (knowable before submission, CLAUDE.md §4) plus the denial
+--               (knowable before submission, docs/project_rules.md §4) plus the denial
 --               OUTCOME rate, which is flagged metric_kind='outcome_rate' — it is
 --               a monitoring target, NOT a feature (never train on it).
 --

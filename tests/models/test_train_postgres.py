@@ -72,7 +72,7 @@ def test_the_run_produces_every_section_the_model_card_quotes(report) -> None:
 
 
 def test_the_baseline_comparison_is_reported_not_just_the_winner(report) -> None:
-    """CLAUDE.md §7: the definition of done is the comparison, both directions."""
+    """docs/project_rules.md §7: the definition of done is the comparison, both directions."""
     models = report["metrics_test_fold"]
     for name in ("base_rate", "payer_rule", "logistic", "xgboost"):
         assert name in models

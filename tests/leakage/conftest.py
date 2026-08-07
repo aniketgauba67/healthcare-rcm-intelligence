@@ -1,4 +1,4 @@
-"""Fixtures for the leakage suite (CLAUDE.md §4.1).
+"""Fixtures for the leakage suite (docs/project_rules.md §4.1).
 
 The suite runs without Postgres and without `data/`: the generator is exercised
 against the same synthetic base frame the simulation tests use, so the leakage gate is

@@ -7,7 +7,7 @@ THIS IS THE §3.5 PAGE
 Medicare fee-for-service has exactly ONE payer. The five payer archetypes compared
 below are 100% invented by this project, are named after no real insurer, and
 carry no relationship to how Medicare Advantage, commercial or Medicaid plans
-behave. CLAUDE.md §3.5 requires the banner on every payer-level analysis, and the
+behave. docs/project_rules.md §3.5 requires the banner on every payer-level analysis, and the
 payer note is rendered INSIDE the banner block rather than beside it, so a reader
 cannot take the comparison and leave the caveat behind.
 

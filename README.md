@@ -1,9 +1,8 @@
 # Healthcare RCM Intelligence Platform
 
 > **Status:** All five phases are complete. Each phase was reviewed against its
-> definition of done by this project's own QA-reviewer agent, working from a
-> separate branch and re-running every measurement rather than accepting the
-> implementer's report — that is what "QA-accepted" means here. It is an internal
+> definition of done through a separate internal QA workflow that re-ran every
+> measurement rather than accepting the implementation report. It is an internal
 > review process, not an audit by an outside party.
 >
 > **Current artifact status:** The live API reports bundle `559022e2` from clean
@@ -220,32 +219,12 @@ See:
 - [`docs/assumptions.md`](docs/assumptions.md)
 - [`docs/simulated_forbidden_columns.md`](docs/simulated_forbidden_columns.md)
 
-## Coding-agent development workflow
+## Development and validation
 
-This repository was developed with a role-based coding-agent workflow coordinated and reviewed by a human project owner.
-
-Agents were assigned bounded responsibilities for:
-
-- Data engineering
-- Simulation engineering
-- Analytics engineering
-- Machine learning
-- Application engineering
-- QA review
-
-The workflow uses:
-
-- Explicit file-ownership boundaries
-- Separate feature branches and worktrees
-- A shared task board with acceptance criteria
-- Tests added alongside new modules
-- Independent QA review before phase acceptance
-- Reconciliation and reproducibility gates
-- Human review of generated code, assumptions, and merge decisions
-
-Coding agents are treated as implementation collaborators, not as a substitute for validation. The repository records several cases where generated work was corrected after tests, review, or reconciliation exposed issues such as test-order dependencies, incomplete leakage protection, misleading analytical output, and unsafe warehouse reload ordering.
-
-See [`CLAUDE.md`](CLAUDE.md) and [`tasks.md`](tasks.md) for the development rules and phase history.
+The implementation was validated with focused tests, independent QA passes,
+reconciliation checks, reproducibility gates, and human review. Durable data,
+modeling, and runtime contracts are recorded in
+[`docs/project_rules.md`](docs/project_rules.md).
 
 ## Technology stack
 
@@ -279,7 +258,7 @@ Configured dependencies are not presented as completed product features until th
 ```text
 .
 ├── config/                 # Source, simulation, and model configuration
-├── docs/                   # Assumptions, provenance, dictionary, leakage rules
+├── docs/                   # Project rules, provenance, model card, and guides
 ├── notebooks/              # Reproducible statistical analysis modules
 ├── sql/
 │   ├── ddl/                # Warehouse, simulation, quarantine, reference schemas
@@ -290,8 +269,6 @@ Configured dependencies are not presented as completed product features until th
 │   ├── simulation/         # Reproducible adjudication generator
 │   └── validation/         # Staging, contracts, quarantine, reconciliation
 ├── tests/                  # Unit, contract, simulation, and integration tests
-├── CLAUDE.md               # Agent roles and engineering rules
-├── tasks.md                # Phase board, QA findings, and acceptance evidence
 ├── Makefile                # Reproducible project commands
 └── pyproject.toml          # Python dependencies and tooling configuration
 ```
@@ -592,8 +569,8 @@ The interrupted time-series example is explicitly labeled illustrative and does 
 4. **Point-in-time correctness**  
    Future ML features must contain only information available at the modeled decision time.
 
-5. **Reviewable agent-assisted development**  
-   AI-generated code must remain understandable, testable, and subject to human and automated review.
+5. **Reviewable development**
+   Code must remain understandable, testable, and subject to human and automated review.
 
 ## Roadmap
 

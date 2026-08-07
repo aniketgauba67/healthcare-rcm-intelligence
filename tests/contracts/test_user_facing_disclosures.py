@@ -259,7 +259,7 @@ def test_the_surface_states_the_keying_rule(surface) -> None:
     """Display-only, forbidden as a feature, and the synthetic id is the grain."""
     name, text = surface
     assert _DISPLAY_ONLY.search(text), (
-        f"{name} never says the crosswalk is display-only (CLAUDE.md §3.4)."
+        f"{name} never says the crosswalk is display-only (docs/project_rules.md §3.4)."
     )
     assert _FORBIDDEN_AS_FEATURE.search(text), (
         f"{name} never says the crosswalk is forbidden as a model feature. A reader who is told "

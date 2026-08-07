@@ -147,7 +147,7 @@ def _denial_request_model() -> type[BaseModel]:
                     "omitted features are imputed from the training fold and named in "
                     "the response's `imputed_features`. Fields are generated from the "
                     "declared Model A feature set, so nothing knowable only AFTER "
-                    "submission can appear here (CLAUDE.md §4)."
+                    "submission can appear here (docs/project_rules.md §4)."
                 )
             },
         ),
@@ -382,7 +382,7 @@ class ExecutiveMetricsResponse(BaseModel):
     monthly: list[dict[str, Any]] = Field(default_factory=list)
     reconciliation: dict[str, Any] = Field(
         description=(
-            "The SQL control totals this response must equal (CLAUDE.md §7). Returned "
+            "The SQL control totals this response must equal (docs/project_rules.md §7). Returned "
             "with the figures rather than asserted elsewhere, so a caller can check them."
         )
     )

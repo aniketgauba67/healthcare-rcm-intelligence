@@ -1,6 +1,6 @@
 """Response provenance: the metadata block every payload carries.
 
-The hard rule for this service is CLAUDE.md §3 restated at the wire: **any
+The hard rule for this service is docs/project_rules.md §3 restated at the wire: **any
 response containing `sim_` fields carries `contains_simulated: true`.** A JSON
 body is read by a program and then, eventually, by a person looking at a log or a
 notebook cell, with none of the surrounding pages. So the flag is not decoration

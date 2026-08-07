@@ -1,6 +1,6 @@
 """Persisting the Model A training matrix, so the leakage guard can find it.
 
-CLAUDE.md §4.1 requires an automated test that fails the build if a forbidden
+docs/project_rules.md §4.1 requires an automated test that fails the build if a forbidden
 column — or a column derived from one — enters a training matrix. That test is
 `tests/leakage/test_training_matrix_guard.py`, and it cannot check a matrix it
 cannot see. Its discovery contract accepts any one of three routes: the path in
@@ -22,7 +22,7 @@ over a warehouse nobody checked" failure this project has already hit once. A
 committed matrix makes the §4.1 probes run on a clean clone, in CI, on real
 feature values, every time. It is 20,867 rows of CMS *synthetic* claim facts and
 `sim_`-prefixed SIMULATED adjudication inputs; no real patient, provider or
-payer data exists anywhere in this project (CLAUDE.md §3).
+payer data exists anywhere in this project (docs/project_rules.md §3).
 
 **Only Model A's matrix belongs here.** The guard's forbidden set is Model A's,
 so a Model C matrix dropped into `artifacts/features/` would fail it correctly
@@ -197,7 +197,7 @@ def _build_manifest(stamped: pd.DataFrame, config: dict, parquet_digest: str) ->
     # commit of their own. This file is committed; its commit IS its stamp.
     return {
         "purpose": "Model A training matrix, discoverable by tests/leakage/ "
-        "(CLAUDE.md §4.1). Regenerate with `make features`.",
+        "(docs/project_rules.md §4.1). Regenerate with `make features`.",
         "provenance": "CMS synthetic claim facts (SOURCE) + sim_-prefixed SIMULATED "
         "adjudication inputs. No real patient, provider or payer data.",
         "rows": int(len(stamped)),

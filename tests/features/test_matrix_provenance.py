@@ -92,7 +92,7 @@ def test_no_simulated_feature_hides_behind_an_unprefixed_name() -> None:
             offenders.append((spec.name, lineage))
     assert not offenders, (
         f"features computed from simulated inputs without the sim_ prefix: {offenders}. "
-        "CLAUDE.md §3.2 — the prefix survives the engineering step, so a matrix, a "
+        "docs/project_rules.md §3.2 — the prefix survives the engineering step, so a matrix, a "
         "SHAP plot or a dashboard column carries its provenance with it."
     )
 

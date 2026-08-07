@@ -1,6 +1,6 @@
 """Reading the bundled demo extract.
 
-This is the read side of the locked decision in CLAUDE.md §2 — the hosted demo
+This is the read side of the locked decision in docs/project_rules.md §2 — the hosted demo
 runs off a bundled DuckDB extract, not live Postgres. Opening a bundle needs no
 database, no network, no credentials and no environment variables, which is the
 whole point: it is what makes the app deployable to Streamlit Community Cloud or

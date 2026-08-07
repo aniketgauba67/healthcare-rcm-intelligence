@@ -7,7 +7,7 @@ the ruling is met. Satisfy the ruling; do not edit or delete this file to make
 the suite green — raise it with qa-reviewer or team-lead if you think the gate
 itself is wrong.
 
-TEAM-LEAD RULING (tasks.md, Phase 4, 2026-07-27): the configured cost matrix is
+PROJECT RULING (Phase 4, 2026-07-27): the configured cost matrix is
 degenerate — a $25 review against a mean $3,800 at stake at a 12% denial rate
 makes reviewing an average claim worth ~$456, so the cost-optimal threshold flags
 99% of the queue. The fault is CONCEPTUAL, not a bad constant. A multiplier of
@@ -40,9 +40,7 @@ serious one in this project. `appeal_processing_cost_usd` was anchored against
 confirmed on live PG that avg(sim_denial_rework_cost + sim_appeal_cost) over the
 2,663 denied claims is 29.8818 — the match is not coincidence. It does NOT follow
 that a forbidden table was queried, and qa's first write-up wrongly said so. The
-figure is PUBLISHED in two places ml-engineer is expected to read — tasks.md, the
-Phase 2 record, and docs/assumptions.md — and §4.5 firewalls `src/simulation/`,
-not the board. The board is the likely route. What is established is that a
+figure is published in `docs/assumptions.md`. What is established is that a
 generator-realized figure influenced a business parameter; by what path is not,
 and this file asserts nothing about that.
 
@@ -50,10 +48,9 @@ The finding survives the correction, because the ruling is about the anchoring
 and not about the route: even as a consistency remark, it makes the operating
 point a function of the layer the firewall exists to hide.
 
-A HOLE THIS EXPOSES, for Phase 5, and nobody's fault: docs/assumptions.md and
-tasks.md republish generator-realized values to an agent that is firewalled from
-the generator. The firewall is enforced on source files and leaks through
-documentation.
+A HOLE THIS EXPOSES: `docs/assumptions.md` republishes generator-realized values
+outside the generator. The firewall is enforced on source files and can leak
+through documentation.
 
 The sensitivity sweep is NOT a substitute for the decomposition. It shows how
 much of the answer is the assumption, which is the honest representation of a
@@ -119,7 +116,7 @@ _GENERATOR_VOICE = re.compile(
 )
 
 # Cross-references carry digits that are not measurements. Stripping them is what
-# lets the numeric test below stay simple without firing on "CLAUDE.md §4.5".
+# lets the numeric test below stay simple without firing on "docs/project_rules.md §4.5".
 _REFERENCE_NOISE = re.compile(r"§\s*\d+(?:\.\d+)*|CLAUDE\.md|[\w/]+\.(?:md|yaml|py)\b")
 
 _NUMERIC = re.compile(r"\d+(?:\.\d+)?")

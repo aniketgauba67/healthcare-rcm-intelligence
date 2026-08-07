@@ -1,4 +1,4 @@
-"""Reproducibility: same seed ⇒ byte-identical output (CLAUDE.md §7).
+"""Reproducibility: same seed ⇒ byte-identical output (docs/project_rules.md §7).
 
 "Byte-identical" is defined as the SHA-256 of each table's canonical CSV
 serialization — see the docstring in src/simulation/run.py for why that, and

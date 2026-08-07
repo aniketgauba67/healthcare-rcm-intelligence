@@ -56,7 +56,7 @@ views:
 	uv run python sql/quality/view_reconciliation.py
 
 # Rebuild the committed Model A feature matrix under artifacts/features/. That
-# file is what the CLAUDE.md §4.1 leakage probes run against on a clean clone,
+# file is what the docs/project_rules.md §4.1 leakage probes run against on a clean clone,
 # so it has to be regenerated (and re-committed) whenever the feature store or
 # the warehouse changes. `make train` writes it as a side effect too.
 #
@@ -76,7 +76,7 @@ train-appeal:
 score:
 	uv run python -m src.models.score
 
-# Build the bundled DuckDB demo extract (CLAUDE.md §2 locked decision: the hosted
+# Build the bundled DuckDB demo extract (docs/project_rules.md §2 locked decision: the hosted
 # demo reads a bundle, not live Postgres). READS the curated views and the model
 # artifacts; writes dashboard/demo_data/rcm_demo.duckdb, which is COMMITTED — a
 # deployed app has no other way to get data. Needs `make views`, `make train` and

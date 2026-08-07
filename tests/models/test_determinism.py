@@ -1,6 +1,6 @@
 """Same seed, same numbers — the property the model card's honesty rests on.
 
-CLAUDE.md §7 states this requirement for the simulation. It matters just as much
+docs/project_rules.md §7 states this requirement for the simulation. It matters just as much
 for the models, for a duller reason: every figure in `docs/model_card.md` is
 copied from `models_artifacts/*/metrics.json`, so a run that quietly varies makes
 the card unverifiable by the next person who runs it.

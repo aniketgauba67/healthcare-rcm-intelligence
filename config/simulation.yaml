@@ -6,7 +6,7 @@
 # commercial, or Medicaid adjudication behaviour. Ranges are bracketed against
 # published industry reporting; each anchor is cited in docs/assumptions.md.
 #
-# Owner: simulation-engineer (CLAUDE.md §5).
+# Deterministic simulation configuration.
 # Versioning rule (persona): bump `version` on EVERY calibration change and note
 # the change in docs/assumptions.md § Changelog.
 # ============================================================================
@@ -14,7 +14,7 @@ version: 0.4.0
 
 # Master seed for the generator. Every component derives an independent stream
 # from this via numpy SeedSequence.spawn, so adding a component never shifts an
-# existing component's draws. Never hardcode a seed in code (CLAUDE.md §2).
+# existing component's draws. Never hardcode a seed in code (docs/project_rules.md §2).
 seed: 42
 
 # ---------------------------------------------------------------------------
@@ -36,7 +36,7 @@ targets:
   appeal_overturn_rate: {min: 0.35, max: 0.60, point: 0.470}
 
 # ---------------------------------------------------------------------------
-# Simulated payer dimension (CLAUDE.md §3.5: Medicare FFS has ONE payer; this
+# Simulated payer dimension (docs/project_rules.md §3.5: Medicare FFS has ONE payer; this
 # multi-payer dimension is 100% simulated). These are ARCHETYPES, deliberately
 # not modelled on and not named after any real insurer.
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ mechanisms:
     late_filing: 2.20                # submitted past the payer's filing limit
     duplicate_submission: 4.50
 
-  # --- Interactions (CLAUDE.md persona §2 requires genuine interactions) ---
+  # --- Interactions (docs/project_rules.md persona §2 requires genuine interactions) ---
   interactions:
     # THE headline interaction: an auth being required is nearly harmless on its
     # own; required AND missing is what bites. Extra OR on top of the main
@@ -194,7 +194,7 @@ mechanisms:
     provider_quality_prevalence_scale: 0.35
 
 # ---------------------------------------------------------------------------
-# Denial categories. CARC codes are used as CATEGORY LABELS ONLY (CLAUDE.md
+# Denial categories. CARC codes are used as CATEGORY LABELS ONLY (docs/project_rules.md
 # §3.7) — no CARC description text is reproduced anywhere in this repo. The
 # `name` values are plain-language labels authored for this project.
 #
@@ -345,7 +345,7 @@ validation:
   max_unknown_service_line_share: 0.20
 
 # ---------------------------------------------------------------------------
-# Linkage / crosswalk seed (CLAUDE.md §3.4). Added by data-engineer under
+# Linkage / crosswalk seed (docs/project_rules.md §3.4). Added by data-engineer under
 # one-commit delegated authority (team-lead ruling 2026-07-22) because the
 # SIMULATED claim->real facility/provider crosswalk must be seed-reproducible.
 # Kept separate from `seed` so the crosswalk is stable across generator changes.

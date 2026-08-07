@@ -1,6 +1,6 @@
 """GATE 1: `config/model.yaml` must agree with the §4.5 firewall document.
 
-CLAUDE.md §4 puts the blacklist in `config/model.yaml`, and §4.5 forbids
+docs/project_rules.md §4 puts the blacklist in `config/model.yaml`, and §4.5 forbids
 ml-engineer from reading `src/simulation/`. Those two rules together mean the
 blacklist is a copy of `docs/simulated_forbidden_columns.md`, and a copy drifts.
 These tests are the anti-drift check in both directions: a column the document

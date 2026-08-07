@@ -99,7 +99,7 @@ def logistic_baseline(feature_set: FeatureSet, config: dict) -> Pipeline:
 
     Wrapped with the preprocessor in one `Pipeline` so that `fit` cannot be
     called on the training fold with statistics learned anywhere else
-    (CLAUDE.md §4.4). The estimator hyperparameters come from
+    (docs/project_rules.md §4.4). The estimator hyperparameters come from
     `config/model.yaml: estimators.logistic`; nothing here is tuned.
     """
     params = dict(config["estimators"]["logistic"])

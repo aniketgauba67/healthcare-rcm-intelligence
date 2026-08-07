@@ -1,6 +1,6 @@
 """Validation suite for the simulated adjudication layer.
 
-Four families, per CLAUDE.md §7 and the simulation-engineer persona:
+Four families, per docs/project_rules.md §7:
 
   * DIRECTIONAL  — the causal claims the generator makes actually hold in the
     data it produced (missing authorization raises the denial rate, and so on),
@@ -425,7 +425,7 @@ def referential_checks(result: SimulationResult) -> list[CheckResult]:
 # Provenance hygiene
 # ---------------------------------------------------------------------------
 # Latent generator internals. Stored so the simulation can be validated, never
-# usable as a model feature (CLAUDE.md §4). Published in
+# usable as a model feature (docs/project_rules.md §4). Published in
 # docs/simulated_forbidden_columns.md so ml-engineer can copy the list into
 # config/model.yaml WITHOUT reading src/simulation/ (§4.5).
 LATENT_ONLY_COLUMNS = (

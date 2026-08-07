@@ -418,7 +418,7 @@ def run_model_c(
             ("facility_provider", "prvdr_num"),
         )
     }
-    # Provider is the facility slice (CLAUDE.md §3.4: group on the synthetic
+    # Provider is the facility slice (docs/project_rules.md §3.4: group on the synthetic
     # prvdr_num, never the crosswalked real CCN). At 193 test rows essentially no
     # provider is scorable, which is the finding rather than an omission.
     provider_rows = slices.pop("facility_provider")
@@ -440,7 +440,7 @@ def run_model_c(
         # property qa measured and which a timestamp would quietly destroy.
         "run_stamp": run_stamp(),
         "seed": seed,
-        "provenance": "Targets and every sim_ feature are SIMULATED (CLAUDE.md §3). "
+        "provenance": "Targets and every sim_ feature are SIMULATED (docs/project_rules.md §3). "
         "No real appeal outcomes exist in this project.",
         "population": {
             "denied_claims": int(len(frame)),

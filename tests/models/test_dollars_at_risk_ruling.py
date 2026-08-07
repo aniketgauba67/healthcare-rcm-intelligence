@@ -7,7 +7,7 @@ the ruling is met. Satisfy the ruling; do not edit or delete this file to make
 the suite green — raise it with qa-reviewer or team-lead if you think the gate
 itself is wrong.
 
-TEAM-LEAD RULING (tasks.md, Phase 4, 2026-07-27): the champion's top-decile
+PROJECT RULING (Phase 4, 2026-07-27): the champion's top-decile
 capture is reported at 38.4% with a bootstrap interval of [16.0%, 59.3%] while a
 constant scorer lands at 20.4% — inside that interval. The required fix was to
 the INSTRUMENT: a paired bootstrap CI on the DIFFERENCE over the same resamples,

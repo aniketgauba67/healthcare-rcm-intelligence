@@ -6,7 +6,7 @@ label in a hat, and nothing about the two strings says which is which. So every
 feature in the store is declared here with its source columns, and the guard
 checks the declaration (`src/features/leakage.py: assert_sources_safe`).
 
-The one sanctioned exception is CLAUDE.md §4.2: historical-rate features are
+The one sanctioned exception is docs/project_rules.md §4.2: historical-rate features are
 *supposed* to read the outcome column, because that is what a historical rate
 is. They are allowed to, on three conditions — they declare
 `point_in_time="prior_period"`, they name the outcome explicitly in

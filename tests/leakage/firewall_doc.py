@@ -1,6 +1,6 @@
 """Parse `docs/simulated_forbidden_columns.md` into a machine-checkable classification.
 
-CLAUDE.md §4.5 forbids ml-engineer from reading `src/simulation/`, so that document
+docs/project_rules.md §4.5 forbids ml-engineer from reading `src/simulation/`, so that document
 is the interface through which the leakage boundary is published, and
 `config/model.yaml: forbidden_features` is meant to be a transcription of it. A
 transcription that nobody diffs is exactly how the current placeholder list ended up

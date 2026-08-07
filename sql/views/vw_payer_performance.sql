@@ -3,7 +3,7 @@
 --
 -- Grain:        one row per simulated payer (sim_payer_id). 5 rows.
 --
--- ***  THE PAYER DIMENSION IS 100 PERCENT SIMULATED (CLAUDE.md §3.5)  ***
+-- ***  THE PAYER DIMENSION IS 100 PERCENT SIMULATED (docs/project_rules.md §3.5)  ***
 --      Medicare FFS has exactly ONE payer. Every payer archetype below is
 --      invented; NONE is modelled on or named after any real insurer, and NO
 --      row here describes real Medicare / Medicare Advantage / commercial /
@@ -86,5 +86,5 @@ group by e.sim_payer_id, e.sim_payer_name;
 
 comment on view rcm.vw_payer_performance is
   'SIMULATED payer performance. The multi-payer dimension is 100 percent '
-  'simulated (CLAUDE.md §3.5) — Medicare FFS has one payer; no row describes a '
+  'simulated (docs/project_rules.md §3.5) — Medicare FFS has one payer; no row describes a '
   'real insurer. Every surface built on this view MUST show the synthetic banner.';

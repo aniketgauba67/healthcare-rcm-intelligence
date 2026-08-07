@@ -1,4 +1,4 @@
-"""Static guard: the `sim_` prefix must survive the view boundary (CLAUDE.md §3.2).
+"""Static guard: the `sim_` prefix must survive the view boundary (docs/project_rules.md §3.2).
 
 The simulated-linkage facility columns live in `rcm.sim_facility_crosswalk` and are
 surfaced by `sql/views/vw_claim_enriched.sql`, which is the flattened one-row-per-claim
@@ -47,7 +47,7 @@ def test_view_sql_never_uses_a_bare_simulated_linkage_column(path: Path):
     offenders = sorted({m.group(0) for m in _BARE_LINKAGE.finditer(body)})
     assert not offenders, (
         f"{path.name} references simulated-linkage column(s) without the `sim_` "
-        f"prefix: {offenders}. CLAUDE.md §3.2 requires the prefix to survive the "
+        f"prefix: {offenders}. docs/project_rules.md §3.2 requires the prefix to survive the "
         f"view boundary — do not alias it away."
     )
 

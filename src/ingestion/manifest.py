@@ -1,6 +1,6 @@
 """Download manifest: the record of every raw artifact we fetch.
 
-Each entry captures exactly what CLAUDE.md's data provenance rules require:
+Each entry captures exactly what docs/project_rules.md's data provenance rules require:
 source URL, release vintage, SHA-256 checksum, byte size, and row count.
 The manifest is the idempotency ledger — a re-run that finds a matching
 checksum on disk skips the download.

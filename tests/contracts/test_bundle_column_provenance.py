@@ -4,7 +4,7 @@ QA-AUTHORED REVIEW GATE (qa owns `tests/`). Do not delete it to go green.
 
 The bundle is the most exposed artifact in this repository: it ships to a public
 hosted demo, and a reader can open it with no database, no environment and no
-code. CLAUDE.md §1 makes "no simulated value presented as real" the property the
+code. docs/project_rules.md §1 makes "no simulated value presented as real" the property the
 project rests on, and §3.2 requires the `sim_` marker on simulated columns.
 
 The specification lives in `bundle_column_provenance.yaml` beside this file, not

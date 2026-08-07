@@ -16,7 +16,7 @@
 # the live warehouse. Establishes what the book of business is and how clean it is
 # before any KPI or model interpretation.
 #
-# **HONESTY (CLAUDE.md §3).** The CMS synthetic Medicare claims are real synthetic
+# **HONESTY (docs/project_rules.md §3).** The CMS synthetic Medicare claims are real synthetic
 # *source* data (charges, DRGs, service dates, diagnoses). Everything about
 # adjudication — denials, payments, appeals, workflow, costs, and the multi-payer
 # dimension — is **SIMULATED** and does not describe any real payer. The payer

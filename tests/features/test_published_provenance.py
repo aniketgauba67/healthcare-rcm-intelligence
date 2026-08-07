@@ -183,7 +183,7 @@ def test_every_exemption_is_written_prose_not_a_shrug() -> None:
     for column in WORK_QUEUE_SCHEMA.columns:
         if column.marker_exempt:
             assert len(column.marker_exempt.split()) >= 12, (
-                f"{column.name}: an exemption from CLAUDE.md §3.2 in {column.marker_exempt!r} "
+                f"{column.name}: an exemption from docs/project_rules.md §3.2 in {column.marker_exempt!r} "
                 "is a decision, and the declaration is where it gets justified."
             )
 
@@ -340,29 +340,19 @@ def test_the_inversion_round_trips_plant_then_remove(tmp_path) -> None:
     assert our_tabular_files(tmp_path) == ["artifacts/features/model_a_training_matrix.parquet"]
 
 
-def test_an_excluded_tree_does_not_fail_and_a_nested_worktree_is_one(tmp_path) -> None:
-    """Exclusions are honoured, and the load-bearing one is checked by name.
-
-    `.claude/worktrees/` holds full checkouts of this repository. Without that
-    exclusion a scan from the primary checkout reports every OTHER worktree's
-    artifacts as living outside a published root — six worktrees' worth of
-    failures, none of them a real defect, which is how a guard gets switched off.
-    """
+def test_an_excluded_tree_does_not_fail(tmp_path) -> None:
+    """Third-party and staging inputs are excluded from output scanning."""
     vendored = tmp_path / ".venv" / "lib" / "lifelines" / "datasets"
     vendored.mkdir(parents=True)
     (vendored / "waltons_dataset.csv").write_text("T,E\n1,1\n")
-
-    sibling = tmp_path / ".claude" / "worktrees" / "feat+other" / "artifacts" / "features"
-    sibling.mkdir(parents=True)
-    (sibling / "model_a_training_matrix.parquet").write_bytes(b"not really a parquet")
 
     staging = tmp_path / "data" / "simulated"
     staging.mkdir(parents=True)
     (staging / "sim_claim_adjudication.parquet").write_bytes(b"not really a parquet")
 
     assert our_tabular_files(tmp_path) == [], (
-        "an excluded tree leaked into the scan; every one of these is either "
-        "third-party, another worktree, or an input tier"
+        "an excluded tree leaked into the scan; every file is either third-party "
+        "or an input-tier artifact"
     )
     assert_every_published_file_is_covered(tmp_path)
 

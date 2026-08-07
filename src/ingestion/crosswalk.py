@@ -1,4 +1,4 @@
-"""SIMULATED linkage crosswalk (CLAUDE.md §3.4).
+"""SIMULATED linkage crosswalk (docs/project_rules.md §3.4).
 
 Synthetic claims carry SYNTHETIC provider/facility identifiers that do NOT join
 to real CCNs/NPIs. This module builds the reproducible, seeded, stratified

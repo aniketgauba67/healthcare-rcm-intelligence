@@ -1,6 +1,6 @@
 """The simulated adjudication generator.
 
-Everything this module produces is INVENTED (CLAUDE.md §3, docs/assumptions.md).
+Everything this module produces is INVENTED (docs/project_rules.md §3, docs/assumptions.md).
 The source CMS synthetic claims contain no denials, no submission or
 adjudication dates, no appeals, and no workflow events; all of that is
 fabricated here from config/simulation.yaml. Nothing generated here describes
@@ -14,7 +14,7 @@ The pipeline runs in CAUSAL order, and that ordering is the point:
 
 Everything a model could legitimately know at scoring time is produced before
 the denial is drawn; everything produced after it is post-submission and belongs
-on the forbidden list (CLAUDE.md §4). `sim_latent_p`, `sim_provider_quality_latent`
+on the forbidden list (docs/project_rules.md §4). `sim_latent_p`, `sim_provider_quality_latent`
 and `sim_appeal_latent_p` are stored for validation only and are never features.
 """
 
@@ -941,7 +941,7 @@ def _operating_costs(
 # Dimension tables
 # ---------------------------------------------------------------------------
 def _payer_dim(cfg: SimulationConfig) -> pd.DataFrame:
-    """The simulated payer dimension. 100% invented (CLAUDE.md §3.5)."""
+    """The simulated payer dimension. 100% invented (docs/project_rules.md §3.5)."""
     return pd.DataFrame(
         {
             "sim_payer_id": [p.id for p in cfg.payers],

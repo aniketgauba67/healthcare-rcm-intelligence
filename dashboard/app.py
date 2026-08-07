@@ -4,13 +4,13 @@
 
 Five pages: Executive overview, Denial prevention, A/R & recovery, Predictive
 work queue, Model & data quality. **Every one of them renders the synthetic-data
-banner** (CLAUDE.md §6, "no page ships without it"), and this module renders it
+banner** (docs/project_rules.md §6, "no page ships without it"), and this module renders it
 too, since the landing view puts numbers on screen like any other page.
 
 WHAT THIS APP IS READING
 ------------------------
 The bundled DuckDB extract under `dashboard/demo_data/`, not a live database.
-That is a locked decision (CLAUDE.md §2): the hosted demo ships its own data, so
+That is a locked decision (docs/project_rules.md §2): the hosted demo ships its own data, so
 a clean clone or a free-tier deployment has something to show without credentials,
 a network or a warehouse. `RCM_DATA_SOURCE=postgres` points the same pages at a
 loaded warehouse for local development; the pages are identical because the

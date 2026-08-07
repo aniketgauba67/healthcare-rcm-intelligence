@@ -1,6 +1,6 @@
 """Detectors that decide whether a training matrix carries leakage.
 
-CLAUDE.md §4.1 requires the build to fail if a forbidden column "or a column derived
+docs/project_rules.md §4.1 requires the build to fail if a forbidden column "or a column derived
 from one" enters a training matrix. Name matching alone cannot do that: a forbidden
 column that has been renamed, binned, log-scaled, divided by the billed amount, or
 aggregated over a claim's history is still the answer key, and none of those show up
@@ -21,7 +21,7 @@ firing is a finding:
    pre-submission facts. This probe also runs on each feature's *null indicator*,
    because null-ness is itself a leakage channel (`sim_denial_review_date` is
    non-null if and only if the claim was denied).
-4. `temporal_findings` — CLAUDE.md §4.3. A split is not temporal if any training row
+4. `temporal_findings` — docs/project_rules.md §4.3. A split is not temporal if any training row
    postdates a test row.
 
 Thresholds are calibrated against real data rather than guessed; see
@@ -419,7 +419,7 @@ def temporal_findings(
     dates: pd.Series,
     is_train: pd.Series,
 ) -> list[Finding]:
-    """CLAUDE.md §4.3: the split must be temporal, not random.
+    """docs/project_rules.md §4.3: the split must be temporal, not random.
 
     A random split leaves training rows scattered past the earliest test row, which is
     what this measures. A clean quantile split on the submission date leaves none.

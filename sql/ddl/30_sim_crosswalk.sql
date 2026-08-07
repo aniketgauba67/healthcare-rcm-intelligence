@@ -1,5 +1,5 @@
 -- ============================================================================
--- 30_sim_crosswalk.sql — SIMULATED linkage crosswalk (CLAUDE.md §3.4)
+-- 30_sim_crosswalk.sql — SIMULATED linkage crosswalk (docs/project_rules.md §3.4)
 -- Grain:        sim_facility_crosswalk: one synthetic billing provider (PRVDR_NUM)
 --               sim_provider_crosswalk: one synthetic attending physician (NPI)
 -- Sources:      DERIVED from synthetic claims + REAL reference directories
@@ -36,7 +36,7 @@ create index ix_sfx_ccn   on rcm.sim_facility_crosswalk (sim_facility_ccn);
 create index ix_sfx_state on rcm.sim_facility_crosswalk (sim_facility_state);
 comment on table rcm.sim_facility_crosswalk is
   'SIMULATED: seeded assignment of synthetic billing providers to REAL facility '
-  'CCNs (Hospital General Information). Not a real correspondence (CLAUDE.md §3.4).';
+  'CCNs (Hospital General Information). Not a real correspondence (docs/project_rules.md §3.4).';
 
 -- ---------------------------------------------------------------------------
 -- sim_provider_crosswalk — synthetic attending physician -> real Medicare
@@ -60,4 +60,4 @@ create index ix_spx_npi     on rcm.sim_provider_crosswalk (sim_real_npi);
 create index ix_spx_state   on rcm.sim_provider_crosswalk (sim_real_provider_state);
 comment on table rcm.sim_provider_crosswalk is
   'SIMULATED: seeded assignment of synthetic attending physicians to REAL '
-  'Medicare NPIs. Not a real correspondence (CLAUDE.md §3.4).';
+  'Medicare NPIs. Not a real correspondence (docs/project_rules.md §3.4).';

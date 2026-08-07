@@ -32,7 +32,7 @@ Prereqs: the docker Postgres warehouse is up and loaded (`make warehouse-all`),
 | `05_process_mining` | dominant paths, rework, bottlenecks, automation | variant analysis, touch-minute bottlenecks |
 | `06_interrupted_time_series` | ITS **methodology, illustrative only** — no intervention module exists | segmented regression with Newey-West SEs; validated on a synthetic series, run on the real series (finds no break, as expected) |
 
-## Honesty rules (CLAUDE.md §3, enforced in every notebook)
+## Honesty rules (docs/project_rules.md §3, enforced in every notebook)
 
 - The adjudication/denial/payment/appeal/workflow layer is **SIMULATED**; only the
   CMS claim attributes (charges, DRGs, dates, diagnoses) are SOURCE.
@@ -51,5 +51,5 @@ the Phase 2 sim layer has no intervention module, so there is nothing real to
 analyze. The notebook validates the segmented-regression estimator on a synthetic
 series with a known injected effect, then runs it on the real monthly series at a
 hypothetical cut (correctly finding no break). It is the harness ready for a future
-simulated-intervention module. Subject to the team-lead scope decision noted in
-`tasks.md` Phase 3.
+simulated-intervention module. A real intervention date remains outside the
+available data contract.

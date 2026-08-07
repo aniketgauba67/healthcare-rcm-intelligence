@@ -1,4 +1,4 @@
-"""CLAUDE.md §6: every dashboard page renders the synthetic-data banner. No page ships without it.
+"""docs/project_rules.md §6: every dashboard page renders the synthetic-data banner. No page ships without it.
 
 QA-AUTHORED REVIEW GATE (qa owns `tests/`). Written before the dashboard exists,
 on purpose. "Not yet built" and "passing" have to look different, and on this
@@ -109,7 +109,9 @@ def test_every_page_renders_the_synthetic_data_banner() -> None:
     naked = [str(p.relative_to(REPO_ROOT)) for p in pages if not _renders_a_banner(p)]
     assert not naked, (
         "these dashboard pages render content without calling the synthetic-data banner "
-        "component (CLAUDE.md §6, 'no page ships without it'):\n  " + "\n  ".join(naked) + "\n\n"
+        "component (docs/project_rules.md §6, 'no page ships without it'):\n  "
+        + "\n  ".join(naked)
+        + "\n\n"
         "§3.5 is why this is absolute rather than a nicety: Medicare FFS has ONE payer and our "
         "payer dimension is 100% simulated, so an unbannered payer page is a five-payer "
         "comparison of something that does not exist. Call the shared component at the top of "

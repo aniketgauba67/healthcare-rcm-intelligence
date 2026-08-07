@@ -1,6 +1,6 @@
 """Download public REFERENCE files (facility/provider directories).
 
-These are real-entity directories (real CCNs, real NPIs). Per CLAUDE.md §3.4
+These are real-entity directories (real CCNs, real NPIs). Per docs/project_rules.md §3.4
 they are linked to the synthetic claims ONLY through the seeded, SIMULATED
 crosswalk — never joined directly.
 """

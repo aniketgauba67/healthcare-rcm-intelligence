@@ -1,6 +1,6 @@
 """What the demo bundle holds, and what each dataset is made of.
 
-CLAUDE.md §3.1 requires every field in every curated table to carry a provenance
+docs/project_rules.md §3.1 requires every field in every curated table to carry a provenance
 classification, and §3.3 requires the register and the dictionary to be updated in
 the same PR that adds a table. `dashboard/demo_data/rcm_demo.duckdb` is a
 COMMITTED data file — a reader can open it from a clean clone with no database —
@@ -78,7 +78,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
             "warehouse fields, REFERENCE FY2023 code-set display text, and the "
             "SIMULATED adjudication layer, every simulated column prefixed sim_. "
             "sim_facility_ccn/name/state/type are SIMULATED-LINKAGE and "
-            "display-only (CLAUDE.md §3.4)."
+            "display-only (docs/project_rules.md §3.4)."
         ),
         order_by="claim_sk",
     ),
@@ -123,7 +123,7 @@ WAREHOUSE_DATASETS: tuple[Dataset, ...] = (
         provenance="SIMULATED",
         grain="one row per simulated payer archetype; 5 rows",
         note=(
-            "CLAUDE.md §3.5: the payer dimension is 100% simulated. Medicare FFS "
+            "docs/project_rules.md §3.5: the payer dimension is 100% simulated. Medicare FFS "
             "has ONE payer. No archetype is modelled on or named after a real "
             "insurer. Any page or export built on this MUST carry the banner."
         ),
@@ -320,7 +320,7 @@ QUEUE_SIM_MARKER_RENAMES: dict[str, str] = {
 
 QUEUE_RENAME_ADVICE = (
     "These are SIMULATED quantities with the `sim_` provenance marker stripped, which is "
-    "the [QUEUE-PREFIX] defect the human directed be fixed (CLAUDE.md §3.2) — and the "
+    "the [QUEUE-PREFIX] defect the human directed be fixed (docs/project_rules.md §3.2) — and the "
     "column header is all a reader of a worklist sees. The rename landed in "
     "src/models/work_queue.py at commit f0a1e12; this tree predates it. Merge that commit "
     "and regenerate with `make train-appeal`. Nothing here renames the columns for you: "

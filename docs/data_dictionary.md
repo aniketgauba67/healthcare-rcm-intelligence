@@ -16,7 +16,7 @@ raw (data/raw, gitignored)          make ingest
                                 dq_quarantine (DERIVED)
 ```
 
-Core principle (CLAUDE.md §3): no simulated value is ever presented as real.
+Core principle (docs/project_rules.md §3): no simulated value is ever presented as real.
 Synthetic claim identifiers never join real CCNs/NPIs directly — the only link
 is the seeded, clearly-labelled `sim_*_crosswalk`. Sections below cover each
 layer; the raw RIF is pipe-delimited, reference files are comma-delimited.
@@ -182,10 +182,10 @@ revenue lines / 338,024 diagnoses; dims 9,660 beneficiaries, 4,876 providers,
 167 DRGs. 910 claims have a null billing provider and 2,741 a null DRG — both
 routed to the Unknown member (reported as data-quality metrics, not errors).
 
-SIMULATED crosswalk tables (CLAUDE.md §3.4 — seeded random assignment, NOT a
+SIMULATED crosswalk tables (docs/project_rules.md §3.4 — seeded random assignment, NOT a
 real linkage; seed in `config/simulation.yaml:linkage.crosswalk_seed`):
 
-Per CLAUDE.md §3.2, both tables are SIMULATED so **every** column carries the
+Per docs/project_rules.md §3.2, both tables are SIMULATED so **every** column carries the
 `sim_` prefix (enforced by `tests/contracts/test_crosswalk.py` and
 `tests/integration/test_crosswalk_prefix_postgres.py`).
 
@@ -201,7 +201,7 @@ crosswalk.
 
 REFERENCE code-set tables (`sql/ddl/60_reference_codes.sql`, loaded by
 `src/ingestion/reference_codes.py`). Vintage matches the 2023-04 claims period
-(CLAUDE.md §2 — FY2023, never ICD-9). Loaded ADDITIVELY: the loader applies only
+(docs/project_rules.md §2 — FY2023, never ICD-9). Loaded ADDITIVELY: the loader applies only
 the create-if-not-exists DDL and enriches `dim_drg.drg_desc`, never dropping or
 reloading `fact_*` / `sim_*`. Give SOURCE claim codes human-readable names:
 
@@ -256,7 +256,7 @@ layer did not invent. Every row also carries `sim_provenance = 'SIMULATED'`,
 
 | Table | Grain | Key | Notes |
 |---|---|---|---|
-| `sim_payer` | one simulated payer archetype | `sim_payer_id` | 5 invented archetypes (Medicare FFS, Medicare Advantage, two commercial, Medicaid MCO) with mix share and contractual filing limit. Not modelled on any real insurer (CLAUDE.md §3.5). |
+| `sim_payer` | one simulated payer archetype | `sim_payer_id` | 5 invented archetypes (Medicare FFS, Medicare Advantage, two commercial, Medicaid MCO) with mix share and contractual filing limit. Not modelled on any real insurer (docs/project_rules.md §3.5). |
 | `sim_service_line` | one service-line bucket | `sim_service_line_id` | 10 contiguous MS-DRG numeric ranges + an UNKNOWN member for claims with no DRG. Bucket boundaries are this project's design choice, not a CMS grouping. |
 | `sim_authorization_eligibility` | one claim | `claim_sk` | PRE-SUBMISSION: prior-auth required/obtained/missing/late, eligibility checked/failed, secondary payer present, with dates. Legitimate Model A features. |
 | `sim_documentation_coding` | one claim | `claim_sk` | PRE-SUBMISSION: documentation completeness flag + score, coder query outstanding, coding specificity deficit, complexity score, duplicate-submission flag. Legitimate Model A features. |
@@ -396,7 +396,7 @@ byte-identical bytes and any diff on this artifact means the data changed.
 `dashboard/demo_data/rcm_demo.duckdb`, 8,400,896 bytes (8.0 MB), **16 tables /
 71,813 rows**. Built by `src/demo/build.py` (`make demo-extract`) from the
 PostgreSQL warehouse plus the model artifacts; committed via the
-`!dashboard/demo_data/*.duckdb` exception in `.gitignore`. CLAUDE.md §2 locks the
+`!dashboard/demo_data/*.duckdb` exception in `.gitignore`. docs/project_rules.md §2 locks the
 hosted demo to a bundled extract, so this file is what the deployed Streamlit app
 reads — no database, no network, no credentials.
 

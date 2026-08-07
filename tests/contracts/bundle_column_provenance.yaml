@@ -3,7 +3,7 @@
 # WHY THIS FILE EXISTS
 # The bundle (dashboard/demo_data/rcm_demo.duckdb) is the single most exposed
 # artifact in this repository: it ships to a public hosted demo and a reader can
-# open it with no database, no environment and no code. CLAUDE.md §1 says the
+# open it with no database, no environment and no code. docs/project_rules.md §1 says the
 # property the whole project rests on is that no simulated value is ever
 # presented as real, and §3.2 says every simulated column carries a `sim_`
 # prefix. The same defect -- a simulated value reaching a surface without its
@@ -24,7 +24,7 @@
 #      a forbidden-column list unexamined, and how an unmarked simulated rate
 #      survived four commits.
 #
-# THE FIVE CLASSES (CLAUDE.md §3.1, plus PROCESS)
+# THE FIVE CLASSES (docs/project_rules.md §3.1, plus PROCESS)
 #   SOURCE     Unmodified field from the CMS synthetic claims files.
 #   DERIVED    Computed ONLY from SOURCE. No simulated input anywhere upstream.
 #   REFERENCE  From an official published code or facility reference file.

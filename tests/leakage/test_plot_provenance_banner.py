@@ -3,7 +3,7 @@
 QA-AUTHORED REVIEW GATE (tests/leakage/ is qa's under the 2026-07-27 ownership
 ruling). Expected RED until the SHAP plot carries a banner.
 
-CLAUDE.md §1: "No simulated value may ever be presented as real." §6 makes the
+docs/project_rules.md §1: "No simulated value may ever be presented as real." §6 makes the
 same demand of the dashboard — "every page renders the synthetic-data banner
 component, no page ships without it". A PNG is the most detachable artifact this
 project produces: it gets dragged into a slide, pasted into a chat, screenshotted
@@ -84,7 +84,7 @@ def test_every_saved_figure_carries_the_synthetic_data_banner(module: pathlib.Pa
         f"synthetic-data banner onto it: {offenders}. `_calibration_plot` in the same file "
         "shows the pattern — a `fig.text(...)` footer reading 'SIMULATED adjudication layer on "
         "CMS synthetic claims — not real denials.' A PNG is the most detachable artifact here; "
-        "it is read in a slide deck long after the model card is out of sight, and CLAUDE.md §1 "
+        "it is read in a slide deck long after the model card is out of sight, and docs/project_rules.md §1 "
         "does not have an exception for charts."
     )
 

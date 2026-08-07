@@ -372,7 +372,7 @@ def test_no_simulated_derived_column_reaches_the_wire_unaccounted(
     assert not offenders, (
         f"{len(offenders)} field(s) reach the wire without a `sim_` marker while "
         "config/model.yaml `forbidden_derived_features` classifies them as functions of "
-        "simulated columns (CLAUDE.md §3.2):\n  "
+        "simulated columns (docs/project_rules.md §3.2):\n  "
         + "\n  ".join(sorted(offenders))
         + "\n\nThis is the [QUEUE-PREFIX] defect at the API boundary, and it is invisible to "
         "tests/leakage/test_output_surface_provenance.py because the API computes none of "

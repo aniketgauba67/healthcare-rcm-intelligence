@@ -166,7 +166,7 @@ def test_the_page_renders_without_raising(page: pathlib.Path, tmp_path: pathlib.
     assert not rendered["exceptions"], (
         f"{page.relative_to(REPO_ROOT)} raised while rendering, so a user gets a stack trace "
         f"instead of a page:\n  " + "\n  ".join(rendered["exceptions"]) + "\n\n"
-        "CLAUDE.md §7 asks that the dashboard work from a clean clone. A page that throws on "
+        "docs/project_rules.md §7 asks that the dashboard work from a clean clone. A page that throws on "
         "its first render is not covered by any name-matching or static check — "
         "tests/contracts/test_dashboard_banner.py stays green on a page that never loads."
     )
@@ -185,7 +185,7 @@ def test_the_page_puts_something_on_screen(page: pathlib.Path, tmp_path: pathlib
 def test_the_rendered_page_carries_the_synthetic_data_banner(
     page: pathlib.Path, tmp_path: pathlib.Path
 ) -> None:
-    """CLAUDE.md §6, checked in the OUTPUT rather than in the call graph.
+    """docs/project_rules.md §6, checked in the OUTPUT rather than in the call graph.
 
     Anchored to the banner constants in `dashboard/disclosures.py`, the single
     source of truth the component renders, so rewording a banner does not make

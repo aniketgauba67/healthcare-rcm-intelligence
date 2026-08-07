@@ -100,7 +100,7 @@ def test_the_folds_partition_the_frame_without_overlap() -> None:
     assert (stacked == 1).all(), "a claim landed in two folds, or in none"
 
 
-# --- preprocessing (CLAUDE.md 4.4) -----------------------------------------
+# --- preprocessing (docs/project_rules.md 4.4) -----------------------------------------
 
 
 def test_preprocessing_statistics_come_from_the_fit_fold_only() -> None:

@@ -9,7 +9,7 @@ the star schema plus the generated frames, so simulation integrity is covered in
 CI without a database. Live Postgres remains the acceptance authority.
 
 This module is deliberately separate from `src/ingestion/load_postgres.py`:
-CLAUDE.md §5 gives that file to data-engineer, and the sim layer owns its own
+The simulation layer owns its own
 load path. The cost of that separation is an ordering dependency, enforced
 below rather than left to a README line — see `_assert_warehouse_ready`.
 """

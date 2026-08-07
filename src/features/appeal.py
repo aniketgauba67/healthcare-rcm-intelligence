@@ -92,7 +92,7 @@ PASSTHROUGH = (
 _DENIAL_CATEGORICALS: tuple[tuple[str, str], ...] = (
     ("sim_denial_type", "FULL or PARTIAL denial, from the remittance advice."),
     ("sim_denial_category", "Denial reason category — the strongest triage signal."),
-    ("sim_denial_carc_group", "CARC code group as a category label (CLAUDE.md §3.7)."),
+    ("sim_denial_carc_group", "CARC code group as a category label (docs/project_rules.md §3.7)."),
 )
 
 
