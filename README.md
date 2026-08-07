@@ -21,6 +21,10 @@ reproducible demo bundle. The free-tier hosted demo is available, but it is not
 production-grade or always-on, and it currently serves the previously accepted
 bundle rather than the newer pinned one.
 
+![Executive overview — every simulated figure is tagged, real CMS data stays visibly distinct.](docs/images/hero-executive-overview.png)
+
+*Executive overview — every simulated figure is tagged, real CMS data stays visibly distinct.*
+
 ## Why this project exists
 
 Healthcare revenue-cycle teams need to understand why claims are denied, where payment delays occur, which appeals are likely to succeed, and how limited analyst capacity should be prioritized. Real claims and denial data are highly sensitive and difficult to share publicly, so this project separates:
