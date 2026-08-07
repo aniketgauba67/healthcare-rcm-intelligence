@@ -3,9 +3,10 @@
 This guide records the zero-cost portfolio deployment on Neon Free, Render Free,
 and Streamlit Community Cloud. It was reviewed and accepted on 2026-08-01 by this
 project's own QA-reviewer agent — an internal review process, not an audit by an
-outside party. The public services serve the artifact accepted then; see the
-pinned-bundle note below, because that artifact has since been superseded. This
-remains portfolio-scale hosting, not a production or always-on deployment.
+outside party. That acceptance applied to an artifact that has since been
+superseded. The public services now serve the current `559022e2` bundle; see the
+pinned-bundle note below for its distinct deployment-verification and QA status.
+This remains portfolio-scale hosting, not a production or always-on deployment.
 
 ## Public services
 
@@ -220,5 +221,8 @@ The bundle pinned today is
 source SHA `01b1a623b22a5d3295087ace8995025ced0d462d`, and reports
 `git_tree_dirty=false`. It is the same pipeline and the same figures with the
 bundle-column `sim_` marker rename applied. It has NOT yet been re-accepted by
-QA or re-validated against the public hosted demo, so the hosted services may
-still be serving the previous artifact until they are redeployed.
+QA. The live API `/ready` response on 2026-08-06 reported this exact artifact,
+source SHA and clean-tree state, and the public Streamlit UI was visually
+re-verified with the corrected `sim_` markers. That runtime and visual
+re-validation confirms what is deployed; it is not a formal QA re-acceptance of
+the rebuilt artifact.

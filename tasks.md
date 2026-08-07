@@ -3065,8 +3065,9 @@ a phase is DONE only when qa-reviewer checks its acceptance box.
   `66456ebf4e52e4c5f5565cf6085efb89d80bc264710b3783bd1eb2e491a03e95`.
   SUPERSEDED by the bundle-column `sim_` marker rename: the pinned artifact is
   now `559022e2fc27461fb874294eca1a6ba39149367afe7b2e49f9b43c2ccc7e8896` from
-  clean source SHA `01b1a623b22a5d3295087ace8995025ced0d462d`, and it has NOT
-  been re-accepted by QA or re-validated on the hosted demo.
+  clean source SHA `01b1a623b22a5d3295087ace8995025ced0d462d`. The live API and
+  Streamlit UI were runtime and visually re-validated on 2026-08-06, including
+  the corrected `sim_` markers; formal QA re-acceptance has NOT yet occurred.
 - [x] Docker Compose clean-clone start with exact 24-base-table / 9-view
   PostgreSQL contract and dependency-aware readiness; independently QA accepted
 - [x] README, local and hosted screenshots, and demo walkthrough
