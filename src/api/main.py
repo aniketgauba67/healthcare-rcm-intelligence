@@ -43,6 +43,7 @@ from contextlib import asynccontextmanager
 import logging
 import os
 import pathlib
+import threading
 from typing import Annotated, Any, Literal
 
 import pandas as pd
@@ -111,8 +112,21 @@ MODEL_C_LIMITATIONS = [
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Build the single scoring model before the process accepts traffic."""
-    scoring.load_denial_risk_model()
+    """Warm the scoring model without delaying process liveness.
+
+    Render must observe an open port before its deployment timeout. Model A is
+    deterministic and guarded by a process-wide single-flight lock, so warming
+    it in a daemon thread lets `/live` answer immediately while `/ready` and any
+    scoring request still wait for that same validated model instance.
+    """
+
+    def warm_model() -> None:
+        try:
+            scoring.load_denial_risk_model()
+        except Exception:
+            _LOGGER.exception("Model A background warmup failed")
+
+    threading.Thread(target=warm_model, name="model-a-warmup", daemon=True).start()
     yield
 
 

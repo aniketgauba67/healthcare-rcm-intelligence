@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import pathlib
 import shutil
+import threading
 
 import duckdb
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from docker.dashboard_server import ReadinessHandler, evaluate_dashboard_readiness
 from src.api import main as api_main
@@ -30,6 +32,27 @@ def test_openapi_distinguishes_liveness_and_readiness() -> None:
     assert "/live" in paths
     assert "/ready" in paths
     assert "/health" in paths
+
+
+def test_api_binds_and_serves_liveness_while_the_model_warms(monkeypatch) -> None:
+    """A slow model fit must not prevent the platform from discovering the port."""
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_model_load() -> None:
+        started.set()
+        assert release.wait(timeout=5), "test did not release the model warmup"
+
+    monkeypatch.setattr(api_main.scoring, "load_denial_risk_model", slow_model_load)
+
+    try:
+        with TestClient(api_main.app) as client:
+            assert started.wait(timeout=1), "lifespan did not start model warmup"
+            response = client.get("/live")
+            assert response.status_code == 200
+            assert response.json()["status"] == "live"
+    finally:
+        release.set()
 
 
 def test_api_liveness_is_separate_from_postgres_readiness(monkeypatch) -> None:
