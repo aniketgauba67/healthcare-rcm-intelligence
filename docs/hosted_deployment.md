@@ -17,10 +17,12 @@ remains portfolio-scale hosting, not a production or always-on deployment.
 | API liveness | <https://healthcare-rcm-intelligence-api.onrender.com/live> |
 | API readiness | <https://healthcare-rcm-intelligence-api.onrender.com/ready> |
 
-The current services deploy from `main`. The screenshot evidence was captured
-from the pre-release deployment branch at source SHA
-`119828e8915044622faa65755a615375799df0fc` on 2026-08-01; it remains historical
-free-tier portfolio evidence, not proof of production availability.
+The current services deploy from `main`. Provider-status and API evidence was
+captured from the pre-release deployment branch at source SHA
+`119828e8915044622faa65755a615375799df0fc` on 2026-08-01. Dashboard screenshots
+were refreshed from the public Streamlit app on 2026-08-06 while repository
+`main` was at `7d016976f3679f23e273c84a9f882c91f1f3f499`. This remains free-tier
+portfolio evidence, not proof of production availability.
 
 ## Where the demo data comes from, and one documented deviation
 
@@ -161,8 +163,12 @@ dashboard. Do not commit `.streamlit/secrets.toml`.
 
 ### Screenshot manifest
 
-Every screenshot was captured on 2026-08-01 from source SHA
-`119828e8915044622faa65755a615375799df0fc`. Provider credentials, database
+The API, readiness, Neon, Render, and Streamlit status screenshots were captured
+on 2026-08-01 from source SHA
+`119828e8915044622faa65755a615375799df0fc`. The seven Streamlit dashboard and
+reconciliation screenshots were refreshed from the public app on 2026-08-06
+while repository `main` was at
+`7d016976f3679f23e273c84a9f882c91f1f3f499`. Provider credentials, database
 hostnames, account identifiers, and secrets are intentionally absent.
 
 | File | Public surface | Backend | Synthetic banner | Simulated-derived fields visible |

@@ -450,8 +450,11 @@ The [zero-cost hosted deployment guide](docs/hosted_deployment.md) records the
 Neon Free, Render Free, and Streamlit Community Cloud architecture and its
 credential-handling rules. The public URLs were verified during hosted QA.
 
-These images came from the integrated local Docker Compose stack. They are local
-reproducibility evidence, not hosted-deployment evidence.
+The Docker service-state image came from the integrated local Compose stack. The
+dashboard images were refreshed from the public Streamlit deployment on
+2026-08-06 after verifying the full billed-charge KPI and the current chart
+annotations and captions. The walkthrough records the capture provenance; none
+of these images is evidence of production availability.
 
 ![Docker Compose services healthy](docs/images/docker-services-healthy.png)
 

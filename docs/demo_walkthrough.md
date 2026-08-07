@@ -143,12 +143,15 @@ docker compose down -v
 
 ## Screenshot evidence manifest
 
-All screenshots were captured on **2026-07-31** from the Docker image built from
-source SHA `9899c0417194906062daf97af956f9d4cef48c11`. “Bundle” below means the
-populated DuckDB application path; the same Compose stack also ran the required
-initialized PostgreSQL service. The SHA identifies the application source used
-for capture. These historical screenshots predate the clean-SHA release candidate
-and therefore show the earlier bundle's dirty-tree disclosure.
+The Docker and API screenshots were captured on **2026-07-31** from the Docker
+image built from source SHA `9899c0417194906062daf97af956f9d4cef48c11`.
+The six dashboard screenshots were refreshed on **2026-08-06** from the public
+Streamlit deployment while repository `main` was at
+`7d016976f3679f23e273c84a9f882c91f1f3f499`. Streamlit does not expose the
+application deployment SHA in the page, so freshness was verified from the
+rendered behavior: the full `$141,046,614` billed-charge KPI and the thin-month
+annotation and corrected trailing-month caption introduced before that commit
+were all visible. “Bundle” below means the populated DuckDB application path.
 
 | Screenshot | Surface | Backend mode | Synthetic banner visible | Simulated-derived fields visible |
 |---|---|---|---:|---:|
@@ -159,8 +162,9 @@ and therefore show the earlier bundle's dirty-tree disclosure.
 | [`dashboard-ar-recovery.png`](images/dashboard-ar-recovery.png) | A/R Recovery | Bundle | Yes | Yes |
 | [`dashboard-work-queue.png`](images/dashboard-work-queue.png) | Work Queue | Bundle | Yes | Yes |
 | [`dashboard-model-data-quality.png`](images/dashboard-model-data-quality.png) | Model & Data Quality | Bundle | Yes | Yes |
-| [`dashboard-reconciliation-17-of-17.png`](images/dashboard-reconciliation-17-of-17.png) | 17/17 reconciliation detail | Bundle | No, focused crop | Yes |
+| [`dashboard-reconciliation-17-of-17.png`](images/dashboard-reconciliation-17-of-17.png) | 17/17 reconciliation detail | Bundle | Yes | Yes |
 
-Each image is a browser capture of the running local stack. No credentials,
+The Docker and API images are browser captures of the running local stack; the
+dashboard images are browser captures of the public hosted app. No credentials,
 tokens, usernames, unrelated desktop content, or raw browser profiles are stored
 in the repository.
